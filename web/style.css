@@ -521,52 +521,238 @@ textarea {
   margin-top: 2px;
 }
 
-/* ---------- daily grid & meal box ---------- */
-.daily-group {
+/* ---------- daily left notice & right schedule board ---------- */
+.daily-left-notice {
   margin-bottom: 12px;
-  padding: 11px;
+  padding: 12px 13px;
   border-radius: 12px;
+  border: 1.5px solid var(--primary);
+  background: var(--primary-weak);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+}
+.notice-row { line-height: 1.45; }
+.notice-stats {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  font-size: 12.5px; color: var(--muted);
+}
+.notice-stats b { color: var(--primary); }
+.btn-xs { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+
+/* 우측 뷰 전환 탭 */
+.right-view-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--card-2);
   border: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+.view-tab {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 12px; border-radius: 9px; border: none;
+  background: transparent; color: var(--muted);
+  font-size: 13.5px; font-weight: 700; cursor: pointer;
+  transition: all .15s;
+}
+.view-tab:hover { color: var(--text); }
+.view-tab.active {
+  background: var(--card); color: var(--primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .1);
+}
+.view-badge {
+  font-size: 11px; font-weight: 700;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--primary-weak); color: var(--primary);
+}
+
+/* 우측 대형 스케줄 보드 & 시간/분 선택 컨트롤러 */
+.schedule-board {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.time-editor-card {
+  border: 1.5px solid var(--primary);
+  border-radius: 14px;
+  padding: 14px;
   background: var(--card-2);
 }
-.daily-quick {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
-  margin-bottom: 9px; font-size: 12px;
+.time-editor-head {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 10px;
 }
-.quick-item {
-  display: inline-flex; align-items: center; gap: 5px;
-  color: var(--muted); font-weight: 600;
+.selected-day-title { display: flex; align-items: center; gap: 8px; font-size: 14.5px; }
+.sel-badge {
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--primary); color: var(--primary-ink);
+  font-size: 12px; font-weight: 700;
 }
-.quick-item input {
-  width: 52px; padding: 5px 6px; border-radius: 8px;
-  border: 1px solid var(--line); background: var(--card);
-  text-align: center; font-size: 12.5px; font-weight: 600;
+.editor-calc-pill {
+  padding: 5px 12px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--line);
+  font-size: 13px;
 }
-.btn-xs { padding: 5px 8px; font-size: 12px; border-radius: 8px; }
-.daily-table-wrap { overflow-x: auto; }
-.daily-grid-table {
-  width: 100%; border-collapse: collapse; font-size: 12px;
-  background: var(--card); border-radius: 8px; overflow: hidden;
+.editor-calc-pill b { color: var(--primary); font-size: 14px; }
+
+.preset-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px dashed var(--line);
 }
-.daily-grid-table th, .daily-grid-table td {
-  border: 1px solid var(--line); padding: 4px 2px; text-align: center;
+.preset-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-right: 2px; }
+.preset-chip { font-size: 12px; padding: 5px 10px; background: var(--card); }
+.preset-chip.chip-off:hover { border-color: var(--bad); color: var(--bad); }
+
+.time-pickers-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
-.daily-grid-table th { background: var(--card-2); color: var(--muted); font-weight: 600; }
-.daily-grid-table th.sat { color: var(--primary); }
-.daily-grid-table th.sun { color: var(--bad); }
-.daily-grid-table td.wk-label { font-weight: 700; color: var(--muted); width: 34px; background: var(--card-2); }
-.daily-grid-table td.wk-sum { font-weight: 700; width: 52px; background: var(--card-2); font-variant-numeric: tabular-nums; }
-.daily-grid-table td.wk-sum.eligible { color: var(--ok); }
-.daily-cell-input {
-  width: 100%; min-width: 34px; max-width: 44px;
-  padding: 5px 2px; border: 1.5px solid transparent; border-radius: 6px;
-  background: transparent; text-align: center; font-size: 12.5px; font-weight: 600;
+.time-picker-box {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 11px 12px;
+}
+.tp-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px; font-size: 13px; font-weight: 700; color: var(--muted);
+}
+.tp-big-time {
+  font-size: 20px; font-weight: 800; color: var(--primary);
   font-variant-numeric: tabular-nums;
 }
-.daily-cell-input:focus { outline: none; border-color: var(--primary); background: var(--card-2); }
-.daily-grid-table td.meal-ok { background: var(--ok-weak); }
-.daily-grid-table td.meal-ok .daily-cell-input { color: var(--ok); font-weight: 700; }
-.daily-summary { margin: 8px 0 0; }
+.tp-slider-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+}
+.tp-sub { font-size: 11.5px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.tp-slider-row input[type="range"] {
+  flex: 1; accent-color: var(--primary); cursor: pointer; height: 6px;
+}
+.hour-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  margin-bottom: 9px;
+}
+.t-chip {
+  padding: 5px 2px; border-radius: 7px;
+  border: 1px solid var(--line); background: var(--card-2);
+  font-size: 11.5px; font-weight: 600; cursor: pointer;
+  text-align: center; font-variant-numeric: tabular-nums;
+}
+.t-chip:hover { border-color: var(--primary); color: var(--primary); }
+.t-chip.active {
+  background: var(--primary); color: var(--primary-ink); border-color: var(--primary); font-weight: 700;
+}
+.tp-min-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.min-chip-row {
+  display: flex; flex-wrap: wrap; gap: 4px; flex: 1;
+}
+.min-chip-row .t-chip { flex: 1 1 36px; padding: 5px 4px; }
+
+.editor-footer-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line);
+}
+.break-selector {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 12.5px; font-weight: 600; color: var(--muted);
+}
+.break-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+.break-btns .chip.active {
+  background: var(--primary); color: var(--primary-ink); border-color: var(--primary); font-weight: 700;
+}
+.apply-buttons {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+
+/* 월별 실제 달력 테이블 */
+.month-cal-wrap {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 13px;
+  background: var(--card);
+}
+.month-cal-head {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: 6px; margin-bottom: 10px;
+}
+.month-cal-head h4 { margin: 0; font-size: 15.5px; }
+.month-cal-table {
+  width: 100%; border-collapse: collapse; table-layout: fixed;
+}
+.month-cal-table th, .month-cal-table td {
+  border: 1px solid var(--line); vertical-align: top;
+}
+.month-cal-table th {
+  background: var(--card-2); color: var(--muted);
+  font-size: 12.5px; font-weight: 700; padding: 8px 4px; text-align: center;
+}
+.month-cal-table th.wk-col { width: 52px; }
+.month-cal-table th.sum-col { width: 124px; }
+.month-cal-table th.sat { color: var(--primary); }
+.month-cal-table th.sun { color: var(--bad); }
+
+.cal-wk-cell {
+  background: var(--card-2); text-align: center; vertical-align: middle !important;
+  font-weight: 700; font-size: 12.5px; color: var(--muted); padding: 6px 4px;
+}
+.cal-empty-cell { background: var(--card-2); opacity: .45; height: 74px; }
+
+.cal-day-cell {
+  padding: 6px 6px 7px; height: 78px; cursor: pointer;
+  transition: background .12s, box-shadow .12s;
+  position: relative;
+}
+.cal-day-cell:hover { background: var(--card-2); }
+.cal-day-cell.selected {
+  box-shadow: 0 0 0 2.5px var(--primary) inset !important;
+  background: var(--primary-weak);
+}
+.cal-day-cell.meal-ok { background: var(--ok-weak); }
+.cal-day-cell.meal-ok.selected { box-shadow: 0 0 0 2.5px var(--primary) inset !important; }
+.cal-day-cell.off-day { opacity: .68; }
+
+.cal-day-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px; font-size: 12px; font-weight: 700;
+}
+.cal-date-num.sat { color: var(--primary); }
+.cal-date-num.sun { color: var(--bad); }
+.cal-meal-icon { font-size: 11px; }
+
+.cal-shift-range {
+  font-size: 11.5px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums; line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-shift-hours {
+  margin-top: 3px;
+  display: inline-block; padding: 1px 6px; border-radius: 5px;
+  font-size: 11px; font-weight: 700;
+  background: var(--primary-weak); color: var(--primary);
+}
+.cal-day-cell.meal-ok .cal-shift-hours {
+  background: var(--card); color: var(--ok);
+}
+.cal-off-badge {
+  margin-top: 8px; font-size: 11.5px; color: var(--muted); font-weight: 600;
+}
+
+.cal-sum-cell {
+  background: var(--card-2); padding: 7px 8px; vertical-align: middle !important;
+  font-size: 12px; line-height: 1.45;
+}
+.cal-sum-cell b { font-size: 13.5px; display: block; }
+.cal-sum-cell.eligible b { color: var(--ok); }
+.cal-sum-sub { font-size: 11px; color: var(--muted); display: block; margin-top: 2px; }
 
 .meal-box {
   margin-top: 10px;
@@ -1148,6 +1334,10 @@ html[data-theme="dark"] .toast {
     grid-template-columns: 1fr;
   }
 
+  .time-pickers-grid {
+    grid-template-columns: 1fr;
+  }
+
   .actions .btn-primary {
     margin-left: 0;
   }
@@ -1235,8 +1425,14 @@ html[data-theme="dark"] .toast {
   .archive,
   .banner,
   .actions,
+  .right-view-switch,
+  .schedule-board,
   .tab-panel:not(.active) {
     display: none !important;
+  }
+
+  #payDoc {
+    display: block !important;
   }
 
   .container {

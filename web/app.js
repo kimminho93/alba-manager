@@ -2,7 +2,8 @@
  * web/app.js — 사장님 도우미 프론트엔드 UI
  *   - 서버 연결 시 /api/* 우선 사용, 미연결(GitHub Pages / file://) 시 window.AlbaEngine 으로 100% 동일 동작
  *   - 다크/라이트 모드 전환 (localStorage 저장)
- *   - 탭 1: 1초 알바 급여 & 표준 급여명세서 (일별/주차별/월총 근무시간 + 주휴수당 + 일정시간 이상 식대 추가지급)
+ *   - 탭 1: 1초 알바 급여 & 표준 급여명세서
+ *           (월별 실제 주차/달력 자동 반영 + 출퇴근 시각 슬라이더/클릭 선택기 + 주휴수당 + 식대 자동지급)
  *   - 탭 2: 위생 점검 / 소방 안전 법정 체크리스트 + 일별 보관함 + PDF/엑셀 출력
  */
 (function () {
@@ -21,12 +22,26 @@
     store: 'alba.store.v1'
   };
 
+  var MINUTE_STEPS = [0, 10, 15, 20, 30, 40, 45, 50];
+
   var state = {
     serverAvailable: false,
     payroll: null,
     checklist: null,
     roster: loadJson(KEYS.roster, []),
-    archive: loadJson(KEYS.archive, [])
+    archive: loadJson(KEYS.archive, []),
+    rightView: 'schedule', // 'schedule' | 'slip'
+    calendar: null,
+    dailyShifts: [],
+    selectedDayIdx: 0,
+    editor: {
+      startHour: 9,
+      startMin: 0,
+      endHour: 14,
+      endMin: 0,
+      breakMinutes: 0,
+      off: false
+    }
   };
 
   function $(id) { return document.getElementById(id); }
@@ -62,6 +77,15 @@
     el.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2400);
+  }
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function fmtTime(h, m) { return pad2(h) + ':' + pad2(m); }
+
+  function parseHM(str, defH, defM) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(str || '').trim());
+    if (!m) return { h: defH, m: defM };
+    return { h: parseInt(m[1], 10), m: parseInt(m[2], 10) };
   }
 
   /* ---------- 테마 & 서버 연결 상태 배지 ---------- */
@@ -128,7 +152,7 @@
     });
   }
 
-  /* ---------- 엑셀 다운로드 유틸 (서버 우선, 폴백 순수 JS) ---------- */
+  /* ---------- 엑셀 다운로드 유틸 ---------- */
   function triggerBlobDownload(bytes, filename) {
     var blob = new Blob([bytes], { type: E.XLSX_MIME });
     var url = URL.createObjectURL(blob);
@@ -172,28 +196,252 @@
   }
 
   /* ==========================================================
-     탭 1: 1초 알바 급여 & 표준 급여명세서
+     월별 실제 달력 & 출퇴근 시각(시/분) 선택기 초기화 및 제어
      ========================================================== */
-  function initDailyGrid() {
-    var tbody = $('dailyGridBody');
-    if (!tbody) return;
-    var html = '';
-    for (var w = 0; w < 4; w++) {
-      html += '<tr>';
-      html += '<td class="wk-label">' + (w + 1) + '주</td>';
-      for (var d = 0; d < 7; d++) {
-        var idx = w * 7 + d;
-        var defVal = d < 5 ? 5 : 0; // 기본: 평일 5시간, 주말 0시간
-        html += '<td id="dCell_' + idx + '">' +
-          '<input id="pD_' + idx + '" class="daily-cell-input" type="number" min="0" max="24" step="0.5" value="' + defVal + '" aria-label="' + (w + 1) + '주 ' + E.DAY_NAMES[d] + '요일 시간">' +
-          '</td>';
-      }
-      html += '<td id="dWkSum_' + w + '" class="wk-sum">25h</td>';
-      html += '</tr>';
+  function initTimePickerChips() {
+    var shHtml = '';
+    for (var h = 6; h <= 21; h++) {
+      shHtml += '<button type="button" class="t-chip" data-sh="' + h + '">' + pad2(h) + '시</button>';
     }
-    tbody.innerHTML = html;
+    $('startHourBtns').innerHTML = shHtml;
+
+    var ehHtml = '';
+    for (var eh = 9; eh <= 24; eh++) {
+      ehHtml += '<button type="button" class="t-chip" data-eh="' + eh + '">' + pad2(eh) + '시</button>';
+    }
+    $('endHourBtns').innerHTML = ehHtml;
+
+    var smHtml = MINUTE_STEPS.map(function (m) {
+      return '<button type="button" class="t-chip" data-sm="' + m + '">' + pad2(m) + '분</button>';
+    }).join('');
+    $('startMinBtns').innerHTML = smHtml;
+
+    var emHtml = MINUTE_STEPS.map(function (m) {
+      return '<button type="button" class="t-chip" data-em="' + m + '">' + pad2(m) + '분</button>';
+    }).join('');
+    $('endMinBtns').innerHTML = emHtml;
   }
 
+  function ensureCalendarAndShifts(payMonth, resetDefault) {
+    var cal = E.buildMonthCalendar(payMonth);
+    var prevCal = state.calendar;
+    state.calendar = cal;
+
+    if (resetDefault || !state.dailyShifts || state.dailyShifts.length === 0) {
+      state.dailyShifts = cal.days.map(function (d) {
+        return {
+          off: d.isWeekend,
+          start: '09:00',
+          end: '14:00',
+          breakMinutes: 0
+        };
+      });
+      var firstWeekday = cal.days.findIndex(function (d) { return !d.isWeekend; });
+      state.selectedDayIdx = firstWeekday >= 0 ? firstWeekday : 0;
+      loadDayIntoEditor(state.selectedDayIdx);
+    } else if (!prevCal || prevCal.payMonth !== cal.payMonth) {
+      // 지급월이 바뀐 경우: 새 달의 요일(평일/주말)에 맞춰 기존 패턴 유지하며 재배치
+      var sampleWeekday = { off: false, start: '09:00', end: '14:00', breakMinutes: 0 };
+      var sampleWeekend = { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
+      if (prevCal && state.dailyShifts.length === prevCal.days.length) {
+        for (var i = 0; i < prevCal.days.length; i++) {
+          if (!prevCal.days[i].isWeekend && !state.dailyShifts[i].off) {
+            sampleWeekday = Object.assign({}, state.dailyShifts[i]);
+            break;
+          }
+        }
+        for (var j = 0; j < prevCal.days.length; j++) {
+          if (prevCal.days[j].isWeekend) {
+            sampleWeekend = Object.assign({}, state.dailyShifts[j]);
+            break;
+          }
+        }
+      }
+      state.dailyShifts = cal.days.map(function (d) {
+        return Object.assign({}, d.isWeekend ? sampleWeekend : sampleWeekday);
+      });
+      if (state.selectedDayIdx >= cal.daysInMonth) state.selectedDayIdx = 0;
+      loadDayIntoEditor(state.selectedDayIdx);
+    }
+
+    // 주차별 입력 모드의 5주, 6주 입력칸 표시 동기화
+    $('pW5Wrap').hidden = cal.weekCount < 5;
+    $('pW6Wrap').hidden = cal.weekCount < 6;
+  }
+
+  function loadDayIntoEditor(dayIdx) {
+    if (!state.calendar || dayIdx < 0 || dayIdx >= state.calendar.daysInMonth) return;
+    state.selectedDayIdx = dayIdx;
+    var sh = state.dailyShifts[dayIdx] || { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
+    var st = parseHM(sh.start, 9, 0);
+    var et = parseHM(sh.end, 14, 0);
+    state.editor.startHour = st.h;
+    state.editor.startMin = st.m;
+    state.editor.endHour = et.h;
+    state.editor.endMin = et.m;
+    state.editor.breakMinutes = sh.breakMinutes || 0;
+    state.editor.off = !!sh.off;
+    renderTimeEditor();
+  }
+
+  function currentEditorShift() {
+    var start = fmtTime(state.editor.startHour, state.editor.startMin);
+    var end = state.editor.endHour === 24 ? '24:00' : fmtTime(state.editor.endHour, state.editor.endMin);
+    var hrs = state.editor.off ? 0 : E.calcShiftHours(start, end, state.editor.breakMinutes);
+    return {
+      off: state.editor.off || hrs <= 0,
+      start: start,
+      end: end,
+      breakMinutes: state.editor.breakMinutes,
+      hours: hrs
+    };
+  }
+
+  function renderTimeEditor() {
+    var cal = state.calendar;
+    var cd = cal && cal.days[state.selectedDayIdx];
+    var sh = currentEditorShift();
+
+    if (cd) {
+      $('selDayBadge').textContent = cal.month + '월 ' + cd.date + '일 (' + cd.dayName + ') · ' + cd.week + '주차';
+      $('selDayTitle').textContent = sh.off
+        ? '현재 휴무일입니다 (시간을 선택하면 근무일로 변경됩니다)'
+        : (sh.start + ' 출근 ~ ' + sh.end + ' 퇴근' + (sh.breakMinutes ? ' (휴게 ' + sh.breakMinutes + '분)' : ''));
+    }
+
+    var minMeal = E.toNumber($('pMealMinHours').value, 4);
+    var mealTag = ($('pMeal').checked && !sh.off && sh.hours >= minMeal) ? ' · 🍚 식대 지급' : '';
+    $('editorCalcPill').innerHTML = sh.off
+      ? '🚫 <b>휴무 (0시간)</b>'
+      : (sh.start + ' ~ ' + sh.end + (sh.breakMinutes ? ' (-' + sh.breakMinutes + '분)' : '') + ' · <b>' + E.formatNum(sh.hours, 2) + '시간</b>' + mealTag);
+
+    $('startDisplay').textContent = sh.start;
+    $('endDisplay').textContent = sh.end;
+    $('startHourRange').value = state.editor.startHour;
+    $('endHourRange').value = state.editor.endHour;
+
+    document.querySelectorAll('[data-sh]').forEach(function (b) {
+      b.classList.toggle('active', Number(b.getAttribute('data-sh')) === state.editor.startHour);
+    });
+    document.querySelectorAll('[data-eh]').forEach(function (b) {
+      b.classList.toggle('active', Number(b.getAttribute('data-eh')) === state.editor.endHour);
+    });
+    document.querySelectorAll('[data-sm]').forEach(function (b) {
+      b.classList.toggle('active', Number(b.getAttribute('data-sm')) === state.editor.startMin);
+    });
+    document.querySelectorAll('[data-em]').forEach(function (b) {
+      b.classList.toggle('active', Number(b.getAttribute('data-em')) === state.editor.endMin);
+    });
+    document.querySelectorAll('[data-break-val]').forEach(function (b) {
+      b.classList.toggle('active', Number(b.getAttribute('data-break-val')) === state.editor.breakMinutes);
+    });
+  }
+
+  function applyEditorToSelectedDay() {
+    var sh = currentEditorShift();
+    state.dailyShifts[state.selectedDayIdx] = {
+      off: sh.off,
+      start: sh.start,
+      end: sh.end,
+      breakMinutes: sh.breakMinutes
+    };
+    renderTimeEditor();
+    recalcPayroll();
+  }
+
+  function setRightView(view) {
+    state.rightView = view === 'slip' ? 'slip' : 'schedule';
+    var isDaily = getSelectedMode() === 'daily';
+    $('rightViewSwitch').hidden = !isDaily;
+
+    if (!isDaily) {
+      $('scheduleBoard').hidden = true;
+      $('payDoc').hidden = false;
+      return;
+    }
+
+    var showSched = state.rightView === 'schedule';
+    $('scheduleBoard').hidden = !showSched;
+    $('payDoc').hidden = showSched;
+    $('btnViewSchedule').classList.toggle('active', showSched);
+    $('btnViewSlip').classList.toggle('active', !showSched);
+  }
+
+  /* ---------- 월별 실제 달력 테이블 렌더링 ---------- */
+  function renderMonthCalendar(r) {
+    var cal = r.calendar || state.calendar;
+    if (!cal) return;
+
+    $('calMonthBadge').textContent = cal.month + '월 · ' + cal.weekCount + '개 주차';
+    $('calBoardTitle').textContent = cal.year + '년 ' + cal.month + '월 출퇴근 달력 (총 ' + cal.weekCount + '개 주차 · ' + cal.daysInMonth + '일)';
+
+    // 주차(0..weekCount-1) × 요일(0=월..6=일) 매트릭스 생성
+    var grid = [];
+    for (var w = 0; w < cal.weekCount; w++) {
+      grid.push([null, null, null, null, null, null, null]);
+    }
+    r.days.forEach(function (d) {
+      if (grid[d.weekIndex]) grid[d.weekIndex][d.dayIndex] = d;
+    });
+
+    var rowsHtml = '';
+    for (var wi = 0; wi < cal.weekCount; wi++) {
+      var wkObj = r.weeks[wi] || { week: wi + 1, hours: 0, eligible: false, allowance: 0, mealDays: 0 };
+      rowsHtml += '<tr>';
+      rowsHtml += '<td class="cal-wk-cell">' + (wi + 1) + '주차</td>';
+
+      for (var di = 0; di < 7; di++) {
+        var day = grid[wi][di];
+        if (!day) {
+          rowsHtml += '<td class="cal-empty-cell"></td>';
+          continue;
+        }
+        var isSel = day.index === state.selectedDayIdx;
+        var isMeal = r.includeMeal && day.mealEligible;
+        var cls = 'cal-day-cell' +
+          (isSel ? ' selected' : '') +
+          (isMeal ? ' meal-ok' : '') +
+          (day.off ? ' off-day' : '');
+        var dateColor = di === 5 ? ' sat' : (di === 6 ? ' sun' : '');
+
+        rowsHtml += '<td class="' + cls + '" data-day-idx="' + day.index + '">' +
+          '<div class="cal-day-top">' +
+            '<span class="cal-date-num' + dateColor + '">' + day.date + '일</span>' +
+            (isMeal ? '<span class="cal-meal-icon" title="식대 지급 대상">🍚</span>' : '') +
+          '</div>';
+
+        if (day.off || day.hours <= 0) {
+          rowsHtml += '<div class="cal-off-badge">휴무</div>';
+        } else {
+          rowsHtml +=
+            '<div class="cal-shift-range">' + escHtml(day.start + '~' + day.end) + '</div>' +
+            '<span class="cal-shift-hours">' + E.formatNum(day.hours, 1) + '시간' +
+              (day.breakMinutes ? ' (-' + day.breakMinutes + 'm)' : '') +
+            '</span>';
+        }
+        rowsHtml += '</td>';
+      }
+
+      var wkSub = r.includeWeekly
+        ? (wkObj.eligible ? ('주휴 +' + E.formatWon(wkObj.allowance) + '원') : '15h 미만 (주휴 0원)')
+        : '주휴 미포함';
+      var mealSub = r.includeMeal ? ('🍚 식대 ' + wkObj.mealDays + '일') : '';
+
+      rowsHtml += '<td class="cal-sum-cell' + (wkObj.eligible && r.includeWeekly ? ' eligible' : '') + '">' +
+        '<b>' + E.formatNum(wkObj.hours, 1) + '시간</b>' +
+        '<span class="cal-sum-sub">' + wkSub + '</span>' +
+        (mealSub ? '<span class="cal-sum-sub">' + mealSub + '</span>' : '') +
+        '</td>';
+
+      rowsHtml += '</tr>';
+    }
+
+    $('monthCalBody').innerHTML = rowsHtml;
+  }
+
+  /* ==========================================================
+     탭 1: 급여 폼 읽기 & 계산 & 렌더링
+     ========================================================== */
   function getSelectedMode() {
     var checked = document.querySelector('input[name="pMode"]:checked');
     return checked ? checked.value : 'daily';
@@ -203,6 +451,7 @@
     var el = document.querySelector('input[name="pMode"][value="' + mode + '"]');
     if (el) el.checked = true;
     $('pWeekMode').checked = mode === 'weekly';
+    setRightView(mode === 'daily' ? 'schedule' : 'slip');
   }
 
   function getSelectedTax() {
@@ -215,38 +464,29 @@
     if (el) el.checked = true;
   }
 
-  function readDailyHours() {
-    var arr = [];
-    for (var i = 0; i < 28; i++) {
-      var el = $('pD_' + i);
-      arr.push(el ? Math.max(0, E.toNumber(el.value, 0)) : 0);
-    }
-    return arr;
-  }
-
-  function writeDailyHours(arr) {
-    for (var i = 0; i < 28; i++) {
-      var el = $('pD_' + i);
-      if (el && arr[i] !== undefined) el.value = arr[i];
-    }
-  }
-
   function readPayrollForm() {
     var mode = getSelectedMode();
+    var payMonth = $('pMonth').value;
+    ensureCalendarAndShifts(payMonth, false);
+
+    var cal = state.calendar;
     var w = [
       E.toNumber($('pW1').value, 0),
       E.toNumber($('pW2').value, 0),
       E.toNumber($('pW3').value, 0),
       E.toNumber($('pW4').value, 0)
     ];
+    if (cal.weekCount >= 5) w.push(E.toNumber($('pW5').value, 0));
+    if (cal.weekCount >= 6) w.push(E.toNumber($('pW6').value, 0));
+
     return {
       name: $('pName').value,
-      payMonth: $('pMonth').value,
+      payMonth: payMonth,
       hourlyWage: E.toNumber($('pWage').value, 0),
       mode: mode,
       totalHours: E.toNumber($('pTotal').value, 0),
       weekHours: w,
-      dailyHours: readDailyHours(),
+      dailyShifts: state.dailyShifts.map(function (s) { return Object.assign({}, s); }),
       lateMinutes: E.toNumber($('pLate').value, 0),
       includeWeekly: $('pWeekly').checked,
       includeMeal: $('pMeal').checked,
@@ -260,15 +500,32 @@
   function applyParsedToForm(parsed) {
     if (parsed.name) $('pName').value = parsed.name;
     if (parsed.hourlyWage) $('pWage').value = parsed.hourlyWage;
+    ensureCalendarAndShifts($('pMonth').value, false);
+
     if (parsed.mode === 'daily' && Array.isArray(parsed.dailyHours)) {
       setSelectedMode('daily');
-      writeDailyHours(parsed.dailyHours);
+      // 자연어 파서에서 넘어온 평일/주말 시간을 출퇴근 시각(09:00 ~ HH:MM)으로 변환해 전체 달력에 적용
+      var wdHours = parsed.dailyHours[0] || 0;
+      var weHours = parsed.dailyHours[5] || 0;
+      state.dailyShifts = state.calendar.days.map(function (cd) {
+        var h = cd.isWeekend ? weHours : wdHours;
+        if (h <= 0) return { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
+        return {
+          off: false,
+          start: '09:00',
+          end: E.minutesToTime(9 * 60 + Math.round(h * 60)),
+          breakMinutes: 0
+        };
+      });
+      loadDayIntoEditor(state.selectedDayIdx);
     } else if (parsed.mode === 'weekly' && Array.isArray(parsed.weekHours)) {
       setSelectedMode('weekly');
       $('pW1').value = parsed.weekHours[0];
       $('pW2').value = parsed.weekHours[1];
       $('pW3').value = parsed.weekHours[2];
       $('pW4').value = parsed.weekHours[3];
+      $('pW5').value = 0;
+      $('pW6').value = 0;
       $('pTotal').value = parsed.totalHours;
     } else if (parsed.mode === 'total' && parsed.totalHours !== null) {
       setSelectedMode('total');
@@ -279,6 +536,7 @@
       $('pW3').value = each;
       $('pW4').value = each;
     }
+
     $('pLate').value = parsed.lateMinutes || 0;
     $('pWeekly').checked = parsed.includeWeekly !== false;
     if (parsed.includeMeal !== null && parsed.includeMeal !== undefined) {
@@ -299,51 +557,45 @@
 
   function syncModeAndHighlights(r) {
     var mode = getSelectedMode();
-    $('dailyGroup').hidden = mode !== 'daily';
+    $('dailyLeftNotice').hidden = mode !== 'daily';
     $('weeksGroup').hidden = mode !== 'weekly';
     $('totalGroup').hidden = mode !== 'total';
     $('mealDaysManualField').hidden = mode === 'daily';
+    $('rightViewSwitch').hidden = mode !== 'daily';
+
+    if (mode !== 'daily') {
+      $('scheduleBoard').hidden = true;
+      $('payDoc').hidden = false;
+    } else {
+      var showSched = state.rightView === 'schedule';
+      $('scheduleBoard').hidden = !showSched;
+      $('payDoc').hidden = showSched;
+    }
 
     $('weeklyBox').classList.toggle('on', $('pWeekly').checked);
     $('mealBox').classList.toggle('on', $('pMeal').checked);
     $('mealConfig').hidden = !$('pMeal').checked;
 
-    var sum = E.round2(
-      E.toNumber($('pW1').value, 0) +
+    var cal = state.calendar;
+    var wSum = E.toNumber($('pW1').value, 0) +
       E.toNumber($('pW2').value, 0) +
       E.toNumber($('pW3').value, 0) +
-      E.toNumber($('pW4').value, 0)
-    );
-    $('weeksSum').textContent = E.formatNum(sum, 2);
+      E.toNumber($('pW4').value, 0) +
+      (cal && cal.weekCount >= 5 ? E.toNumber($('pW5').value, 0) : 0) +
+      (cal && cal.weekCount >= 6 ? E.toNumber($('pW6').value, 0) : 0);
+    $('weeksSum').textContent = E.formatNum(E.round2(wSum), 2);
 
-    // 일별 그리드 셀 하이라이트 & 주별 합계 업데이트
-    if (r && Array.isArray(r.days)) {
-      r.days.forEach(function (d) {
-        var td = $('dCell_' + d.index);
-        if (td) {
-          var highlight = $('pMeal').checked && d.mealEligible;
-          td.classList.toggle('meal-ok', highlight);
-          td.title = d.hours > 0
-            ? (d.week + '주 ' + d.dayName + '요일: ' + d.hours + '시간' + (d.mealEligible ? ' (🍚 식대 지급 대상)' : ' (식대 기준 미달)'))
-            : '';
-        }
-      });
-      for (var w = 0; w < 4; w++) {
-        var wkEl = $('dWkSum_' + w);
-        if (wkEl && r.weeks[w]) {
-          wkEl.textContent = E.formatNum(r.weeks[w].hours, 1) + 'h';
-          wkEl.classList.toggle('eligible', r.weeks[w].eligible);
-        }
-      }
+    if (r) {
       $('dailyTotalHours').textContent = E.formatNum(r.totalHours, 2);
       $('dailyWorkDays').textContent = r.workDays;
       $('dailyMealDays').textContent = r.mealDays;
-    }
 
-    if (r) {
       $('mealSummaryText').textContent = r.includeMeal
         ? ('일 ' + E.formatNum(r.mealMinHours, 1) + '시간 이상 근무 ' + r.mealDays + '일 × ' + E.formatWon(r.mealAmount) + '원 = +' + E.formatWon(r.mealAllowance) + '원')
         : '체크 시 하루 기준시간 이상 근무한 날에 식대를 추가 지급합니다';
+
+      renderMonthCalendar(r);
+      renderTimeEditor();
     }
   }
 
@@ -357,7 +609,9 @@
     $('slipName').textContent = r.name;
     $('slipMonth').textContent = r.payMonthLabel;
     $('slipWage').textContent = E.formatWon(r.hourlyWage) + '원';
-    var modeLabel = r.mode === 'daily' ? ('일별 입력 · ' + r.workDays + '일') : (r.mode === 'weekly' ? '주차별 입력' : '4주 균등');
+    var modeLabel = r.mode === 'daily'
+      ? ('일별 출퇴근 · ' + r.workDays + '일 / ' + r.weeks.length + '개 주차')
+      : (r.mode === 'weekly' ? ('주차별 · ' + r.weeks.length + '개 주차') : '4주 균등');
     $('slipHours').textContent = E.formatNum(r.totalHours, 2) + '시간 (' + modeLabel + ')';
     $('slipWeekly').innerHTML =
       '주휴 <span class="pill ' + (r.includeWeekly ? 'pill-ok' : 'pill-off') + '">' + (r.includeWeekly ? '포함' : '미포함') + '</span> ' +
@@ -564,6 +818,8 @@
     if (!$('pMonth').value) $('pMonth').value = yyyy + '-' + mm;
     if (!$('cDate').value) $('cDate').value = yyyy + '-' + mm + '-' + dd;
 
+    ensureCalendarAndShifts($('pMonth').value, true);
+
     var savedStore = loadJson(KEYS.store, null);
     if (savedStore) {
       if (savedStore.store) $('cStore').value = savedStore.store;
@@ -578,6 +834,155 @@
 
   function bindEvents() {
     $('themeToggle').addEventListener('click', toggleTheme);
+
+    // 우측 상단 뷰 전환 탭 (일별 출퇴근 시간표 크게 입력 <-> 표준 급여명세서 보기)
+    $('btnViewSchedule').addEventListener('click', function () { setRightView('schedule'); });
+    $('btnViewSlip').addEventListener('click', function () { setRightView('slip'); });
+    $('btnOpenScheduleView').addEventListener('click', function () {
+      setRightView('schedule');
+      $('scheduleBoard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    // 달력 날짜 클릭 -> 해당 날짜 선택
+    $('monthCalBody').addEventListener('click', function (ev) {
+      var cell = ev.target.closest('[data-day-idx]');
+      if (!cell) return;
+      var idx = Number(cell.getAttribute('data-day-idx'));
+      loadDayIntoEditor(idx);
+      recalcPayroll();
+    });
+
+    // 출퇴근 슬라이더 조작 시 선택된 날짜에 즉시 반영
+    $('startHourRange').addEventListener('input', function () {
+      state.editor.startHour = Number($('startHourRange').value);
+      state.editor.off = false;
+      applyEditorToSelectedDay();
+    });
+    $('endHourRange').addEventListener('input', function () {
+      state.editor.endHour = Number($('endHourRange').value);
+      if (state.editor.endHour === 24) state.editor.endMin = 0;
+      state.editor.off = false;
+      applyEditorToSelectedDay();
+    });
+
+    // 시/분 클릭 칩 선택 시 즉시 반영
+    $('startHourBtns').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-sh]');
+      if (!b) return;
+      state.editor.startHour = Number(b.getAttribute('data-sh'));
+      state.editor.off = false;
+      applyEditorToSelectedDay();
+    });
+    $('endHourBtns').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-eh]');
+      if (!b) return;
+      state.editor.endHour = Number(b.getAttribute('data-eh'));
+      if (state.editor.endHour === 24) state.editor.endMin = 0;
+      state.editor.off = false;
+      applyEditorToSelectedDay();
+    });
+    $('startMinBtns').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-sm]');
+      if (!b) return;
+      state.editor.startMin = Number(b.getAttribute('data-sm'));
+      state.editor.off = false;
+      applyEditorToSelectedDay();
+    });
+    $('endMinBtns').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-em]');
+      if (!b) return;
+      if (state.editor.endHour === 24) state.editor.endHour = 23;
+      state.editor.endMin = Number(b.getAttribute('data-em'));
+      state.editor.off = false;
+      applyEditorToSelectedDay();
+    });
+
+    // 휴게시간 칩 선택
+    $('breakBtns').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-break-val]');
+      if (!b) return;
+      state.editor.breakMinutes = Number(b.getAttribute('data-break-val'));
+      applyEditorToSelectedDay();
+    });
+
+    // 빠른 시간대 프리셋 칩
+    document.querySelectorAll('.preset-chip').forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        if (chip.getAttribute('data-off') === 'true') {
+          state.editor.off = true;
+          applyEditorToSelectedDay();
+          showToast('🚫 선택된 날짜를 휴무로 설정했습니다.');
+          return;
+        }
+        var st = parseHM(chip.getAttribute('data-start'), 9, 0);
+        var et = parseHM(chip.getAttribute('data-end'), 14, 0);
+        state.editor.startHour = st.h;
+        state.editor.startMin = st.m;
+        state.editor.endHour = et.h;
+        state.editor.endMin = et.m;
+        state.editor.breakMinutes = Number(chip.getAttribute('data-break') || 0);
+        state.editor.off = false;
+        applyEditorToSelectedDay();
+      });
+    });
+
+    // 적용 범위 버튼들
+    $('btnApplySelectedDay').addEventListener('click', function () {
+      applyEditorToSelectedDay();
+      var cd = state.calendar.days[state.selectedDayIdx];
+      showToast('✓ ' + cd.date + '일(' + cd.dayName + ')에 적용되었습니다.');
+    });
+
+    $('btnApplyWeekday').addEventListener('click', function () {
+      var sh = currentEditorShift();
+      state.calendar.days.forEach(function (cd, i) {
+        if (!cd.isWeekend) {
+          state.dailyShifts[i] = { off: sh.off, start: sh.start, end: sh.end, breakMinutes: sh.breakMinutes };
+        }
+      });
+      recalcPayroll();
+      showToast('📅 평일(월~금) 전체에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
+    });
+
+    $('btnApplyWeekend').addEventListener('click', function () {
+      var sh = currentEditorShift();
+      state.calendar.days.forEach(function (cd, i) {
+        if (cd.isWeekend) {
+          state.dailyShifts[i] = { off: sh.off, start: sh.start, end: sh.end, breakMinutes: sh.breakMinutes };
+        }
+      });
+      recalcPayroll();
+      showToast('📅 주말(토·일) 전체에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
+    });
+
+    $('btnApplySameDow').addEventListener('click', function () {
+      var sh = currentEditorShift();
+      var targetDow = state.calendar.days[state.selectedDayIdx].dow;
+      var dayName = E.DAY_NAMES[targetDow];
+      state.calendar.days.forEach(function (cd, i) {
+        if (cd.dow === targetDow) {
+          state.dailyShifts[i] = { off: sh.off, start: sh.start, end: sh.end, breakMinutes: sh.breakMinutes };
+        }
+      });
+      recalcPayroll();
+      showToast('📅 이번 달 모든 ' + dayName + '요일에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
+    });
+
+    $('btnSetDayOff').addEventListener('click', function () {
+      state.editor.off = true;
+      applyEditorToSelectedDay();
+      var cd = state.calendar.days[state.selectedDayIdx];
+      showToast('🚫 ' + cd.date + '일(' + cd.dayName + ') 휴무 처리');
+    });
+
+    $('btnClearAllDays').addEventListener('click', function () {
+      state.dailyShifts = state.calendar.days.map(function () {
+        return { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
+      });
+      state.editor.off = true;
+      recalcPayroll();
+      showToast('📅 이번 달 전체를 휴무(0시간)로 초기화했습니다.');
+    });
 
     // 한 줄 자연어 파서
     $('parseForm').addEventListener('submit', function (ev) {
@@ -602,44 +1007,24 @@
       });
     });
 
-    // 일별 그리드 입력 및 빠른 채우기 버튼
-    $('dailyGridBody').addEventListener('input', recalcPayroll);
-
-    $('btnFillWeekday').addEventListener('click', function () {
-      var val = Math.max(0, E.toNumber($('qWeekday').value, 0));
-      for (var w = 0; w < 4; w++) {
-        for (var d = 0; d < 5; d++) {
-          $('pD_' + (w * 7 + d)).value = val;
-        }
-      }
-      recalcPayroll();
-      showToast('📅 평일(월~금) 일괄 ' + val + '시간 적용');
-    });
-
-    $('btnFillWeekend').addEventListener('click', function () {
-      var val = Math.max(0, E.toNumber($('qWeekend').value, 0));
-      for (var w = 0; w < 4; w++) {
-        for (var d = 5; d < 7; d++) {
-          $('pD_' + (w * 7 + d)).value = val;
-        }
-      }
-      recalcPayroll();
-      showToast('📅 주말(토·일) 일괄 ' + val + '시간 적용');
-    });
-
-    $('btnClearDaily').addEventListener('click', function () {
-      for (var i = 0; i < 28; i++) $('pD_' + i).value = 0;
-      recalcPayroll();
-      showToast('📅 일별 시간을 모두 0시간으로 초기화했습니다.');
-    });
-
-    // 근무시간 모드 라디오 전환
+    // 근무시간 모드 라디오 전환 (일별 선택 시 우측 달력 보드로 자동 전환)
     document.querySelectorAll('input[name="pMode"]').forEach(function (el) {
-      el.addEventListener('change', recalcPayroll);
+      el.addEventListener('change', function () {
+        var m = getSelectedMode();
+        setRightView(m === 'daily' ? 'schedule' : 'slip');
+        recalcPayroll();
+      });
+    });
+
+    // 지급월 변경 시 해당 월의 실제 달력/주차 재구성
+    $('pMonth').addEventListener('change', function () {
+      ensureCalendarAndShifts($('pMonth').value, false);
+      recalcPayroll();
+      showToast('📅 ' + state.calendar.year + '년 ' + state.calendar.month + '월 달력 (' + state.calendar.weekCount + '개 주차) 적용');
     });
 
     // 급여 폼 실시간 반응
-    ['pName', 'pMonth', 'pWage', 'pTotal', 'pW1', 'pW2', 'pW3', 'pW4', 'pLate', 'pMealMinHours', 'pMealAmount', 'pMealDays'].forEach(function (id) {
+    ['pName', 'pWage', 'pTotal', 'pW1', 'pW2', 'pW3', 'pW4', 'pW5', 'pW6', 'pLate', 'pMealMinHours', 'pMealAmount', 'pMealDays'].forEach(function (id) {
       $(id).addEventListener('input', recalcPayroll);
     });
     ['pWeekMode', 'pWeekly', 'pMeal'].forEach(function (id) {
@@ -751,7 +1136,7 @@
 
   syncThemeBtn();
   initTabs();
-  initDailyGrid();
+  initTimePickerChips();
   initDefaults();
   bindEvents();
   recalcPayroll();

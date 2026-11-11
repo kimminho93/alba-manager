@@ -66,7 +66,7 @@
             <label class="field"><span>알바생 이름</span>
               <input id="pName" type="text" value="철수" maxlength="20">
             </label>
-            <label class="field"><span>지급월</span>
+            <label class="field"><span>지급월 <em class="hint">월별 주차 자동 반영</em></span>
               <input id="pMonth" type="month">
             </label>
           </div>
@@ -78,46 +78,24 @@
           <div class="field">
             <span>근무시간 입력 방식</span>
             <div class="segmented" role="radiogroup" aria-label="근무시간 입력 방식">
-              <label><input type="radio" name="pMode" value="daily" checked><span>📅 매일(일별)</span></label>
-              <label><input type="radio" name="pMode" value="weekly"><span>📆 주차별(1~4주)</span></label>
+              <label><input type="radio" name="pMode" value="daily" checked><span>📅 일별(출퇴근)</span></label>
+              <label><input type="radio" name="pMode" value="weekly"><span>📆 주차별</span></label>
               <label><input type="radio" name="pMode" value="total"><span>⏱ 월 총 시간</span></label>
             </div>
             <input id="pWeekMode" type="checkbox" hidden>
           </div>
 
-          <!-- ① 매일(일별) 시간 입력 모드 -->
-          <div id="dailyGroup" class="daily-group">
-            <div class="daily-quick">
-              <div class="quick-item">
-                <span>평일(월~금)</span>
-                <input id="qWeekday" type="number" min="0" max="24" step="0.5" value="5" aria-label="평일 일괄 시간">
-                <button id="btnFillWeekday" type="button" class="btn btn-xs">일괄 적용</button>
-              </div>
-              <div class="quick-item">
-                <span>주말(토·일)</span>
-                <input id="qWeekend" type="number" min="0" max="24" step="0.5" value="0" aria-label="주말 일괄 시간">
-                <button id="btnFillWeekend" type="button" class="btn btn-xs">일괄 적용</button>
-              </div>
-              <button id="btnClearDaily" type="button" class="btn btn-xs btn-ghost">초기화</button>
+          <!-- ① 일별 모드일 때 좌측 안내 배너 -->
+          <div id="dailyLeftNotice" class="daily-left-notice">
+            <div class="notice-row">
+              <span>📅 <b>우측 큰 달력 화면</b>에서 날짜별 출근~퇴근 시각을 클릭·슬라이드로 선택하세요!</span>
             </div>
-
-            <div class="daily-table-wrap">
-              <table class="daily-grid-table" aria-label="일별 근무시간 입력표">
-                <thead>
-                  <tr>
-                    <th>주차</th>
-                    <th>월</th><th>화</th><th>수</th><th>목</th><th>금</th>
-                    <th class="sat">토</th><th class="sun">일</th>
-                    <th>주 합계</th>
-                  </tr>
-                </thead>
-                <tbody id="dailyGridBody"></tbody>
-              </table>
+            <div class="notice-stats">
+              <span>총 <b id="dailyTotalHours">0</b>시간 (<b id="dailyWorkDays">0</b>일)</span>
+              <span>·</span>
+              <span>🍚 식대 대상 <b id="dailyMealDays">0</b>일</span>
             </div>
-            <p class="muted small daily-summary">
-              총 <b id="dailyTotalHours">100</b>시간 (<b id="dailyWorkDays">20</b>일 근무) ·
-              🍚 식대 대상 <b id="dailyMealDays">20</b>일 (초록 칸 = 식대 기준시간 충족)
-            </p>
+            <button id="btnOpenScheduleView" type="button" class="btn btn-xs btn-primary">👉 우측 달력 시간표 크게 열기</button>
           </div>
 
           <!-- ② 월 총 근무시간 입력 모드 -->
@@ -127,13 +105,15 @@
             </label>
           </div>
 
-          <!-- ③ 주차별(1~4주) 입력 모드 -->
+          <!-- ③ 주차별 입력 모드 (선택한 월의 실제 주차 수 반영) -->
           <div id="weeksGroup" hidden>
-            <div class="weeks">
+            <div id="weeksInputsWrap" class="weeks">
               <label class="field"><span>1주</span><input id="pW1" type="number" min="0" step="0.5" value="15"></label>
               <label class="field"><span>2주</span><input id="pW2" type="number" min="0" step="0.5" value="15"></label>
-              <label class="field"><span>3주</span><input id="pW3" type="number" step="0.5" min="0" value="15"></label>
-              <label class="field"><span>4주</span><input id="pW4" type="number" step="0.5" min="0" value="15"></label>
+              <label class="field"><span>3주</span><input id="pW3" type="number" min="0" step="0.5" value="15"></label>
+              <label class="field"><span>4주</span><input id="pW4" type="number" min="0" step="0.5" value="15"></label>
+              <label id="pW5Wrap" class="field" hidden><span>5주</span><input id="pW5" type="number" min="0" step="0.5" value="0"></label>
+              <label id="pW6Wrap" class="field" hidden><span>6주</span><input id="pW6" type="number" min="0" step="0.5" value="0"></label>
             </div>
             <p class="muted small">합계 <b id="weeksSum">60</b>시간 · 주 15시간 이상인 주만 주휴수당 대상</p>
           </div>
@@ -193,12 +173,131 @@
           </div>
         </form>
 
+        <!-- 우측 프리뷰 & 일별 출퇴근 시간표 대형 보드 카드 -->
         <div class="card preview-card">
           <div class="banner pay-banner">
             <p id="bannerText">계산 중…</p>
             <button id="copyKakao" type="button" class="btn btn-kakao">💬 카톡 명세서 복사</button>
           </div>
 
+          <!-- 우측 상단 뷰 전환 바 (일별 출퇴근 시간표 크게 입력 <-> 급여명세서 미리보기) -->
+          <div id="rightViewSwitch" class="right-view-switch">
+            <button id="btnViewSchedule" type="button" class="view-tab active">
+              📅 일별 출퇴근 시간표 크게 입력 <span id="calMonthBadge" class="view-badge">11월 · 5주차</span>
+            </button>
+            <button id="btnViewSlip" type="button" class="view-tab">
+              🧾 표준 급여명세서 보기
+            </button>
+          </div>
+
+          <!-- [우측 뷰 A] 월별 실제 달력 & 출퇴근 시각(몇 시 ~ 몇 시) 슬라이더·클릭 선택 보드 -->
+          <div id="scheduleBoard" class="schedule-board">
+            <!-- 출퇴근 시각 선택 컨트롤러 (슬라이더 + 시/분 클릭 피커) -->
+            <div class="time-editor-card">
+              <div class="time-editor-head">
+                <div class="selected-day-title">
+                  <span class="sel-badge" id="selDayBadge">날짜 선택</span>
+                  <strong id="selDayTitle">날짜를 클릭하거나 일괄 적용하세요</strong>
+                </div>
+                <div class="editor-calc-pill" id="editorCalcPill">
+                  09:00 ~ 14:00 · <b>5시간</b> 근무
+                </div>
+              </div>
+
+              <!-- 원클릭 시간대 프리셋 -->
+              <div class="preset-bar">
+                <span class="preset-label">빠른 시간대</span>
+                <button type="button" class="chip preset-chip" data-start="09:00" data-end="14:00" data-break="0">오전 09:00~14:00 (5h)</button>
+                <button type="button" class="chip preset-chip" data-start="10:00" data-end="15:00" data-break="0">미들 10:00~15:00 (5h)</button>
+                <button type="button" class="chip preset-chip" data-start="13:00" data-end="18:00" data-break="0">오후 13:00~18:00 (5h)</button>
+                <button type="button" class="chip preset-chip" data-start="18:00" data-end="23:00" data-break="0">야간 18:00~23:00 (5h)</button>
+                <button type="button" class="chip preset-chip" data-start="09:00" data-end="18:00" data-break="60">풀타임 09:00~18:00 (휴게1h→8h)</button>
+                <button type="button" class="chip preset-chip chip-off" data-off="true">🚫 휴무</button>
+              </div>
+
+              <!-- 출근 / 퇴근 슬라이더 + 시·분 클릭 선택 -->
+              <div class="time-pickers-grid">
+                <!-- 출근 시각 -->
+                <div class="time-picker-box">
+                  <div class="tp-header">
+                    <span>🌅 출근 시각</span>
+                    <strong id="startDisplay" class="tp-big-time">09:00</strong>
+                  </div>
+                  <div class="tp-slider-row">
+                    <span class="tp-sub">시(Hour) 슬라이드</span>
+                    <input id="startHourRange" type="range" min="0" max="23" step="1" value="9">
+                  </div>
+                  <div id="startHourBtns" class="hour-chip-grid" aria-label="출근 시 선택"></div>
+                  <div class="tp-min-row">
+                    <span class="tp-sub">분(Min) 선택</span>
+                    <div id="startMinBtns" class="min-chip-row"></div>
+                  </div>
+                </div>
+
+                <!-- 퇴근 시각 -->
+                <div class="time-picker-box">
+                  <div class="tp-header">
+                    <span>🌇 퇴근 시각</span>
+                    <strong id="endDisplay" class="tp-big-time">14:00</strong>
+                  </div>
+                  <div class="tp-slider-row">
+                    <span class="tp-sub">시(Hour) 슬라이드</span>
+                    <input id="endHourRange" type="range" min="0" max="24" step="1" value="14">
+                  </div>
+                  <div id="endHourBtns" class="hour-chip-grid" aria-label="퇴근 시 선택"></div>
+                  <div class="tp-min-row">
+                    <span class="tp-sub">분(Min) 선택</span>
+                    <div id="endMinBtns" class="min-chip-row"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 휴게시간 & 일괄 적용 버튼 바 -->
+              <div class="editor-footer-bar">
+                <div class="break-selector">
+                  <span>☕ 휴게시간 차감</span>
+                  <div id="breakBtns" class="break-btns">
+                    <button type="button" class="chip active" data-break-val="0">없음</button>
+                    <button type="button" class="chip" data-break-val="30">30분</button>
+                    <button type="button" class="chip" data-break-val="60">1시간</button>
+                    <button type="button" class="chip" data-break-val="90">1시간 30분</button>
+                  </div>
+                </div>
+
+                <div class="apply-buttons">
+                  <button id="btnApplySelectedDay" type="button" class="btn btn-xs btn-primary">✓ 선택한 날짜 적용</button>
+                  <button id="btnApplyWeekday" type="button" class="btn btn-xs">평일(월~금) 일괄 적용</button>
+                  <button id="btnApplyWeekend" type="button" class="btn btn-xs">주말(토·일) 일괄 적용</button>
+                  <button id="btnApplySameDow" type="button" class="btn btn-xs">같은 요일 전체 적용</button>
+                  <button id="btnSetDayOff" type="button" class="btn btn-xs btn-ghost">선택일 휴무</button>
+                  <button id="btnClearAllDays" type="button" class="btn btn-xs btn-ghost">전체 휴무 초기화</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 월별 실제 달력 (1주차 ~ N주차 × 월~일) -->
+            <div class="month-cal-wrap">
+              <div class="month-cal-head">
+                <h4 id="calBoardTitle">2026년 11월 출퇴근 달력 (총 5개 주차)</h4>
+                <span class="muted small">날짜 칸을 클릭하면 위 시간 선택기로 바로 수정됩니다 · 초록 배지(🍚) = 식대 지급일</span>
+              </div>
+              <div class="table-wrap">
+                <table class="month-cal-table" aria-label="월별 출퇴근 달력">
+                  <thead>
+                    <tr>
+                      <th class="wk-col">주차</th>
+                      <th>월</th><th>화</th><th>수</th><th>목</th><th>금</th>
+                      <th class="sat">토</th><th class="sun">일</th>
+                      <th class="sum-col">주 합계 / 주휴·식대</th>
+                    </tr>
+                  </thead>
+                  <tbody id="monthCalBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- [우측 뷰 B] 표준 급여명세서 문서 -->
           <div class="doc" id="payDoc">
             <div class="doc-head">
               <h3>급여명세서</h3>

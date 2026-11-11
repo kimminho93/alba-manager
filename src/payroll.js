@@ -1,15 +1,15 @@
 /*
  * src/payroll.js — 급여·주휴수당·식대·세금 정산 엔진 (표준 급여명세서 데이터 생성)
  *
- *  근무시간 모드  : 'total'(월 총 시간) | 'weekly'(1~4주차별) | 'daily'(매일 28일 시간표)
+ *  근무시간 모드  :
+ *    - 'daily'  : 지급월(YYYY-MM) 실제 달력(28~31일, 4~6주차) 기반 출퇴근 시각(HH:MM ~ HH:MM) 입력
+ *                 (하위호환: 숫자 배열 dailyHours만 전달된 경우 4주×7일 숫자 모드로 동작)
+ *    - 'weekly' : 월별 주차(1~N주) 시간 직접 입력
+ *    - 'total'  : 월 총 근무시간 입력 (4주 균등 분할)
  *  주휴수당(주별)  = 주 근무시간 >= 15h 인 주에 대해 round((min(주시간,40) / 40) × 8 × 시급)
  *  식대(일별조건)  = 일 근무시간 >= 기준시간(기본 4h) 인 날 수 × 1일 식대(기본 8,000원)
  *  지각/조퇴 차감 = round((지각분 / 60) × 시급)
  *  세전 지급총액  = 기본급 − 지각차감 + 주휴수당 + 식대
- *  세금(10원 미만 절사)
- *    3.3%   : 소득세 floor(세전×0.03/10)×10 + 지방소득세 floor(소득세×0.1/10)×10
- *    4대보험 : 국민연금 4.5% + 건강보험 3.545% + 장기요양(건보의 12.95%) + 고용보험 0.9%
- *    미적용  : 0원
  */
 (function (root, factory) {
   'use strict';
@@ -24,7 +24,7 @@
 
   var WEEKS = 4;
   var DAYS_PER_WEEK = 7;
-  var TOTAL_DAYS = WEEKS * DAYS_PER_WEEK; // 28일 (4주 × 월~일)
+  var TOTAL_DAYS = WEEKS * DAYS_PER_WEEK;
   var DAY_NAMES = ['월', '화', '수', '목', '금', '토', '일'];
   var WEEKLY_MIN_HOURS = 15;
   var WEEKLY_CAP_HOURS = 40;
@@ -49,19 +49,127 @@
     return def;
   }
 
+  /** "09:30" → 570 (분). 형식이 잘못되면 null 반환 */
+  function parseTimeMinutes(t) {
+    if (typeof t !== 'string') return null;
+    var m = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
+    if (!m) return null;
+    var hh = parseInt(m[1], 10);
+    var mm = parseInt(m[2], 10);
+    if (hh < 0 || hh > 24 || mm < 0 || mm > 59) return null;
+    if (hh === 24 && mm > 0) return null;
+    return hh * 60 + mm;
+  }
+
+  /** 분(0~1440) → "HH:MM" */
+  function minutesToTime(mins) {
+    var m = ((Math.round(mins) % 1440) + 1440) % 1440;
+    var hh = String(Math.floor(m / 60)).padStart(2, '0');
+    var mm = String(m % 60).padStart(2, '0');
+    return hh + ':' + mm;
+  }
+
+  /**
+   * 출근 시각 ~ 퇴근 시각 (휴게시간 분 차감) → 근무시간(h)
+   * 퇴근이 출근보다 같거나 이르면 익일(야간) 근무로 간주 (+24h)
+   */
+  function calcShiftHours(start, end, breakMinutes) {
+    var s = parseTimeMinutes(start);
+    var e = parseTimeMinutes(end);
+    if (s === null || e === null) return 0;
+    if (s === e) return 0;
+    var diff = e > s ? (e - s) : (1440 - s + e);
+    var brk = Math.max(0, M.toNumber(breakMinutes, 0));
+    var workMins = Math.max(0, diff - brk);
+    return M.round2(workMins / 60);
+  }
+
+  /**
+   * 지급월("YYYY-MM")의 실제 달력 및 주차(월~일 기준) 계산
+   */
+  function buildMonthCalendar(payMonth) {
+    var y = 2026, m = 11;
+    if (typeof payMonth === 'string' && /^(\d{4})-(\d{2})$/.test(payMonth)) {
+      var parts = payMonth.split('-');
+      y = parseInt(parts[0], 10);
+      m = parseInt(parts[1], 10);
+    } else {
+      var now = new Date();
+      y = now.getFullYear();
+      m = now.getMonth() + 1;
+    }
+    var daysInMonth = new Date(y, m, 0).getDate();
+    // JS getDay(): 0=일..6=토 -> 월요일 시작 인덱스(0=월..5=토, 6=일)로 변환
+    var firstJsDay = new Date(y, m - 1, 1).getDay();
+    var firstDow = (firstJsDay + 6) % 7;
+    var weekCount = Math.ceil((firstDow + daysInMonth) / 7);
+
+    var days = [];
+    for (var d = 1; d <= daysInMonth; d++) {
+      var offset = firstDow + (d - 1);
+      var dow = offset % 7;
+      var weekIdx = Math.floor(offset / 7); // 0 .. weekCount-1
+      days.push({
+        date: d,
+        dateStr: y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0'),
+        dow: dow,
+        dayName: DAY_NAMES[dow],
+        isWeekend: dow >= 5,
+        week: weekIdx + 1,
+        weekIndex: weekIdx
+      });
+    }
+    return {
+      year: y,
+      month: m,
+      payMonth: y + '-' + String(m).padStart(2, '0'),
+      daysInMonth: daysInMonth,
+      firstDow: firstDow,
+      weekCount: weekCount,
+      days: days
+    };
+  }
+
+  function normalizeShift(s) {
+    if (!s || typeof s !== 'object') {
+      return { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
+    }
+    var off = toBool(s.off, false);
+    var start = typeof s.start === 'string' && parseTimeMinutes(s.start) !== null ? s.start.trim() : '09:00';
+    var end = typeof s.end === 'string' && parseTimeMinutes(s.end) !== null ? s.end.trim() : '14:00';
+    var brk = Math.max(0, Math.round(M.toNumber(s.breakMinutes, 0)));
+    return { off: off, start: start, end: end, breakMinutes: brk };
+  }
+
   function normalizePayrollInput(raw) {
     raw = raw || {};
+    var payMonth = typeof raw.payMonth === 'string' && /^\d{4}-\d{2}$/.test(raw.payMonth) ? raw.payMonth : '';
+    var cal = buildMonthCalendar(payMonth);
+
     var wh = Array.isArray(raw.weekHours) ? raw.weekHours : [];
-    var weekHours = [0, 1, 2, 3].map(function (i) { return Math.max(0, M.toNumber(wh[i], 0)); });
+    var weekCountForWeekly = Math.max(WEEKS, wh.length || WEEKS);
+    var weekHours = [];
+    for (var wi = 0; wi < weekCountForWeekly; wi++) {
+      weekHours.push(Math.max(0, M.toNumber(wh[wi], 0)));
+    }
+
+    var hasDailyShifts = Array.isArray(raw.dailyShifts) && raw.dailyShifts.length > 0;
+    var dailyShifts = null;
+    if (hasDailyShifts) {
+      dailyShifts = [];
+      for (var d = 0; d < cal.daysInMonth; d++) {
+        dailyShifts.push(normalizeShift(raw.dailyShifts[d]));
+      }
+    }
 
     var dh = Array.isArray(raw.dailyHours) ? raw.dailyHours : [];
     var dailyHours = [];
-    for (var d = 0; d < TOTAL_DAYS; d++) {
-      dailyHours.push(Math.max(0, M.clamp(M.toNumber(dh[d], 0), 0, 24)));
+    var dhLen = Math.max(TOTAL_DAYS, dh.length);
+    for (var i = 0; i < dhLen; i++) {
+      dailyHours.push(Math.max(0, M.clamp(M.toNumber(dh[i], 0), 0, 24)));
     }
 
     var mode = raw.mode === 'daily' ? 'daily' : (raw.mode === 'weekly' ? 'weekly' : 'total');
-    var payMonth = typeof raw.payMonth === 'string' && /^\d{4}-\d{2}$/.test(raw.payMonth) ? raw.payMonth : '';
 
     var mealMinHours = raw.mealMinHours === undefined || raw.mealMinHours === null || raw.mealMinHours === ''
       ? DEFAULT_MEAL_MIN_HOURS
@@ -81,6 +189,7 @@
       totalHours: Math.max(0, M.toNumber(raw.totalHours, 0)),
       weekHours: weekHours,
       dailyHours: dailyHours,
+      dailyShifts: dailyShifts,
       lateMinutes: Math.max(0, Math.round(M.toNumber(raw.lateMinutes, 0))),
       includeWeekly: toBool(raw.includeWeekly, true),
       includeMeal: toBool(raw.includeMeal, false),
@@ -134,7 +243,7 @@
     rows.push({
       kind: 'pay', section: '지급', label: '기본급', amount: r.basePay, sign: 1,
       formula: fmtH(r.totalHours) + '시간 × ' + won(r.hourlyWage) + '원' +
-        (r.mode === 'daily' ? ' (총 ' + r.workDays + '일 근무)' : '')
+        (r.mode === 'daily' ? ' (총 ' + r.workDays + '일 출근 · ' + r.weeks.length + '개 주차)' : '')
     });
 
     var weeklyDetail = '';
@@ -222,58 +331,103 @@
     var inp = normalizePayrollInput(raw);
     var wage = inp.hourlyWage;
     var minMealH = inp.mealMinHours;
+    var cal = buildMonthCalendar(inp.payMonth);
 
-    var weekHours;
+    var weekHours = [];
+    var weekMealDays = [];
     var daysDetail = [];
     var workDays = 0;
     var dailyMealDays = 0;
 
-    for (var w = 0; w < WEEKS; w++) {
-      for (var d = 0; d < DAYS_PER_WEEK; d++) {
-        var idx = w * DAYS_PER_WEEK + d;
-        var h = inp.dailyHours[idx] || 0;
+    if (inp.dailyShifts && inp.dailyShifts.length > 0) {
+      // 실제 월별 달력(28~31일, 4~6주차) + 출퇴근 시각(start~end) 기반 계산
+      for (var w = 0; w < cal.weekCount; w++) {
+        weekHours.push(0);
+        weekMealDays.push(0);
+      }
+      cal.days.forEach(function (cd, idx) {
+        var sh = inp.dailyShifts[idx] || { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
+        var h = sh.off ? 0 : calcShiftHours(sh.start, sh.end, sh.breakMinutes);
         var mealEligible = h > 0 && h >= minMealH;
         if (h > 0) workDays++;
-        if (mealEligible) dailyMealDays++;
+        if (mealEligible) {
+          dailyMealDays++;
+          weekMealDays[cd.weekIndex] += 1;
+        }
+        weekHours[cd.weekIndex] = M.round2(weekHours[cd.weekIndex] + h);
         daysDetail.push({
           index: idx,
-          week: w + 1,
-          dayIndex: d,
-          dayName: DAY_NAMES[d],
+          date: cd.date,
+          dateStr: cd.dateStr,
+          week: cd.week,
+          weekIndex: cd.weekIndex,
+          dayIndex: cd.dow,
+          dayName: cd.dayName,
+          isWeekend: cd.isWeekend,
+          off: sh.off || h <= 0,
+          start: sh.start,
+          end: sh.end,
+          breakMinutes: sh.breakMinutes,
           hours: M.round2(h),
           mealEligible: mealEligible
         });
+      });
+    } else {
+      // 하위 호환: dailyHours 숫자 배열 (4주×7일)
+      for (var w2 = 0; w2 < WEEKS; w2++) {
+        var wSum = 0;
+        var wMeals = 0;
+        for (var d2 = 0; d2 < DAYS_PER_WEEK; d2++) {
+          var idx2 = w2 * DAYS_PER_WEEK + d2;
+          var h2 = inp.dailyHours[idx2] || 0;
+          var mealElig2 = h2 > 0 && h2 >= minMealH;
+          if (h2 > 0) workDays++;
+          if (mealElig2) {
+            dailyMealDays++;
+            wMeals++;
+          }
+          wSum += h2;
+          daysDetail.push({
+            index: idx2,
+            date: idx2 + 1,
+            week: w2 + 1,
+            weekIndex: w2,
+            dayIndex: d2,
+            dayName: DAY_NAMES[d2],
+            isWeekend: d2 >= 5,
+            off: h2 <= 0,
+            start: '09:00',
+            end: minutesToTime(9 * 60 + Math.round(h2 * 60)),
+            breakMinutes: 0,
+            hours: M.round2(h2),
+            mealEligible: mealElig2
+          });
+        }
+        weekHours.push(M.round2(wSum));
+        weekMealDays.push(wMeals);
       }
     }
 
+    var activeWeekHours;
     if (inp.mode === 'daily') {
-      weekHours = [0, 1, 2, 3].map(function (w) {
-        var s = 0;
-        for (var d = 0; d < DAYS_PER_WEEK; d++) s += inp.dailyHours[w * DAYS_PER_WEEK + d] || 0;
-        return M.round2(s);
-      });
+      activeWeekHours = weekHours;
     } else if (inp.mode === 'weekly') {
-      weekHours = inp.weekHours.slice();
+      activeWeekHours = inp.weekHours.slice();
     } else {
-      weekHours = [0, 1, 2, 3].map(function () { return inp.totalHours / WEEKS; });
+      activeWeekHours = [0, 1, 2, 3].map(function () { return inp.totalHours / WEEKS; });
     }
 
-    var totalHours = inp.mode === 'total' ? inp.totalHours : M.round2(M.sum(weekHours));
+    var totalHours = inp.mode === 'total' ? inp.totalHours : M.round2(M.sum(activeWeekHours));
     var basePay = Math.round(totalHours * wage);
 
-    var weeks = weekHours.map(function (h, i) {
+    var weeks = activeWeekHours.map(function (h, i) {
       var eligible = h >= WEEKLY_MIN_HOURS;
-      var wMealDays = 0;
-      for (var d = 0; d < DAYS_PER_WEEK; d++) {
-        var dh = inp.dailyHours[i * DAYS_PER_WEEK + d] || 0;
-        if (dh > 0 && dh >= minMealH) wMealDays++;
-      }
       return {
         week: i + 1,
         hours: M.round2(h),
         eligible: eligible,
         allowance: inp.includeWeekly && eligible ? weeklyAllowanceFor(h, wage) : 0,
-        mealDays: wMealDays
+        mealDays: weekMealDays[i] || 0
       };
     });
 
@@ -296,6 +450,7 @@
 
     var r = {
       input: inp,
+      calendar: cal,
       name: inp.name,
       payMonth: inp.payMonth,
       payMonthLabel: payMonthLabel(inp.payMonth),
@@ -328,6 +483,10 @@
   return {
     DAY_NAMES: DAY_NAMES,
     TAX_TYPES: TAX_TYPES,
+    parseTimeMinutes: parseTimeMinutes,
+    minutesToTime: minutesToTime,
+    calcShiftHours: calcShiftHours,
+    buildMonthCalendar: buildMonthCalendar,
     normalizePayrollInput: normalizePayrollInput,
     weeklyAllowanceFor: weeklyAllowanceFor,
     lateDeductionFor: lateDeductionFor,

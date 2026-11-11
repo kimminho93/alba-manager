@@ -67,21 +67,26 @@
       rows.push([T(w.week + '주차'), N(w.hours), T(subText), W(w.allowance)]);
     });
 
-    if (r.mode === 'daily' && Array.isArray(r.days) && r.days.length === 28) {
+    if (r.mode === 'daily' && Array.isArray(r.days) && r.days.length > 0) {
       rows.push([]);
-      rows.push([H('주차'), H('월~금 일별 시간(h)'), H('토·일 시간(h)'), H('주 합계 / 식대 대상일')]);
-      for (var wIdx = 0; wIdx < 4; wIdx++) {
-        var slice = r.days.slice(wIdx * 7, wIdx * 7 + 7);
-        var wkdayStr = slice.slice(0, 5).map(function (d) { return d.dayName + ':' + d.hours; }).join('  ');
-        var wkendStr = slice.slice(5, 7).map(function (d) { return d.dayName + ':' + d.hours; }).join('  ');
-        var wkObj = r.weeks[wIdx];
+      rows.push([H('주차'), H('평일(월~금) 출퇴근 기록'), H('주말(토·일) 출퇴근 기록'), H('주 합계 / 식대 대상일')]);
+      r.weeks.forEach(function (wkObj) {
+        var wkDays = r.days.filter(function (d) { return d.week === wkObj.week; });
+        var wkdayStr = wkDays.filter(function (d) { return !d.isWeekend; }).map(function (d) {
+          var label = (d.date ? d.date + '일(' + d.dayName + ')' : d.dayName);
+          return label + ' ' + (d.hours > 0 ? (d.start && d.end ? d.start + '~' + d.end + '(' + d.hours + 'h)' : d.hours + 'h') : '휴무');
+        }).join(', ');
+        var wkendStr = wkDays.filter(function (d) { return d.isWeekend; }).map(function (d) {
+          var label = (d.date ? d.date + '일(' + d.dayName + ')' : d.dayName);
+          return label + ' ' + (d.hours > 0 ? (d.start && d.end ? d.start + '~' + d.end + '(' + d.hours + 'h)' : d.hours + 'h') : '휴무');
+        }).join(', ');
         rows.push([
-          T((wIdx + 1) + '주차'),
-          T(wkdayStr),
-          T(wkendStr),
+          T(wkObj.week + '주차'),
+          T(wkdayStr || '-'),
+          T(wkendStr || '-'),
           T('합계 ' + wkObj.hours + 'h · 식대 대상 ' + (wkObj.mealDays || 0) + '일')
         ]);
-      }
+      });
     }
 
     rows.push([]);

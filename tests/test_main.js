@@ -105,6 +105,45 @@ test('일별(매일) 근무시간 입력 + 일정시간(4h) 이상 근무 시 �
   assert.strictEqual(r.net, 1104000);
 });
 
+test('월별 실제 달력 주차(buildMonthCalendar) & 출퇴근 시각(calcShiftHours / dailyShifts) 검증', () => {
+  // 2026-11: 11월 1일(일) ~ 11월 30일(월) -> 총 30일, 월~일 기준 6개 주차에 걸침
+  const calNov = E.buildMonthCalendar('2026-11');
+  assert.strictEqual(calNov.daysInMonth, 30);
+  assert.strictEqual(calNov.weekCount, 6);
+  assert.strictEqual(calNov.days[0].dayName, '일');
+  assert.strictEqual(calNov.days[29].dayName, '월');
+
+  // 출퇴근 시각 -> 근무시간 계산 (휴게시간 및 야간 자정 넘김 포함)
+  assert.strictEqual(E.calcShiftHours('09:30', '14:30', 0), 5);
+  assert.strictEqual(E.calcShiftHours('09:00', '18:00', 60), 8);
+  assert.strictEqual(E.calcShiftHours('22:00', '02:00', 0), 4);
+
+  // dailyShifts 배열로 2026-11 평일 09:00~14:00(5h) 근무 정산
+  const shifts = calNov.days.map((d) => ({
+    off: d.isWeekend,
+    start: '09:00',
+    end: '14:00',
+    breakMinutes: 0
+  }));
+  const r = E.calculatePayroll({
+    name: '현우',
+    payMonth: '2026-11',
+    hourlyWage: 10000,
+    mode: 'daily',
+    dailyShifts: shifts,
+    includeWeekly: true,
+    includeMeal: true,
+    mealMinHours: 4,
+    mealAmount: 8000,
+    tax: 'none'
+  });
+  // 2026년 11월 평일 수 = 21일 -> 총 105시간, 식대 21일
+  assert.strictEqual(r.workDays, 21);
+  assert.strictEqual(r.totalHours, 105);
+  assert.strictEqual(r.mealDays, 21);
+  assert.strictEqual(r.weeks.length, 6);
+});
+
 test('주휴수당 포함 체크 해제 시 주휴수당 0원', () => {
   const r = E.calculatePayroll({
     name: '영희',
