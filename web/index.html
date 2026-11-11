@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="1초 알바 급여·주휴수당·식대 정산 & 표준 급여명세서, 위생·소방 법정 체크리스트 (서버 없이 동작)">
+  <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('alba.theme');
+        if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-logo">🧾</span>
+      <div>
+        <h1>사장님 도우미</h1>
+        <p>알바 급여 정산 · 위생/소방 법정 점검</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span id="modeBadge" class="badge badge-muted" title="실행 모드">⏳ 연결 확인 중…</span>
+      <button id="themeToggle" class="icon-btn" type="button" aria-label="다크/라이트 모드 전환">🌙</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" type="button" role="tab" data-tab="payroll" aria-selected="true">💰 1초 알바 급여 &amp; 명세서</button>
+    <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false">🛡️ 위생 점검 / 소방 안전 법정 체크리스트</button>
+  </nav>
+
+  <main class="container">
+    <!-- ======================= 탭 1: 급여 ======================= -->
+    <section id="tab-payroll" class="tab-panel active" role="tabpanel">
+      <div class="card parser-bar">
+        <form id="parseForm" class="parser-form" autocomplete="off">
+          <span class="parser-icon">⚡</span>
+          <input id="parseInput" type="text" placeholder="예) 지민 평일 5시간 시급 10,500원 4시간 이상 식대 8,000원" aria-label="한 줄 입력">
+          <button type="submit" class="btn btn-primary">1초 정산</button>
+        </form>
+        <div class="parser-sub">
+          <div class="chips">
+            <span class="chips-label">예시</span>
+            <button type="button" class="chip" data-example="철수 이번 달 총 62시간, 시급 10,000원 지각 20분">철수 62시간 · 지각 20분</button>
+            <button type="button" class="chip" data-example="영희 80시간 만원">영희 80시간 만원</button>
+            <button type="button" class="chip" data-example="민수 주 14시간 시급 11,000원 주휴미포함">민수 주 14시간 · 주휴미포함</button>
+            <button type="button" class="chip" data-example="지민 평일 5시간 시급 10,500원 4시간 이상 식대 8,000원">지민 평일 5h · 식대 8,000원</button>
+          </div>
+          <div id="parseResult" class="parse-result"></div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <form id="payForm" class="card input-card" autocomplete="off" onsubmit="return false">
+          <h2 class="card-title">근무 정보</h2>
+
+          <div class="row-2">
+            <label class="field"><span>알바생 이름</span>
+              <input id="pName" type="text" value="철수" maxlength="20">
+            </label>
+            <label class="field"><span>지급월</span>
+              <input id="pMonth" type="month">
+            </label>
+          </div>
+
+          <label class="field"><span>시급 (원) <em class="hint">자유 입력 · 2026 최저 10,320원</em></span>
+            <input id="pWage" type="number" inputmode="numeric" min="0" step="10" value="10320">
+          </label>
+
+          <div class="field">
+            <span>근무시간 입력 방식</span>
+            <div class="segmented" role="radiogroup" aria-label="근무시간 입력 방식">
+              <label><input type="radio" name="pMode" value="daily" checked><span>📅 매일(일별)</span></label>
+              <label><input type="radio" name="pMode" value="weekly"><span>📆 주차별(1~4주)</span></label>
+              <label><input type="radio" name="pMode" value="total"><span>⏱ 월 총 시간</span></label>
+            </div>
+            <input id="pWeekMode" type="checkbox" hidden>
+          </div>
+
+          <!-- ① 매일(일별) 시간 입력 모드 -->
+          <div id="dailyGroup" class="daily-group">
+            <div class="daily-quick">
+              <div class="quick-item">
+                <span>평일(월~금)</span>
+                <input id="qWeekday" type="number" min="0" max="24" step="0.5" value="5" aria-label="평일 일괄 시간">
+                <button id="btnFillWeekday" type="button" class="btn btn-xs">일괄 적용</button>
+              </div>
+              <div class="quick-item">
+                <span>주말(토·일)</span>
+                <input id="qWeekend" type="number" min="0" max="24" step="0.5" value="0" aria-label="주말 일괄 시간">
+                <button id="btnFillWeekend" type="button" class="btn btn-xs">일괄 적용</button>
+              </div>
+              <button id="btnClearDaily" type="button" class="btn btn-xs btn-ghost">초기화</button>
+            </div>
+
+            <div class="daily-table-wrap">
+              <table class="daily-grid-table" aria-label="일별 근무시간 입력표">
+                <thead>
+                  <tr>
+                    <th>주차</th>
+                    <th>월</th><th>화</th><th>수</th><th>목</th><th>금</th>
+                    <th class="sat">토</th><th class="sun">일</th>
+                    <th>주 합계</th>
+                  </tr>
+                </thead>
+                <tbody id="dailyGridBody"></tbody>
+              </table>
+            </div>
+            <p class="muted small daily-summary">
+              총 <b id="dailyTotalHours">100</b>시간 (<b id="dailyWorkDays">20</b>일 근무) ·
+              🍚 식대 대상 <b id="dailyMealDays">20</b>일 (초록 칸 = 식대 기준시간 충족)
+            </p>
+          </div>
+
+          <!-- ② 월 총 근무시간 입력 모드 -->
+          <div id="totalGroup" hidden>
+            <label class="field"><span>이번 달 총 근무시간 <em class="hint">4주 균등 분할 계산</em></span>
+              <div class="input-unit"><input id="pTotal" type="number" inputmode="decimal" min="0" step="0.5" value="60"><b>시간</b></div>
+            </label>
+          </div>
+
+          <!-- ③ 주차별(1~4주) 입력 모드 -->
+          <div id="weeksGroup" hidden>
+            <div class="weeks">
+              <label class="field"><span>1주</span><input id="pW1" type="number" min="0" step="0.5" value="15"></label>
+              <label class="field"><span>2주</span><input id="pW2" type="number" min="0" step="0.5" value="15"></label>
+              <label class="field"><span>3주</span><input id="pW3" type="number" step="0.5" min="0" value="15"></label>
+              <label class="field"><span>4주</span><input id="pW4" type="number" step="0.5" min="0" value="15"></label>
+            </div>
+            <p class="muted small">합계 <b id="weeksSum">60</b>시간 · 주 15시간 이상인 주만 주휴수당 대상</p>
+          </div>
+
+          <label class="field"><span>지각·조퇴 (분)</span>
+            <div class="input-unit"><input id="pLate" type="number" inputmode="numeric" min="0" step="5" value="0"><b>분</b></div>
+          </label>
+
+          <div class="field"><span>세금 공제</span>
+            <div class="segmented" role="radiogroup">
+              <label><input type="radio" name="pTax" value="3.3" checked><span>3.3%</span></label>
+              <label><input type="radio" name="pTax" value="4ins"><span>4대보험</span></label>
+              <label><input type="radio" name="pTax" value="none"><span>미적용 0%</span></label>
+            </div>
+          </div>
+
+          <label id="weeklyBox" class="weekly-box on">
+            <input id="pWeekly" type="checkbox" checked>
+            <span class="weekly-text">
+              <b>주휴수당 포함하여 정산하기</b>
+              <small>주 15시간 이상인 주 : (min(주시간,40) ÷ 40) × 8 × 시급</small>
+            </span>
+          </label>
+
+          <!-- 식대 추가 지급 설정 박스 -->
+          <div id="mealBox" class="meal-box on">
+            <label class="meal-head">
+              <input id="pMeal" type="checkbox" checked>
+              <span class="weekly-text">
+                <b>🍚 일정 시간 이상 근무 시 식대 추가 지급</b>
+                <small id="mealSummaryText">하루 기준시간 이상 근무한 날에 식대를 추가 지급합니다</small>
+              </span>
+            </label>
+            <div id="mealConfig" class="meal-config">
+              <label class="field">
+                <span>지급 기준 (하루 N시간 이상)</span>
+                <div class="input-unit">
+                  <input id="pMealMinHours" type="number" min="0.5" max="24" step="0.5" value="4">
+                  <b>시간↑</b>
+                </div>
+              </label>
+              <label class="field">
+                <span>1일 식대 금액</span>
+                <div class="input-unit">
+                  <input id="pMealAmount" type="number" min="0" step="500" value="8000">
+                  <b>원</b>
+                </div>
+              </label>
+              <label id="mealDaysManualField" class="field" hidden>
+                <span>식대 지급 일수 <em class="hint">월/주차 모드 수동 입력</em></span>
+                <div class="input-unit">
+                  <input id="pMealDays" type="number" min="0" max="31" step="1" value="16">
+                  <b>일</b>
+                </div>
+              </label>
+            </div>
+          </div>
+        </form>
+
+        <div class="card preview-card">
+          <div class="banner pay-banner">
+            <p id="bannerText">계산 중…</p>
+            <button id="copyKakao" type="button" class="btn btn-kakao">💬 카톡 명세서 복사</button>
+          </div>
+
+          <div class="doc" id="payDoc">
+            <div class="doc-head">
+              <h3>급여명세서</h3>
+              <span class="doc-law">근로기준법 제48조 제2항 기준</span>
+            </div>
+            <table class="doc-info">
+              <tr><th>성명</th><td id="slipName">-</td><th>지급월</th><td id="slipMonth">-</td></tr>
+              <tr><th>시급</th><td id="slipWage">-</td><th>총 근무시간</th><td id="slipHours">-</td></tr>
+              <tr><th>주휴 / 식대</th><td id="slipWeekly">-</td><th>세금 방식</th><td id="slipTax">-</td></tr>
+            </table>
+            <div class="table-wrap">
+              <table class="doc-table slip-table">
+                <thead><tr><th>구분</th><th>항목</th><th class="num">금액</th><th>산출식 (계산 방법)</th></tr></thead>
+                <tbody id="slipBody"></tbody>
+              </table>
+            </div>
+            <div id="weekStrip" class="week-strip"></div>
+            <p class="doc-foot">위 금액을 정히 지급합니다. &nbsp; 사업주 : ____________ (인)</p>
+          </div>
+
+          <div class="actions">
+            <button id="btnPrintPay" type="button" class="btn">🖨️ PDF 출력/저장</button>
+            <button id="btnXlsxPay" type="button" class="btn">📊 엑셀(.xlsx) 다운로드</button>
+            <button id="btnAddRoster" type="button" class="btn btn-primary">➕ 아래 정산 명단에 추가</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card archive">
+        <div class="archive-head">
+          <h2 class="card-title">📋 정산 명단 <span id="rosterCount" class="count">0명</span></h2>
+          <div class="archive-actions">
+            <span class="total-pill">총 입금 합계 <b id="rosterTotal">0원</b></span>
+            <button id="btnRosterXlsx" type="button" class="btn">📊 명단 전체 엑셀(.xlsx) 다운로드</button>
+            <button id="btnRosterClear" type="button" class="btn btn-ghost">비우기</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="list-table">
+            <thead>
+              <tr><th>#</th><th>성명</th><th>지급월</th><th class="num">근무</th><th class="num">시급</th><th class="num">주휴수당</th><th class="num">식대</th><th class="num">세전총액</th><th class="num">공제</th><th class="num">실수령액</th><th></th></tr>
+            </thead>
+            <tbody id="rosterBody"></tbody>
+            <tfoot id="rosterFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= 탭 2: 위생·소방 ======================= -->
+    <section id="tab-checklist" class="tab-panel" role="tabpanel">
+      <div class="grid">
+        <form id="chkForm" class="card input-card" autocomplete="off" onsubmit="return false">
+          <h2 class="card-title">점검 정보</h2>
+          <label class="field"><span>매장명 (상호)</span>
+            <input id="cStore" type="text" placeholder="예) 행복분식 강남점" maxlength="40">
+          </label>
+          <div class="row-2">
+            <label class="field"><span>점검일자</span><input id="cDate" type="date"></label>
+            <label class="field"><span>점검자 성명</span><input id="cInspector" type="text" placeholder="홍길동" maxlength="20"></label>
+          </div>
+          <div class="row-2">
+            <label class="field"><span>냉장 온도 <em class="hint">0~5°C</em></span>
+              <div class="input-unit"><input id="cFridge" type="number" step="0.1" value="3.0"><b>°C</b></div>
+              <small id="fridgeHint" class="temp-hint"></small>
+            </label>
+            <label class="field"><span>냉동 온도 <em class="hint">-18°C 이하</em></span>
+              <div class="input-unit"><input id="cFreezer" type="number" step="0.1" value="-18.5"><b>°C</b></div>
+              <small id="freezerHint" class="temp-hint"></small>
+            </label>
+          </div>
+
+          <div class="check-list">
+            <label class="check-item"><input id="cCheck1" type="checkbox"><span><b>①</b> 냉장·냉동 온도 정상 &amp; 소비기한 경과 식재료 없음</span></label>
+            <label class="check-item"><input id="cCheck2" type="checkbox"><span><b>②</b> 개인위생(보건증·위생모) &amp; 조리장·칼·도마 소독 완료</span></label>
+            <label class="check-item"><input id="cCheck3" type="checkbox"><span><b>③</b> 소화기·비상구 확보 &amp; 가스밸브·누전차단기 이상 없음</span></label>
+          </div>
+
+          <label class="field"><span>특이사항 메모</span>
+            <textarea id="cMemo" rows="3" maxlength="500" placeholder="예) 냉동고 성에 제거 필요, 소화기 교체 예정"></textarea>
+          </label>
+        </form>
+
+        <div class="card preview-card">
+          <div id="chkBanner" class="banner chk-banner">
+            <p id="chkBannerText">계산 중…</p>
+            <span id="chkScore" class="score">0/9</span>
+          </div>
+
+          <div class="doc" id="chkDoc">
+            <div class="doc-head">
+              <h3>위생 점검 / 소방 안전 체크리스트</h3>
+              <span class="doc-law">법정 9대 점검 항목</span>
+            </div>
+            <table class="doc-info">
+              <tr><th>매장명</th><td id="chkStore">-</td><th>점검일자</th><td id="chkDate">-</td></tr>
+              <tr><th>점검자</th><td id="chkInspector">-</td><th>종합 결과</th><td id="chkVerdict">-</td></tr>
+              <tr><th>냉장 온도</th><td id="chkFridge">-</td><th>냉동 온도</th><td id="chkFreezer">-</td></tr>
+            </table>
+            <div class="table-wrap">
+              <table class="doc-table chk-table">
+                <thead><tr><th>분류</th><th>No</th><th>점검 항목</th><th>결과</th><th>비고</th></tr></thead>
+                <tbody id="chkBody"></tbody>
+              </table>
+            </div>
+            <div class="memo-box"><b>특이사항</b><p id="chkMemo">-</p></div>
+            <p class="doc-foot">점검자 : <span id="chkSign">________</span> (서명)</p>
+          </div>
+
+          <div class="actions">
+            <button id="btnPrintChk" type="button" class="btn">🖨️ 점검표 PDF 출력/저장</button>
+            <button id="btnXlsxChk" type="button" class="btn">📊 점검표 엑셀(.xlsx) 다운로드</button>
+            <button id="btnAddArchive" type="button" class="btn btn-primary">🗂️ 보관함에 저장</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card archive">
+        <div class="archive-head">
+          <h2 class="card-title">🗂️ 일별 위생·소방 점검 보관함 <span id="archiveCount" class="count">0일</span></h2>
+          <div class="archive-actions">
+            <button id="btnArchiveXlsx" type="button" class="btn">📊 보관함 일괄 엑셀(.xlsx) 다운로드</button>
+            <button id="btnArchiveClear" type="button" class="btn btn-ghost">비우기</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="list-table">
+            <thead>
+              <tr><th>#</th><th>점검일자</th><th>매장명</th><th>점검자</th><th class="num">냉장</th><th class="num">냉동</th><th>적합</th><th>결과</th><th>특이사항</th><th></th></tr>
+            </thead>
+            <tbody id="archiveBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="./engine.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

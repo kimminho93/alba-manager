@@ -1,0 +1,14 @@
+{
+  "name": "alba-manager",
+  "version": "1.0.0",
+  "description": "1초 알바 급여 & 표준 급여명세서 + 위생·소방 법정 체크리스트 (서버 없이 100% 브라우저 동작)",
+  "private": true,
+  "scripts": {
+    "build": "node tools/build.js",
+    "start": "node server/app.js",
+    "web": "node server/app.js --static",
+    "test": "node tests/test_main.js && node tests/test_server.js",
+    "clean": "node tools/build.js --clean"
+  }
+}
+
