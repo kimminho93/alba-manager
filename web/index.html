@@ -215,39 +215,55 @@
                 <button type="button" class="chip preset-chip chip-off" data-off="true">🚫 휴무</button>
               </div>
 
-              <!-- 출근 / 퇴근 슬라이더 + 시·분 클릭 선택 -->
+              <!-- 출근 / 퇴근 클릭 시 아래로 스크롤바가 열리는 드롭다운 타임피커 -->
               <div class="time-pickers-grid">
-                <!-- 출근 시각 -->
+                <!-- 출근 시각 드롭다운 스크롤 피커 -->
                 <div class="time-picker-box">
                   <div class="tp-header">
                     <span>🌅 출근 시각</span>
-                    <strong id="startDisplay" class="tp-big-time">09:00</strong>
+                    <span class="tp-sub">클릭 후 마우스 휠로 스크롤 선택</span>
                   </div>
-                  <div class="tp-slider-row">
-                    <span class="tp-sub">시(Hour) 슬라이드</span>
-                    <input id="startHourRange" type="range" min="0" max="23" step="1" value="9">
-                  </div>
-                  <div id="startHourBtns" class="hour-chip-grid" aria-label="출근 시 선택"></div>
-                  <div class="tp-min-row">
-                    <span class="tp-sub">분(Min) 선택</span>
-                    <div id="startMinBtns" class="min-chip-row"></div>
+                  <div class="tp-dropdown-row">
+                    <div class="scroll-select" id="startHourDropdown">
+                      <button type="button" class="scroll-select-btn" id="startHourBtn" aria-expanded="false">
+                        <span id="startHourText">09시</span>
+                        <span class="caret">▾</span>
+                      </button>
+                      <div class="scroll-menu" id="startHourMenu" role="listbox" aria-label="출근 시 선택"></div>
+                    </div>
+                    <span class="tp-colon">:</span>
+                    <div class="scroll-select" id="startMinDropdown">
+                      <button type="button" class="scroll-select-btn" id="startMinBtn" aria-expanded="false">
+                        <span id="startMinText">00분</span>
+                        <span class="caret">▾</span>
+                      </button>
+                      <div class="scroll-menu" id="startMinMenu" role="listbox" aria-label="출근 분 선택"></div>
+                    </div>
                   </div>
                 </div>
 
-                <!-- 퇴근 시각 -->
+                <!-- 퇴근 시각 드롭다운 스크롤 피커 -->
                 <div class="time-picker-box">
                   <div class="tp-header">
                     <span>🌇 퇴근 시각</span>
-                    <strong id="endDisplay" class="tp-big-time">14:00</strong>
+                    <span class="tp-sub">클릭 후 마우스 휠로 스크롤 선택</span>
                   </div>
-                  <div class="tp-slider-row">
-                    <span class="tp-sub">시(Hour) 슬라이드</span>
-                    <input id="endHourRange" type="range" min="0" max="24" step="1" value="14">
-                  </div>
-                  <div id="endHourBtns" class="hour-chip-grid" aria-label="퇴근 시 선택"></div>
-                  <div class="tp-min-row">
-                    <span class="tp-sub">분(Min) 선택</span>
-                    <div id="endMinBtns" class="min-chip-row"></div>
+                  <div class="tp-dropdown-row">
+                    <div class="scroll-select" id="endHourDropdown">
+                      <button type="button" class="scroll-select-btn" id="endHourBtn" aria-expanded="false">
+                        <span id="endHourText">14시</span>
+                        <span class="caret">▾</span>
+                      </button>
+                      <div class="scroll-menu" id="endHourMenu" role="listbox" aria-label="퇴근 시 선택"></div>
+                    </div>
+                    <span class="tp-colon">:</span>
+                    <div class="scroll-select" id="endMinDropdown">
+                      <button type="button" class="scroll-select-btn" id="endMinBtn" aria-expanded="false">
+                        <span id="endMinText">00분</span>
+                        <span class="caret">▾</span>
+                      </button>
+                      <div class="scroll-menu" id="endMinMenu" role="listbox" aria-label="퇴근 분 선택"></div>
+                    </div>
                   </div>
                 </div>
               </div>

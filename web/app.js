@@ -22,7 +22,7 @@
     store: 'alba.store.v1'
   };
 
-  var MINUTE_STEPS = [0, 10, 15, 20, 30, 40, 45, 50];
+  var MINUTE_STEPS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
   var state = {
     serverAvailable: false,
@@ -196,30 +196,61 @@
   }
 
   /* ==========================================================
-     월별 실제 달력 & 출퇴근 시각(시/분) 선택기 초기화 및 제어
+     월별 실제 달력 & 출퇴근 시각(시/분) 드롭다운 스크롤 선택기
      ========================================================== */
   function initTimePickerChips() {
     var shHtml = '';
-    for (var h = 6; h <= 21; h++) {
-      shHtml += '<button type="button" class="t-chip" data-sh="' + h + '">' + pad2(h) + '시</button>';
+    for (var h = 0; h <= 23; h++) {
+      shHtml += '<button type="button" class="scroll-option" role="option" data-sh="' + h + '">' +
+        '<span>' + pad2(h) + '시</span><small class="muted">' + (h < 12 ? '오전' : '오후') + '</small></button>';
     }
-    $('startHourBtns').innerHTML = shHtml;
+    $('startHourMenu').innerHTML = shHtml;
 
     var ehHtml = '';
-    for (var eh = 9; eh <= 24; eh++) {
-      ehHtml += '<button type="button" class="t-chip" data-eh="' + eh + '">' + pad2(eh) + '시</button>';
+    for (var eh = 0; eh <= 24; eh++) {
+      ehHtml += '<button type="button" class="scroll-option" role="option" data-eh="' + eh + '">' +
+        '<span>' + pad2(eh) + '시</span><small class="muted">' + (eh === 24 ? '자정' : (eh < 12 ? '오전' : '오후')) + '</small></button>';
     }
-    $('endHourBtns').innerHTML = ehHtml;
+    $('endHourMenu').innerHTML = ehHtml;
 
     var smHtml = MINUTE_STEPS.map(function (m) {
-      return '<button type="button" class="t-chip" data-sm="' + m + '">' + pad2(m) + '분</button>';
+      return '<button type="button" class="scroll-option" role="option" data-sm="' + m + '">' +
+        '<span>' + pad2(m) + '분</span></button>';
     }).join('');
-    $('startMinBtns').innerHTML = smHtml;
+    $('startMinMenu').innerHTML = smHtml;
 
     var emHtml = MINUTE_STEPS.map(function (m) {
-      return '<button type="button" class="t-chip" data-em="' + m + '">' + pad2(m) + '분</button>';
+      return '<button type="button" class="scroll-option" role="option" data-em="' + m + '">' +
+        '<span>' + pad2(m) + '분</span></button>';
     }).join('');
-    $('endMinBtns').innerHTML = emHtml;
+    $('endMinMenu').innerHTML = emHtml;
+  }
+
+  function closeAllScrollDropdowns(exceptEl) {
+    document.querySelectorAll('.scroll-select.open').forEach(function (el) {
+      if (el !== exceptEl) {
+        el.classList.remove('open');
+        var btn = el.querySelector('.scroll-select-btn');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  function toggleScrollDropdown(wrapId) {
+    var wrap = $(wrapId);
+    if (!wrap) return;
+    var willOpen = !wrap.classList.contains('open');
+    closeAllScrollDropdowns(wrap);
+    wrap.classList.toggle('open', willOpen);
+    var btn = wrap.querySelector('.scroll-select-btn');
+    if (btn) btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    if (willOpen) {
+      var menu = wrap.querySelector('.scroll-menu');
+      var active = menu && menu.querySelector('.scroll-option.active');
+      if (menu && active) {
+        menu.scrollTop = Math.max(0, active.offsetTop - (menu.clientHeight / 2) + (active.offsetHeight / 2));
+      }
+    }
   }
 
   function ensureCalendarAndShifts(payMonth, resetDefault) {
@@ -315,10 +346,10 @@
       ? '🚫 <b>휴무 (0시간)</b>'
       : (sh.start + ' ~ ' + sh.end + (sh.breakMinutes ? ' (-' + sh.breakMinutes + '분)' : '') + ' · <b>' + E.formatNum(sh.hours, 2) + '시간</b>' + mealTag);
 
-    $('startDisplay').textContent = sh.start;
-    $('endDisplay').textContent = sh.end;
-    $('startHourRange').value = state.editor.startHour;
-    $('endHourRange').value = state.editor.endHour;
+    $('startHourText').textContent = pad2(state.editor.startHour) + '시';
+    $('startMinText').textContent = pad2(state.editor.startMin) + '분';
+    $('endHourText').textContent = pad2(state.editor.endHour) + '시';
+    $('endMinText').textContent = pad2(state.editor.endMin) + '분';
 
     document.querySelectorAll('[data-sh]').forEach(function (b) {
       b.classList.toggle('active', Number(b.getAttribute('data-sh')) === state.editor.startHour);
@@ -852,48 +883,57 @@
       recalcPayroll();
     });
 
-    // 출퇴근 슬라이더 조작 시 선택된 날짜에 즉시 반영
-    $('startHourRange').addEventListener('input', function () {
-      state.editor.startHour = Number($('startHourRange').value);
-      state.editor.off = false;
-      applyEditorToSelectedDay();
-    });
-    $('endHourRange').addEventListener('input', function () {
-      state.editor.endHour = Number($('endHourRange').value);
-      if (state.editor.endHour === 24) state.editor.endMin = 0;
-      state.editor.off = false;
-      applyEditorToSelectedDay();
+    // 드롭다운 스크롤 피커 열기/닫기 및 옵션 선택
+    [
+      { btnId: 'startHourBtn', wrapId: 'startHourDropdown' },
+      { btnId: 'startMinBtn', wrapId: 'startMinDropdown' },
+      { btnId: 'endHourBtn', wrapId: 'endHourDropdown' },
+      { btnId: 'endMinBtn', wrapId: 'endMinDropdown' }
+    ].forEach(function (item) {
+      $(item.btnId).addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        toggleScrollDropdown(item.wrapId);
+      });
     });
 
-    // 시/분 클릭 칩 선택 시 즉시 반영
-    $('startHourBtns').addEventListener('click', function (ev) {
+    document.addEventListener('click', function (ev) {
+      if (!ev.target.closest('.scroll-select')) {
+        closeAllScrollDropdowns(null);
+      }
+    });
+
+    $('startHourMenu').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-sh]');
       if (!b) return;
       state.editor.startHour = Number(b.getAttribute('data-sh'));
       state.editor.off = false;
+      closeAllScrollDropdowns(null);
       applyEditorToSelectedDay();
     });
-    $('endHourBtns').addEventListener('click', function (ev) {
+    $('endHourMenu').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-eh]');
       if (!b) return;
       state.editor.endHour = Number(b.getAttribute('data-eh'));
       if (state.editor.endHour === 24) state.editor.endMin = 0;
       state.editor.off = false;
+      closeAllScrollDropdowns(null);
       applyEditorToSelectedDay();
     });
-    $('startMinBtns').addEventListener('click', function (ev) {
+    $('startMinMenu').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-sm]');
       if (!b) return;
       state.editor.startMin = Number(b.getAttribute('data-sm'));
       state.editor.off = false;
+      closeAllScrollDropdowns(null);
       applyEditorToSelectedDay();
     });
-    $('endMinBtns').addEventListener('click', function (ev) {
+    $('endMinMenu').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-em]');
       if (!b) return;
       if (state.editor.endHour === 24) state.editor.endHour = 23;
       state.editor.endMin = Number(b.getAttribute('data-em'));
       state.editor.off = false;
+      closeAllScrollDropdowns(null);
       applyEditorToSelectedDay();
     });
 
