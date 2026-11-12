@@ -1827,3 +1827,6 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .75; }
 .cloud-actions .btn { width: 100%; justify-content: center; padding: 14px 12px; font-size: 16px; }
 .cloud-warn { margin: 10px 0 0; font-size: 14px; color: var(--bad); word-break: keep-all; }
 @media print { .cloud-btn, .modal { display: none !important; } }
+
+.cloud-backup { margin-top: 20px; padding-top: 16px; border-top: 1.5px solid var(--line); }
+.cloud-backup-title { margin: 0 0 4px; font-size: 17px; }

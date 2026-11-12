@@ -12,6 +12,7 @@ module.exports = Object.assign(
   require('../src/parser.js'),
   require('../src/payroll.js'),
   require('../src/checklist.js'),
+  require('../src/backup.js'),
   require('../src/xlsx.js'),
   require('../src/reports.js')
 );

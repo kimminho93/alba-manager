@@ -1477,7 +1477,46 @@
         '<button type="button" class="btn btn-ghost" data-cloud="off">연동 끊기</button>' +
         '</div>';
     }
+    html +=
+      '<div class="cloud-backup">' +
+      '<h3 class="cloud-backup-title">💾 백업 파일</h3>' +
+      '<p class="cloud-sub">구글 계정을 바꾸거나 다른 기기로 옮길 때 쓰세요. 모든 기록이 파일 하나로 저장됩니다.</p>' +
+      '<div class="cloud-actions">' +
+      '<button type="button" class="btn" data-cloud="backup-save">⬇️ 백업 파일 내려받기</button>' +
+      '<button type="button" class="btn" data-cloud="backup-load">⬆️ 백업 파일 불러오기</button>' +
+      '</div></div>';
     body.innerHTML = html;
+  }
+
+  function backupDownload() {
+    var text = E.buildBackup(cloudData());
+    var blob = new Blob([text], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = E.backupFileName();
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+    showToast('💾 백업 파일을 내려받았습니다 (' + state.roster.length + '명 · 점검 ' + state.archive.length + '일)');
+  }
+
+  function backupRestore(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var r = E.parseBackup(String(reader.result || ''));
+      if (!r.ok) { window.alert(r.error); return; }
+      var msg = '백업 파일의 기록으로 바꿉니다.\n\n' +
+        '불러올 기록: 정산 명단 ' + r.counts.roster + '명 · 점검 보관함 ' + r.counts.archive + '일\n' +
+        '지금 화면의 기록: 정산 명단 ' + state.roster.length + '명 · 점검 보관함 ' + state.archive.length + '일 (사라집니다)\n\n계속할까요?';
+      if (!window.confirm(msg)) return;
+      cloudApply(r.data);
+      if (window.AlbaCloud) window.AlbaCloud.markDirty();
+      showToast('⬆️ 백업 파일을 불러왔습니다' + (r.counts.skipped ? ' (읽을 수 없는 ' + r.counts.skipped + '건 제외)' : ''));
+    };
+    reader.onerror = function () { window.alert('파일을 읽지 못했습니다.'); };
+    reader.readAsText(file);
   }
 
   function initCloud() {
@@ -1502,6 +1541,8 @@
       var b = ev.target.closest('[data-cloud]');
       if (!b) return;
       var act = b.getAttribute('data-cloud');
+      if (act === 'backup-save') { backupDownload(); return; }
+      if (act === 'backup-load') { $('backupFile').click(); return; }
       if (act === 'connect') {
         C.connect().then(function (ok) { if (ok) showToast('☁️ 구글 시트 연동 완료'); });
       } else if (act === 'save') {
@@ -1519,6 +1560,10 @@
         C.disconnect();
         showToast('구글 연동을 끊었습니다');
       }
+    });
+    $('backupFile').addEventListener('change', function (ev) {
+      backupRestore(ev.target.files && ev.target.files[0]);
+      ev.target.value = '';
     });
     renderCloudUi(C.getStatus());
   }

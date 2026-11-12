@@ -284,6 +284,35 @@ test('위생 점검 엑셀: 41개 항목 전부 시트에 포함', () => {
   assert.strictEqual(bytes[0], 0x50);
 });
 
+test('백업 파일: 내려받기 → 불러오기로 기록이 그대로 복원되고, 엉뚱한 파일은 거절', () => {
+  const roster = [{ name: '철수', hourlyWage: 10000, totalHours: 60 }, { name: '영희', hourlyWage: 11000, totalHours: 80 }];
+  const archive = [{ store: '행복분식', date: '2026-11-12', inspector: '김사장', checks: [1, 2, 3] }];
+  const presets = [{ name: '오전', start: '09:00', end: '14:00', breakMin: 0 }];
+  const text = E.buildBackup({ roster, archive, presets, store: { store: '행복분식', inspector: '김사장' } }, Date.UTC(2026, 10, 12, 8, 0, 0));
+  assert.ok(E.backupFileName(new Date(2026, 10, 12).getTime()).indexOf('사장님도우미_백업_2026-11-12') === 0);
+  const r = E.parseBackup(text);
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.counts.roster, 2);
+  assert.strictEqual(r.counts.archive, 1);
+  assert.deepStrictEqual(r.data.roster, roster);
+  assert.deepStrictEqual(r.data.archive, archive);
+  assert.strictEqual(r.data.store.store, '행복분식');
+  assert.strictEqual(r.data.presets.length, 1);
+
+  assert.strictEqual(E.parseBackup('').ok, false);
+  assert.strictEqual(E.parseBackup('안녕하세요').ok, false);
+  assert.strictEqual(E.parseBackup('{"app":"other","data":{}}').ok, false);
+  assert.strictEqual(E.parseBackup('{"app":"alba-manager","version":99,"data":{}}').ok, false);
+  // 일부 항목이 깨져 있으면 그 항목만 제외
+  const bad = JSON.stringify({ app: 'alba-manager', version: 1, data: { roster: [roster[0], 'x', null, 5], archive: [], presets: [{ start: 'a', end: 'b' }], store: 3 } });
+  const rb = E.parseBackup(bad);
+  assert.strictEqual(rb.ok, true);
+  assert.strictEqual(rb.counts.roster, 1);
+  assert.strictEqual(rb.counts.skipped, 3);
+  assert.strictEqual(rb.data.presets.length, 0);
+  assert.deepStrictEqual(rb.data.store, { store: '', inspector: '' });
+});
+
 test('순수 JS OpenXML .xlsx ZIP 시그니처(PK\\x03\\x04) 검증', () => {
   const r = E.calculatePayroll({ name: '철수', hourlyWage: 10000, totalHours: 60, includeMeal: true, mealDays: 15, mealAmount: 8000 });
   const bytes = E.payrollSlipXlsx(r);
