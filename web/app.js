@@ -583,6 +583,11 @@
   }
 
   /* ---------- 월별 실제 달력 테이블 렌더링 ---------- */
+  function syncPayMonthLabel() {
+    var m = /^(\d{4})-(\d{2})$/.exec($('pMonth').value || '');
+    $('pMonthLabel').textContent = m ? (m[1] + '년 ' + Number(m[2]) + '월') : '월 선택';
+  }
+
   function renderMonthCalendar(r) {
     var cal = r.calendar || state.calendar;
     if (!cal) return;
@@ -1278,8 +1283,20 @@
       });
     });
 
+    // 지급월 ◀ ▶ 버튼 (한글 "2026년 11월" 표기)
+    function shiftPayMonth(delta) {
+      var m = /^(\d{4})-(\d{2})$/.exec($('pMonth').value || '');
+      var d = m ? new Date(Number(m[1]), Number(m[2]) - 1 + delta, 1) : new Date();
+      $('pMonth').value = d.getFullYear() + '-' + pad2(d.getMonth() + 1);
+      $('pMonth').dispatchEvent(new Event('change'));
+    }
+    $('pMonthPrev').addEventListener('click', function () { shiftPayMonth(-1); });
+    $('pMonthNext').addEventListener('click', function () { shiftPayMonth(1); });
+    syncPayMonthLabel();
+
     // 지급월 변경 시 해당 월의 실제 달력/주차 재구성
     $('pMonth').addEventListener('change', function () {
+      syncPayMonthLabel();
       ensureCalendarAndShifts($('pMonth').value, false);
       recalcPayroll();
       showToast('📅 ' + state.calendar.year + '년 ' + state.calendar.month + '월 달력 (' + state.calendar.weekCount + '개 주차) 적용');

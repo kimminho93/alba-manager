@@ -64,13 +64,17 @@
         <form id="payForm" class="card input-card" autocomplete="off" onsubmit="return false">
           <h2 class="card-title">근무 정보</h2>
 
-          <div class="row-2">
-            <label class="field"><span>알바생 이름</span>
-              <input id="pName" type="text" value="철수" maxlength="20">
-            </label>
-            <label class="field"><span>지급월 <em class="hint">월별 주차 자동 반영</em></span>
-              <input id="pMonth" type="month">
-            </label>
+          <label class="field"><span>알바생 이름</span>
+            <input id="pName" type="text" value="철수" maxlength="20">
+          </label>
+
+          <div class="field month-field"><span>지급월 <em class="hint">월별 주차 자동 반영</em></span>
+            <input id="pMonth" type="hidden">
+            <div class="month-stepper" role="group" aria-label="지급월 선택">
+              <button type="button" id="pMonthPrev" class="month-step" aria-label="이전 달">◀</button>
+              <output id="pMonthLabel" class="month-label" aria-live="polite">----년 --월</output>
+              <button type="button" id="pMonthNext" class="month-step" aria-label="다음 달">▶</button>
+            </div>
           </div>
 
           <label class="field"><span>시급 (원) <em class="hint">자유 입력 · 2026 최저 10,320원</em></span>
@@ -141,16 +145,16 @@
             <label class="meal-head">
               <input id="pMeal" type="checkbox" checked>
               <span class="weekly-text">
-                <b>🍚 일정 시간 이상 근무 시 식대 추가 지급</b>
+                <b>🍚 식대 추가 지급</b>
                 <small id="mealSummaryText">하루 기준시간 이상 근무한 날에 식대를 추가 지급합니다</small>
               </span>
             </label>
             <div id="mealConfig" class="meal-config">
               <label class="field">
-                <span>지급 기준 (하루 N시간 이상)</span>
+                <span>하루 근무 기준</span>
                 <div class="input-unit">
                   <input id="pMealMinHours" type="number" min="0.5" max="24" step="0.5" value="4">
-                  <b>시간↑</b>
+                  <b>시간 이상</b>
                 </div>
               </label>
               <label class="field">
