@@ -39,6 +39,7 @@
       }
     }
     if (vars) s = s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] === undefined ? m : String(vars[k]); });
+    if (LANG === 'en') s = s.replace(/(^|[^\d.])1 days\b/g, '$11 day');
     return s;
   }
   /** 브라우저 언어가 한국어가 아니면 'en' (navigator.language 값을 넘겨 받음) */
@@ -232,7 +233,7 @@
     '■ 근무 요약': '■ Work summary',
     '총 근무시간': 'Total hours',
     '출근일수': 'Days worked',
-    '{n}일': '{n}d',
+    '{n}일': '{n} days',
     '주 약속일수': 'Agreed days/week',
     '주 {d}일': '{d} d/wk',
     '식대 지급 횟수': 'Meals paid',
@@ -328,7 +329,7 @@
     '지급됨': 'Paid', '포함': 'Included', '미포함': 'Not included'
   });
   I.addPatterns([
-    [/^(\d+)일$/, '$1d'], [/^(\d+)명$/, '$1 staff'], [/^(\d+)회$/, '$1'],
+    [/^(\d+)일$/, '$1 days'], [/^(\d+)명$/, '$1 staff'], [/^(\d+)회$/, '$1'],
     [/^(\d+)분$/, '$1 min'], [/^(\d+)주$/, '$1 wk'], [/^(\d+)주차$/, 'Wk $1'],
     [/^(\d+)시간$/, '$1 h'], [/^주 (\d+)일$/, '$1 d/wk']
   ]);
@@ -350,7 +351,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var ENGINE_VERSION = '1.0.0';
+  var ENGINE_VERSION = '1.1.0';
 
   /** "10,000원", " 62 " 같은 값을 숫자로 변환. 실패 시 def 반환 */
   function toNumber(v, def) {
@@ -1407,6 +1408,7 @@
   return {
     DAY_NAMES: DAY_NAMES,
     dayName: dayNm,
+    moneyText: W,
     TAX_TYPES: TAX_TYPES,
     parseTimeMinutes: parseTimeMinutes,
     minutesToTime: minutesToTime,
@@ -3150,4 +3152,4 @@
 });
 
 /* ===== 버전 (package.json 의 version) ===== */
-;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.0.0';
+;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.1.0';

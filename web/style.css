@@ -2361,3 +2361,17 @@ body.on-punch .app-footer, body.locked .app-footer { display: none; }
 @media print { .saver { display: none !important; } }
 
 .app-ver { margin-top: 6px; font-size: 12px; opacity: .7; }
+
+.lang-btn { font-size: 14px; font-weight: 700; padding: 0 12px; }
+@media screen {
+  html[lang="en"] .day-sheet .preset-add::before { content: '＋ Add'; }
+  html[lang="en"] .day-sheet .preset-edit-toggle::before { content: '✏️ Edit'; }
+  html[lang="en"] body:not(.money-show) .m-amt::after { content: '•••••'; }
+}
+
+.egg-pop { position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.45); animation: eggIn .25s ease; }
+.egg-box { background: var(--card, #fff); color: var(--text, #111); border-radius: 20px; padding: 28px 26px; text-align: center; max-width: 86vw; box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+.egg-emoji { font-size: 48px; }
+.egg-text { margin-top: 10px; font-size: 20px; font-weight: 800; line-height: 1.4; }
+.egg-sub { margin-top: 8px; font-size: 22px; }
+@keyframes eggIn { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: scale(1); } }

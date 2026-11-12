@@ -33,6 +33,7 @@
       }
     }
     if (vars) s = s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] === undefined ? m : String(vars[k]); });
+    if (LANG === 'en') s = s.replace(/(^|[^\d.])1 days\b/g, '$11 day');
     return s;
   }
   /** 브라우저 언어가 한국어가 아니면 'en' (navigator.language 값을 넘겨 받음) */

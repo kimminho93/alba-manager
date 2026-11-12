@@ -11,9 +11,12 @@
 
   var E = window.AlbaEngine;
   if (!E) {
-    document.body.insertAdjacentHTML('afterbegin', '<div class="fatal">엔진(engine.js)을 불러오지 못했습니다.</div>');
+    document.body.insertAdjacentHTML('afterbegin', '<div class="fatal">Could not load engine.js / 엔진(engine.js)을 불러오지 못했습니다.</div>');
     return;
   }
+
+  var tr = E.t;   // 번역 도우미: tr('한국어 {n}', { n: 3 })
+  function moneyBig(v) { return E.getLang() === 'en' ? '<small>₩</small>' + E.formatWon(v) : E.formatWon(v) + '<small>원</small>'; }
 
   var KEYS = {
     theme: 'alba.theme',
@@ -126,7 +129,7 @@
     var btn = $('themeToggle');
     if (btn) {
       btn.textContent = cur === 'dark' ? '☀️' : '🌙';
-      btn.title = cur === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환';
+      btn.title = cur === 'dark' ? tr('라이트 모드로 전환') : tr('다크 모드로 전환');
     }
   }
 
@@ -134,9 +137,9 @@
     var big = document.documentElement.getAttribute('data-fs') === 'large';
     var btn = $('fontToggle');
     if (!btn) return;
-    btn.textContent = big ? '가−' : '가+';
+    btn.textContent = big ? tr('가−') : tr('가+');
     btn.setAttribute('aria-pressed', big ? 'true' : 'false');
-    btn.title = big ? '글자를 보통 크기로' : '글자를 크게';
+    btn.title = big ? tr('글자를 보통 크기로') : tr('글자를 크게');
   }
 
   function toggleFontSize() {
@@ -160,12 +163,12 @@
     if (!badge) return;
     if (isServer) {
       badge.className = 'badge badge-server';
-      badge.textContent = '🟢 서버 연결됨 (API + JS 엔진)';
-      badge.title = '백엔드 API(/api/*)와 브라우저 JS 엔진이 함께 동작 중입니다.';
+      badge.textContent = tr('🟢 서버 연결됨 (API + JS 엔진)');
+      badge.title = tr('백엔드 API(/api/*)와 브라우저 JS 엔진이 함께 동작 중입니다.');
     } else {
       badge.className = 'badge badge-web';
-      badge.textContent = '⚡ 웹 단독 실행 (100% 브라우저 엔진)';
-      badge.title = '서버 없이 브라우저 내장 JS 엔진으로 100% 동일하게 동작 중입니다.';
+      badge.textContent = tr('⚡ 웹 단독 실행 (100% 브라우저 엔진)');
+      badge.title = tr('서버 없이 브라우저 내장 JS 엔진으로 100% 동일하게 동작 중입니다.');
     }
   }
 
@@ -231,18 +234,18 @@
         })
         .then(function (buf) {
           triggerBlobDownload(new Uint8Array(buf), filename);
-          showToast('📊 엑셀(.xlsx) 다운로드 완료: ' + filename);
+          showToast(tr('📊 엑셀(.xlsx) 다운로드 완료: {f}', { f: filename }));
         })
         .catch(function () {
           setModeBadge(false);
           var bytes = localBuilder();
           triggerBlobDownload(bytes, filename);
-          showToast('📊 엑셀(.xlsx) 다운로드 완료: ' + filename);
+          showToast(tr('📊 엑셀(.xlsx) 다운로드 완료: {f}', { f: filename }));
         });
     } else {
       var bytes = localBuilder();
       triggerBlobDownload(bytes, filename);
-      showToast('📊 엑셀(.xlsx) 다운로드 완료: ' + filename);
+      showToast(tr('📊 엑셀(.xlsx) 다운로드 완료: {f}', { f: filename }));
     }
   }
 
@@ -278,15 +281,18 @@
     return (Math.round(h * 10) / 10) + 'h';
   }
 
+  var PRESET_EN = { '오전': 'Morning', '미들': 'Mid', '오후': 'Afternoon', '야간': 'Night', '풀타임': 'Full-time' };
+  function presetName(n) { return E.getLang() === 'en' && PRESET_EN[n] ? PRESET_EN[n] : n; }
+
   function renderPresets() {
     var box = $('presetList');
     if (!box) return;
     var html = presetState.list.map(function (p, i) {
-      var label = (p.name ? escHtml(p.name) + ' ' : '') + escHtml(p.start) + '~' + escHtml(p.end) +
-        ' (' + presetHours(p) + (p.breakMin ? ', 휴게' + p.breakMin + '분' : '') + ')';
+      var label = (p.name ? escHtml(presetName(p.name)) + ' ' : '') + escHtml(p.start) + '~' + escHtml(p.end) +
+        ' (' + presetHours(p) + (p.breakMin ? tr(', 휴게{m}분', { m: p.breakMin }) : '') + ')';
       var tools = presetState.editMode
-        ? '<span class="preset-tools"><button type="button" class="preset-tool" data-act="edit" data-i="' + i + '" title="수정">✏️</button>' +
-          '<button type="button" class="preset-tool" data-act="del" data-i="' + i + '" title="삭제">✕</button></span>'
+        ? '<span class="preset-tools"><button type="button" class="preset-tool" data-act="edit" data-i="' + i + '" title="' + tr('수정') + '">✏️</button>' +
+          '<button type="button" class="preset-tool" data-act="del" data-i="' + i + '" title="' + tr('삭제') + '">✕</button></span>'
         : '';
       return '<span class="preset-item"><button type="button" class="chip preset-chip" data-i="' + i + '">' + label + '</button>' + tools + '</span>';
     }).join('');
@@ -296,9 +302,9 @@
     var full = presetState.list.length >= PRESET_MAX;
     $('presetCount').textContent = presetState.list.length + '/' + PRESET_MAX;
     $('presetAddBtn').disabled = full;
-    $('presetAddBtn').title = full ? '최대 ' + PRESET_MAX + '개까지 만들 수 있어요' : '시간대 추가 (최대 ' + PRESET_MAX + '개)';
+    $('presetAddBtn').title = full ? tr('최대 {n}개까지 만들 수 있어요', { n: PRESET_MAX }) : tr('시간대 추가 (최대 {n}개)', { n: PRESET_MAX });
     $('presetEditToggle').classList.toggle('active', presetState.editMode);
-    $('presetEditToggle').textContent = presetState.editMode ? '✔ 편집 완료' : '✏️ 편집';
+    $('presetEditToggle').textContent = presetState.editMode ? tr('✔ 편집 완료') : tr('✏️ 편집');
   }
 
   function openPresetForm(idx) {
@@ -311,11 +317,11 @@
     if (!Array.prototype.some.call(sel.options, function (o) { return Number(o.value) === p.breakMin; })) {
       var opt = document.createElement('option');
       opt.value = String(p.breakMin);
-      opt.textContent = '휴게 ' + p.breakMin + '분';
+      opt.textContent = tr('휴게 {m}분', { m: p.breakMin });
       sel.appendChild(opt);
     }
     sel.value = String(p.breakMin);
-    $('presetSaveBtn').textContent = idx >= 0 ? '수정 저장' : '추가';
+    $('presetSaveBtn').textContent = idx >= 0 ? tr('수정 저장') : tr('추가');
     $('presetForm').hidden = false;
     $('presetName').focus();
   }
@@ -335,12 +341,12 @@
       if (tool) {
         var ti = Number(tool.getAttribute('data-i'));
         if (tool.getAttribute('data-act') === 'del') {
-          if (!window.confirm('이 시간대를 삭제할까요?')) return;
+          if (!window.confirm(tr('이 시간대를 삭제할까요?'))) return;
           presetState.list.splice(ti, 1);
           savePresets();
           closePresetForm();
           renderPresets();
-          showToast('🗑 시간대를 삭제했습니다.');
+          showToast(tr('🗑 시간대를 삭제했습니다.'));
         } else {
           openPresetForm(ti);
         }
@@ -351,7 +357,7 @@
       if (chip.getAttribute('data-off') === 'true') {
         state.editor.off = true;
         applyEditorToSelectedDay();
-        showToast('🚫 선택된 날짜를 휴무로 설정했습니다.');
+        showToast(tr('🚫 선택된 날짜를 휴무로 설정했습니다.'));
         return;
       }
       var p = presetState.list[Number(chip.getAttribute('data-i'))];
@@ -369,7 +375,7 @@
 
     $('presetAddBtn').addEventListener('click', function () {
       if (presetState.list.length >= PRESET_MAX) {
-        showToast('시간대는 최대 ' + PRESET_MAX + '개까지 만들 수 있어요.');
+        showToast(tr('시간대는 최대 {n}개까지 만들 수 있어요.', { n: PRESET_MAX }));
         return;
       }
       openPresetForm(-1);
@@ -387,22 +393,22 @@
       ev.preventDefault();
       var start = $('presetStart').value;
       var end = $('presetEnd').value;
-      if (!start || !end) { showToast('출근/퇴근 시각을 입력해 주세요.'); return; }
+      if (!start || !end) { showToast(tr('출근/퇴근 시각을 입력해 주세요.')); return; }
       var st = parseHM(start, 9, 0), et = parseHM(end, 14, 0);
       var sMin = st.h * 60 + st.m;
       var eMin = et.h * 60 + et.m;
       if (eMin === 0) { eMin = 24 * 60; end = '24:00'; } // 00:00 퇴근은 자정(24:00)으로 처리
       var brk = Number($('presetBreak').value) || 0;
-      if (eMin <= sMin) { showToast('퇴근 시각은 출근 시각보다 늦어야 해요.'); return; }
-      if (eMin - sMin <= brk) { showToast('휴게시간이 근무시간보다 길어요.'); return; }
+      if (eMin <= sMin) { showToast(tr('퇴근 시각은 출근 시각보다 늦어야 해요.')); return; }
+      if (eMin - sMin <= brk) { showToast(tr('휴게시간이 근무시간보다 길어요.')); return; }
       var item = { name: $('presetName').value.trim().slice(0, 8), start: start, end: end, breakMin: brk };
       if (presetState.editingIdx >= 0) {
         presetState.list[presetState.editingIdx] = item;
-        showToast('✏️ 시간대를 수정했습니다.');
+        showToast(tr('✏️ 시간대를 수정했습니다.'));
       } else {
-        if (presetState.list.length >= PRESET_MAX) { showToast('최대 ' + PRESET_MAX + '개까지 가능합니다.'); return; }
+        if (presetState.list.length >= PRESET_MAX) { showToast(tr('최대 {n}개까지 가능합니다.', { n: PRESET_MAX })); return; }
         presetState.list.push(item);
-        showToast('＋ 시간대를 추가했습니다. (' + presetState.list.length + '/' + PRESET_MAX + ')');
+        showToast(tr('＋ 시간대를 추가했습니다. ({a}/{b})', { a: presetState.list.length, b: PRESET_MAX }));
       }
       savePresets();
       closePresetForm();
@@ -418,26 +424,26 @@
     var shHtml = '';
     for (var h = 0; h <= 23; h++) {
       shHtml += '<button type="button" class="scroll-option" role="option" data-sh="' + h + '">' +
-        '<span>' + pad2(h) + '시</span><small class="muted">' + (h < 12 ? '오전' : '오후') + '</small></button>';
+        '<span>' + tr('{n}시', { n: pad2(h) }) + '</span><small class="muted">' + (h < 12 ? tr('오전') : tr('오후')) + '</small></button>';
     }
     $('startHourMenu').innerHTML = shHtml;
 
     var ehHtml = '';
     for (var eh = 0; eh <= 24; eh++) {
       ehHtml += '<button type="button" class="scroll-option" role="option" data-eh="' + eh + '">' +
-        '<span>' + pad2(eh) + '시</span><small class="muted">' + (eh === 24 ? '자정' : (eh < 12 ? '오전' : '오후')) + '</small></button>';
+        '<span>' + tr('{n}시', { n: pad2(eh) }) + '</span><small class="muted">' + (eh === 24 ? tr('자정') : (eh < 12 ? tr('오전') : tr('오후'))) + '</small></button>';
     }
     $('endHourMenu').innerHTML = ehHtml;
 
     var smHtml = MINUTE_STEPS.map(function (m) {
       return '<button type="button" class="scroll-option" role="option" data-sm="' + m + '">' +
-        '<span>' + pad2(m) + '분</span></button>';
+        '<span>' + tr('{n}분', { n: pad2(m) }) + '</span></button>';
     }).join('');
     $('startMinMenu').innerHTML = smHtml;
 
     var emHtml = MINUTE_STEPS.map(function (m) {
       return '<button type="button" class="scroll-option" role="option" data-em="' + m + '">' +
-        '<span>' + pad2(m) + '분</span></button>';
+        '<span>' + tr('{n}분', { n: pad2(m) }) + '</span></button>';
     }).join('');
     $('endMinMenu').innerHTML = emHtml;
   }
@@ -518,11 +524,11 @@
   }
 
   function mealShort(m) {
-    return m.lunch && m.dinner ? '점저' : (m.lunch ? '점' : (m.dinner ? '저' : ''));
+    return m.lunch && m.dinner ? tr('점저') : (m.lunch ? tr('점') : (m.dinner ? tr('저') : ''));
   }
 
   function mealWords(m) {
-    return m.lunch && m.dinner ? '점심·저녁' : (m.lunch ? '점심' : (m.dinner ? '저녁' : ''));
+    return m.lunch && m.dinner ? tr('점심·저녁') : (m.lunch ? tr('점심') : (m.dinner ? tr('저녁') : ''));
   }
 
   function renderTimeEditor() {
@@ -531,26 +537,26 @@
     var sh = currentEditorShift();
 
     if (cd) {
-      $('selDayBadge').textContent = cal.month + '월 ' + cd.date + '일 (' + cd.dayName + ') · ' + cd.week + '주차';
-      $('selDayTitle').textContent = sh.off ? '휴무일 · 시간을 고르면 근무일로 바뀌어요' : '근무일';
+      $('selDayBadge').textContent = tr('{m}월 {d}일 ({w}) · {k}주차', { m: cal.month, d: cd.date, w: cd.dayName, k: cd.week });
+      $('selDayTitle').textContent = sh.off ? tr('휴무일 · 시간을 고르면 근무일로 바뀌어요') : tr('근무일');
     }
 
     var minMeal = E.toNumber($('pMealMinHours').value, 4);
     var ml = E.mealsForShift(storeShift(sh), minMeal);
     var showMeal = $('pMeal').checked && !sh.off;
-    var mealTag = showMeal && (ml.lunch || ml.dinner) ? ' · 🍚 ' + mealWords(ml) + ' 식대' : '';
+    var mealTag = showMeal && (ml.lunch || ml.dinner) ? ' · 🍚 ' + tr('{w} 식대', { w: mealWords(ml) }) : '';
     $('mealPick').hidden = !showMeal;
     $('mealLunch').checked = ml.lunch;
     $('mealDinner').checked = ml.dinner;
-    $('mealPickNote').textContent = ml.manual ? '직접 고침' : '자동';
+    $('mealPickNote').textContent = ml.manual ? tr('직접 고침') : tr('자동');
     $('editorCalcPill').innerHTML = sh.off
-      ? '🚫 <b>휴무 (0시간)</b>'
-      : (sh.start + ' ~ ' + sh.end + (sh.breakMinutes ? ' (-' + sh.breakMinutes + '분)' : '') + ' · <b>' + E.formatNum(sh.hours, 2) + '시간</b>' + mealTag);
+      ? '🚫 <b>' + tr('휴무 (0시간)') + '</b>'
+      : (sh.start + ' ~ ' + sh.end + (sh.breakMinutes ? ' (-' + tr('{n}분', { n: sh.breakMinutes }) + ')' : '') + ' · <b>' + tr('{n}시간', { n: E.formatNum(sh.hours, 2) }) + '</b>' + mealTag);
 
-    $('startHourText').textContent = pad2(state.editor.startHour) + '시';
-    $('startMinText').textContent = pad2(state.editor.startMin) + '분';
-    $('endHourText').textContent = pad2(state.editor.endHour) + '시';
-    $('endMinText').textContent = pad2(state.editor.endMin) + '분';
+    $('startHourText').textContent = tr('{n}시', { n: pad2(state.editor.startHour) });
+    $('startMinText').textContent = tr('{n}분', { n: pad2(state.editor.startMin) });
+    $('endHourText').textContent = tr('{n}시', { n: pad2(state.editor.endHour) });
+    $('endMinText').textContent = tr('{n}분', { n: pad2(state.editor.endMin) });
 
     document.querySelectorAll('[data-sh]').forEach(function (b) {
       b.classList.toggle('active', Number(b.getAttribute('data-sh')) === state.editor.startHour);
@@ -597,27 +603,27 @@
   /* ---------- 월별 실제 달력 테이블 렌더링 ---------- */
   function syncPayMonthLabel() {
     var m = /^(\d{4})-(\d{2})$/.exec($('pMonth').value || '');
-    $('pMonthLabel').textContent = m ? (m[1] + '년 ' + Number(m[2]) + '월') : '월 선택';
+    $('pMonthLabel').textContent = m ? tr('{y}년 {m}월', { y: m[1], m: Number(m[2]) }) : tr('월 선택');
   }
 
   // 주별 주휴 상태 문구 + (결근 주일 때) 예외 지급 버튼
   function weekStatus(w, r, idx) {
-    if (!r.includeWeekly) return { text: '주휴 미포함', btn: '', cls: '' };
-    var days = (w.workDays !== null && w.workDays !== undefined) ? (w.workDays + '/' + w.contractDays + '일 출근') : '';
+    if (!r.includeWeekly) return { text: tr('주휴 미포함'), btn: '', cls: '' };
+    var days = (w.workDays !== null && w.workDays !== undefined) ? tr('{a}/{b}일 출근', { a: w.workDays, b: w.contractDays }) : '';
     if (w.eligible && !w.excused) {
-      return { text: '주휴 +' + E.formatWon(w.allowance) + '원' + (days ? ' · 개근 ' + days : ''), btn: '', cls: 'ok' };
+      return { text: tr('주휴 +{a}', { a: E.moneyText(w.allowance) }) + (days ? tr(' · 개근 ') + days : ''), btn: '', cls: 'ok' };
     }
     if (w.excused) {
       return {
-        text: '주휴 +' + E.formatWon(w.allowance) + '원 (결근 있으나 지급)',
-        btn: '<button type="button" class="btn btn-xs wk-excuse-btn" data-week-excuse="' + idx + '">다시 제외하기</button>',
+        text: tr('주휴 +{a}', { a: E.moneyText(w.allowance) }) + tr(' (결근 있으나 지급)'),
+        btn: '<button type="button" class="btn btn-xs wk-excuse-btn" data-week-excuse="' + idx + '">' + tr('다시 제외하기') + '</button>',
         cls: 'ok'
       };
     }
-    if (!w.hoursOk) return { text: '주휴 없음 (15시간 미만)', btn: '', cls: '' };
+    if (!w.hoursOk) return { text: tr('주휴 없음 (15시간 미만)'), btn: '', cls: '' };
     return {
-      text: '주휴 없음 · ' + (days || '결근') + (w.partial ? '' : ''),
-      btn: '<button type="button" class="btn btn-xs wk-excuse-btn" data-week-excuse="' + idx + '" title="공휴일·사장님 사정으로 쉰 주">이 주는 주휴 지급</button>',
+      text: tr('주휴 없음 · ') + (days || tr('결근')),
+      btn: '<button type="button" class="btn btn-xs wk-excuse-btn" data-week-excuse="' + idx + '" title="' + tr('공휴일·사장님 사정으로 쉰 주') + '">' + tr('이 주는 주휴 지급') + '</button>',
       cls: 'bad'
     };
   }
@@ -626,8 +632,8 @@
     var cal = r.calendar || state.calendar;
     if (!cal) return;
 
-    $('calMonthBadge').textContent = cal.month + '월 · ' + cal.weekCount + '개 주차';
-    $('calBoardTitle').textContent = cal.year + '년 ' + cal.month + '월 출퇴근 달력 (총 ' + cal.weekCount + '개 주차 · ' + cal.daysInMonth + '일)';
+    $('calMonthBadge').textContent = tr('{m}월 · {n}개 주차', { m: cal.month, n: cal.weekCount });
+    $('calBoardTitle').textContent = tr('{y}년 {m}월 출퇴근 달력 (총 {n}개 주차 · {d}일)', { y: cal.year, m: cal.month, n: cal.weekCount, d: cal.daysInMonth });
 
     // 주차(0..weekCount-1) × 요일(0=월..6=일) 매트릭스 생성
     var grid = [];
@@ -661,18 +667,18 @@
         rowsHtml += '<td class="' + cls + '" data-day-idx="' + day.index + '">' +
           '<div class="cal-date-num' + dateColor + '">' + day.date + '</div>' +
           (isOff
-            ? '<div class="cal-off-badge">휴무</div>'
+            ? '<div class="cal-off-badge">' + tr('휴무') + '</div>'
             : '<div class="cal-shift-range">' + shiftRangeHtml(day.start, day.end) + '</div>') +
-          (isMeal ? '<div class="cal-meal-icon" title="식대: ' + mealWords(day.meals) + '">🍚' + mealShort(day.meals) + '</div>' : '') +
+          (isMeal ? '<div class="cal-meal-icon" title="' + tr('식대: {w}', { w: mealWords(day.meals) }) + '">🍚' + mealShort(day.meals) + '</div>' : '') +
           '</td>';
       }
       rowsHtml += '</tr>';
 
       // 주간 합계: 한 줄 요약
       var st = weekStatus(wkObj, r, wi);
-      var mealSub = r.includeMeal ? (' · 🍚 식대 ' + wkObj.mealDays + '회') : '';
+      var mealSub = r.includeMeal ? (' · 🍚 ' + tr('식대 {n}회', { n: wkObj.mealDays })) : '';
       rowsHtml += '<tr class="cal-week-sum"><td colspan="7"><div class="wk-line ' + st.cls + '">' +
-        '<b>' + (wi + 1) + '주차 ' + E.formatNum(wkObj.hours, 1) + '시간</b>' +
+        '<b>' + tr('{k}주차 {h}시간', { k: wi + 1, h: E.formatNum(wkObj.hours, 1) }) + '</b>' +
         '<span class="wk-line-text">' + st.text + mealSub + '</span>' +
         (st.btn || '') + '</div></td></tr>';
     }
@@ -762,8 +768,8 @@
       $('dailyMealDays').textContent = r.mealDays;
 
       $('mealSummaryText').textContent = r.includeMeal
-        ? ('점심·저녁 ' + r.mealDays + '회 × ' + E.formatWon(r.mealAmount) + '원 = +' + E.formatWon(r.mealAllowance) + '원')
-        : '체크 시 점심·저녁 식사 시간에 일한 날 식대를 추가 지급합니다';
+        ? tr('점심·저녁 {n}회 × {a} = +{b}', { n: r.mealDays, a: E.moneyText(r.mealAmount), b: E.moneyText(r.mealAllowance) })
+        : tr('체크 시 점심·저녁 식사 시간에 일한 날 식대를 추가 지급합니다');
 
       renderMonthCalendar(r);
       renderTimeEditor();
@@ -772,33 +778,33 @@
 
   function renderPayroll(r) {
     state.payroll = r;
-    $('pContractLabel').textContent = '주 ' + state.contractDays + '일';
+    $('pContractLabel').textContent = tr('주 {d}일', { d: state.contractDays });
     syncModeAndHighlights(r);
 
     $('bannerText').innerHTML =
-      '<span class="pay-label"><b>' + escHtml(r.name) + '</b>님에게 줄 돈 (실수령액)</span>' +
-      '<b class="money">' + E.formatWon(r.net) + '<small>원</small></b>' +
-      '<span class="pay-sub">' + E.formatNum(r.totalHours, 2) + '시간 · 주휴 ' + (r.includeWeekly ? '포함' : '미포함') +
-        (r.includeMeal ? (' · 식대 ' + r.mealDays + '회 포함') : '') + ' · ' + escHtml(r.tax.label) + '</span>';
-    $('setSummary').textContent = '시급 ' + E.formatWon(r.hourlyWage) + '원 · 주 ' + state.contractDays + '일 · ' +
-      r.tax.label + ' · 주휴 ' + (r.includeWeekly ? '포함' : '미포함') +
-      (r.includeMeal ? (' · 식대 ' + E.formatWon(r.mealAmount) + '원') : ' · 식대 없음');
+      '<span class="pay-label">' + tr('<b>{n}</b>님에게 줄 돈 (실수령액)', { n: escHtml(r.name) }) + '</span>' +
+      '<b class="money">' + moneyBig(r.net) + '</b>' +
+      '<span class="pay-sub">' + tr('{h}시간 · 주휴 {w}', { h: E.formatNum(r.totalHours, 2), w: r.includeWeekly ? tr('포함') : tr('미포함') }) +
+        (r.includeMeal ? tr(' · 식대 {n}회 포함', { n: r.mealDays }) : '') + ' · ' + escHtml(r.tax.label) + '</span>';
+    $('setSummary').textContent = tr('시급 {w} · 주 {d}일 · ', { w: E.moneyText(r.hourlyWage), d: state.contractDays }) +
+      r.tax.label + tr(' · 주휴 {s}', { s: r.includeWeekly ? tr('포함') : tr('미포함') }) +
+      (r.includeMeal ? tr(' · 식대 {a}', { a: E.moneyText(r.mealAmount) }) : tr(' · 식대 없음'));
 
     $('slipName').textContent = r.name;
     $('slipMonth').textContent = r.payMonthLabel;
-    $('slipWage').textContent = E.formatWon(r.hourlyWage) + '원';
+    $('slipWage').textContent = E.moneyText(r.hourlyWage);
     var modeLabel = r.mode === 'daily'
-      ? ('일별 출퇴근 · ' + r.workDays + '일 / ' + r.weeks.length + '개 주차')
-      : (r.mode === 'weekly' ? ('주차별 · ' + r.weeks.length + '개 주차') : '4주 균등');
-    $('slipHours').textContent = E.formatNum(r.totalHours, 2) + '시간 (' + modeLabel + ')';
+      ? tr('일별 출퇴근 · {d}일 / {n}개 주차', { d: r.workDays, n: r.weeks.length })
+      : (r.mode === 'weekly' ? tr('주차별 · {n}개 주차', { n: r.weeks.length }) : tr('4주 균등'));
+    $('slipHours').textContent = tr('{h}시간 ({m})', { h: E.formatNum(r.totalHours, 2), m: modeLabel });
     $('slipWeekly').innerHTML =
-      '주휴 <span class="pill ' + (r.includeWeekly ? 'pill-ok' : 'pill-off') + '">' + (r.includeWeekly ? '포함' : '미포함') + '</span> ' +
-      '· 식대 <span class="pill ' + (r.includeMeal ? 'pill-ok' : 'pill-off') + '">' + (r.includeMeal ? (r.mealDays + '회') : '미포함') + '</span>';
+      tr('주휴') + ' <span class="pill ' + (r.includeWeekly ? 'pill-ok' : 'pill-off') + '">' + (r.includeWeekly ? tr('포함') : tr('미포함')) + '</span> ' +
+      '· ' + tr('식대') + ' <span class="pill ' + (r.includeMeal ? 'pill-ok' : 'pill-off') + '">' + (r.includeMeal ? tr('{n}회', { n: r.mealDays }) : tr('미포함')) + '</span>';
     $('slipTax').textContent = r.tax.label;
 
     $('slipBody').innerHTML = r.rows.map(function (row) {
       var cls = 'row-' + row.kind;
-      var isPositiveBadge = row.badge && row.badge !== '미포함';
+      var isPositiveBadge = row.badge && row.badge !== tr('미포함');
       var badge = row.badge
         ? ' <span class="pill ' + (isPositiveBadge ? 'pill-ok' : 'pill-off') + '">' + escHtml(row.badge) + '</span>'
         : '';
@@ -807,22 +813,22 @@
       return '<tr class="' + cls + '">' +
         '<td class="sec">' + escHtml(row.section) + '</td>' +
         '<td class="label">' + escHtml(row.label) + badge + '</td>' +
-        '<td class="num">' + amtPrefix + E.formatWon(row.amount) + '원</td>' +
+        '<td class="num">' + amtPrefix + E.moneyText(row.amount) + '</td>' +
         '<td class="formula">' + escHtml(row.formula) + detail + '</td>' +
         '</tr>';
     }).join('');
 
     $('weekStrip').innerHTML = r.weeks.map(function (w) {
       var active = r.includeWeekly && w.eligible;
-      var mealSub = r.includeMeal && r.mode === 'daily' ? (' · 🍚 식대 ' + w.mealDays + '회') : '';
+      var mealSub = r.includeMeal && r.mode === 'daily' ? (' · 🍚 ' + tr('식대 {n}회', { n: w.mealDays })) : '';
       return '<div class="week-cell ' + (active ? 'yes' : 'no') + '">' +
-        '<b>' + w.week + '주차 · ' + E.formatNum(w.hours, 2) + 'h' + mealSub + '</b>' +
+        '<b>' + tr('{k}주차', { k: w.week }) + ' · ' + E.formatNum(w.hours, 2) + 'h' + mealSub + '</b>' +
         '<span class="w-amt">' + (r.includeWeekly
           ? (w.eligible
-              ? '주휴 +' + E.formatWon(w.allowance) + '원' + (w.excused ? ' (결근 있으나 지급)' : '')
-              : (!w.hoursOk ? '15h 미만 (주휴 0원)'
-                : '결근으로 주휴 없음' + (w.workDays !== null && w.workDays !== undefined ? ' (' + w.workDays + '/' + w.contractDays + '일)' : '')))
-          : '주휴 미포함 (0원)') + '</span>' +
+              ? tr('주휴 +{a}', { a: E.moneyText(w.allowance) }) + (w.excused ? tr(' (결근 있으나 지급)') : '')
+              : (!w.hoursOk ? tr('15h 미만 (주휴 0원)')
+                : tr('결근으로 주휴 없음') + (w.workDays !== null && w.workDays !== undefined ? ' (' + tr('{a}/{b}일', { a: w.workDays, b: w.contractDays }) + ')' : '')))
+          : tr('주휴 미포함 (0원)')) + '</span>' +
         '</div>';
     }).join('');
   }
@@ -848,7 +854,7 @@
     E.setRates(state.settings.rates);
     E.setMealTimes(state.settings.mealTimes);
     var mw = state.settings.minWage;
-    $('minWageHint').textContent = '최저시급 ' + E.formatWon(mw) + '원';
+    $('minWageHint').textContent = tr('최저시급 {a}', { a: E.moneyText(mw) });
     $('awWage').value = mw;
     var r = state.settings.rates;
     var eff = Math.round(r.incomeTax * (1 + r.localTax / 100) * 1000) / 1000;
@@ -872,7 +878,7 @@
     var eff = Math.round(r.incomeTax * (1 + r.localTax / 100) * 1000) / 1000;
     var lab = document.querySelector('input[name="pTax"][value="3.3"] + span');
     if (lab) lab.textContent = eff + '%';
-    $('minWageHint').textContent = '최저시급 ' + E.formatWon(state.settings.minWage) + '원';
+    $('minWageHint').textContent = tr('최저시급 {a}', { a: E.moneyText(state.settings.minWage) });
     $('awWage').value = state.settings.minWage;
     recalcPayroll();
     renderRoster();
@@ -954,7 +960,7 @@
   function renderChips() {
     var box = $('workerChips');
     document.body.classList.toggle('no-workers', !state.workers.length);
-    var html = '<button type="button" class="wchip wchip-add" id="chipAdd" aria-label="알바생 추가">＋</button>' +
+    var html = '<button type="button" class="wchip wchip-add" id="chipAdd" aria-label="' + tr('알바생 추가') + '">＋</button>' +
       state.workers.map(function (w) {
         return '<button type="button" class="wchip' + (w.id === state.selId ? ' on' : '') + '" data-chip="' + escHtml(w.id) + '">' + escHtml(w.name) + '</button>';
       }).join('');
@@ -983,9 +989,9 @@
     var pm = $('pMonth').value;
     var results = monthResults();
     var sum = E.summarizePayrolls(results);
-    $('rosterCount').textContent = sum.count + '명';
-    $('rosterTotal').textContent = E.formatWon(sum.totalNet) + '원';
-    $('rosterMonthLabel').textContent = pm.slice(0, 4) + '년 ' + Number(pm.slice(5)) + '월';
+    $('rosterCount').textContent = tr('{n}명', { n: sum.count });
+    $('rosterTotal').textContent = E.moneyText(sum.totalNet);
+    $('rosterMonthLabel').textContent = tr('{y}년 {m}월', { y: pm.slice(0, 4), m: Number(pm.slice(5)) });
     renderChips();
     renderPunch();
 
@@ -995,11 +1001,11 @@
       var sel = w.id === state.selId;
       return '<div class="rcard' + (sel ? ' on' : '') + '">' +
         '<button type="button" class="rcard-main" data-pick-worker="' + escHtml(w.id) + '">' +
-          '<span class="rcard-name">' + escHtml(r.name) + (sel ? ' <em>보는 중</em>' : '') + '</span>' +
-          '<span class="rcard-sub">' + (hasRec ? (E.formatNum(r.totalHours, 2) + '시간 · 식대 ' + (r.includeMeal ? r.mealDays + '회' : '없음')) : '기록 없음') + '</span>' +
+          '<span class="rcard-name">' + escHtml(r.name) + (sel ? ' <em>' + tr('보는 중') + '</em>' : '') + '</span>' +
+          '<span class="rcard-sub">' + (hasRec ? tr('{h}시간 · 식대 {m}', { h: E.formatNum(r.totalHours, 2), m: r.includeMeal ? tr('{n}회', { n: r.mealDays }) : tr('없음') }) : tr('기록 없음')) + '</span>' +
         '</button>' +
-        '<b class="rcard-amt m-amt">' + E.formatWon(r.net) + '원</b>' +
-        '<button type="button" class="rcard-del" data-del-worker="' + escHtml(w.id) + '" aria-label="' + escHtml(r.name) + ' 삭제">✕</button>' +
+        '<b class="rcard-amt m-amt">' + E.moneyText(r.net) + '</b>' +
+        '<button type="button" class="rcard-del" data-del-worker="' + escHtml(w.id) + '" aria-label="' + escHtml(tr('{n} 삭제', { n: r.name })) + '">✕</button>' +
         '</div>';
     }).join('');
 
@@ -1016,29 +1022,29 @@
       return '<tr class="roster-row' + (sel ? ' selected' : '') + '" data-wid="' + escHtml(w.id) + '">' +
         '<td>' + (idx + 1) + '</td>' +
         '<td><button type="button" class="worker-link" data-pick-worker="' + escHtml(w.id) + '"><b>' + escHtml(r.name) + '</b></button>' +
-          (sel ? ' <span class="pill pill-ok">보는 중</span>' : '') + '</td>' +
+          (sel ? ' <span class="pill pill-ok">' + tr('보는 중') + '</span>' : '') + '</td>' +
         '<td>' + escHtml(r.payMonthLabel) + '</td>' +
-        '<td class="num">' + (hasRec ? E.formatNum(r.totalHours, 2) + 'h' : '<small class="muted">기록 없음</small>') + '</td>' +
-        '<td class="num">' + E.formatWon(r.hourlyWage) + '원</td>' +
-        '<td class="num">' + E.formatWon(r.weeklyAllowance) + '원 <span class="pill ' + (r.includeWeekly ? 'pill-ok' : 'pill-off') + '">' + (r.includeWeekly ? '포함' : '미포함') + '</span></td>' +
-        '<td class="num">' + E.formatWon(r.mealAllowance) + '원 <span class="pill ' + (r.includeMeal ? 'pill-ok' : 'pill-off') + '">' + (r.includeMeal ? (r.mealDays + '회') : '미포함') + '</span></td>' +
-        '<td class="num">' + E.formatWon(r.gross) + '원</td>' +
-        '<td class="num">' + (r.tax.total ? '-' + E.formatWon(r.tax.total) : '0') + '원 <small class="muted">(' + escHtml(r.tax.type === 'none' ? '0%' : (r.tax.type === '3.3' ? '3.3%' : '4대')) + ')</small></td>' +
-        '<td class="num net">' + E.formatWon(r.net) + '원</td>' +
-        '<td class="num"><button type="button" class="btn-del" data-del-worker="' + escHtml(w.id) + '" title="이 알바생 삭제">✕</button></td>' +
+        '<td class="num">' + (hasRec ? E.formatNum(r.totalHours, 2) + 'h' : '<small class="muted">' + tr('기록 없음') + '</small>') + '</td>' +
+        '<td class="num">' + E.moneyText(r.hourlyWage) + '</td>' +
+        '<td class="num">' + E.moneyText(r.weeklyAllowance) + ' <span class="pill ' + (r.includeWeekly ? 'pill-ok' : 'pill-off') + '">' + (r.includeWeekly ? tr('포함') : tr('미포함')) + '</span></td>' +
+        '<td class="num">' + E.moneyText(r.mealAllowance) + ' <span class="pill ' + (r.includeMeal ? 'pill-ok' : 'pill-off') + '">' + (r.includeMeal ? tr('{n}회', { n: r.mealDays }) : tr('미포함')) + '</span></td>' +
+        '<td class="num">' + E.moneyText(r.gross) + '</td>' +
+        '<td class="num">' + (r.tax.total ? '-' + E.moneyText(r.tax.total) : E.moneyText(0)) + ' <small class="muted">(' + escHtml(r.tax.type === 'none' ? '0%' : (r.tax.type === '3.3' ? '3.3%' : tr('4대'))) + ')</small></td>' +
+        '<td class="num net">' + E.moneyText(r.net) + '</td>' +
+        '<td class="num"><button type="button" class="btn-del" data-del-worker="' + escHtml(w.id) + '" title="' + tr('이 알바생 삭제') + '">✕</button></td>' +
         '</tr>';
     }).join('');
 
     $('rosterFoot').innerHTML =
       '<tr>' +
-      '<td colspan="3">합계 (' + sum.count + '명)</td>' +
+      '<td colspan="3">' + tr('합계 ({n}명)', { n: sum.count }) + '</td>' +
       '<td class="num">' + E.formatNum(sum.totalHours, 2) + 'h</td>' +
       '<td class="num">-</td>' +
-      '<td class="num">' + E.formatWon(sum.totalWeekly) + '원</td>' +
-      '<td class="num">' + E.formatWon(sum.totalMeal) + '원</td>' +
-      '<td class="num">' + E.formatWon(sum.totalGross) + '원</td>' +
-      '<td class="num">' + (sum.totalTax ? '-' + E.formatWon(sum.totalTax) : '0') + '원</td>' +
-      '<td class="num">' + E.formatWon(sum.totalNet) + '원</td>' +
+      '<td class="num">' + E.moneyText(sum.totalWeekly) + '</td>' +
+      '<td class="num">' + E.moneyText(sum.totalMeal) + '</td>' +
+      '<td class="num">' + E.moneyText(sum.totalGross) + '</td>' +
+      '<td class="num">' + (sum.totalTax ? '-' + E.moneyText(sum.totalTax) : E.moneyText(0)) + '</td>' +
+      '<td class="num">' + E.moneyText(sum.totalNet) + '</td>' +
       '<td></td>' +
       '</tr>';
   }
@@ -1063,7 +1069,7 @@
   /* 점검 항목 체크 목록(왼쪽 입력 폼)을 한 번만 그린다 */
   function buildChecklistForm() {
     var html = '';
-    E.CHECKLIST_GROUPS.forEach(function (g) {
+    E.getChecklistGroups().forEach(function (g) {
       html += '<section class="chk-form-group"><h4 class="chk-form-title">' + escHtml(g.title) + '</h4>';
       g.items.forEach(function (it) {
         html += '<label class="check-item chk-form-item"><input type="checkbox" value="' + it.no + '">' +
@@ -1086,27 +1092,27 @@
 
     var fh = $('fridgeHint');
     fh.className = 'temp-hint ' + (c.fridgeOk ? 'ok' : 'bad');
-    fh.textContent = c.fridgeOk ? '✓ 적정 (0~5°C)' : '⚠ 기준 이탈 (0~5°C 유지 필요)';
+    fh.textContent = c.fridgeOk ? tr('✓ 적정 (0~5°C)') : tr('⚠ 기준 이탈 (0~5°C 유지 필요)');
 
     var fzh = $('freezerHint');
     fzh.className = 'temp-hint ' + (c.freezerOk ? 'ok' : 'bad');
-    fzh.textContent = c.freezerOk ? '✓ 적정 (-18°C 이하)' : '⚠ 기준 이탈 (-18°C 이하 유지 필요)';
+    fzh.textContent = c.freezerOk ? tr('✓ 적정 (-18°C 이하)') : tr('⚠ 기준 이탈 (-18°C 이하 유지 필요)');
 
     var banner = $('chkBanner');
     banner.className = 'banner chk-banner ' + (c.allPass ? 'ok' : 'bad');
     $('chkBannerText').textContent = c.allPass
-      ? '✅ 위생 점검 ' + c.total + '개 항목 모두 적합합니다.'
-      : '⚠️ 점검필요 항목이 ' + c.failCount + '건 있습니다. 체크하지 않은 항목과 온도를 확인하세요.';
-    $('chkScore').textContent = '적합 ' + c.passCount + '/' + c.total;
-    $('chkProgress').textContent = c.input.checks.length + ' / ' + c.total + ' 체크';
+      ? tr('✅ 위생 점검 {n}개 항목 모두 적합합니다.', { n: c.total })
+      : tr('⚠️ 점검필요 항목이 {n}건 있습니다. 체크하지 않은 항목과 온도를 확인하세요.', { n: c.failCount });
+    $('chkScore').textContent = tr('적합 {p}/{n}', { p: c.passCount, n: c.total });
+    $('chkProgress').textContent = tr('{a} / {b} 체크', { a: c.input.checks.length, b: c.total });
 
     $('chkStore').textContent = c.store;
     $('chkDate').textContent = c.date || '-';
     $('chkInspector').textContent = c.inspector;
     $('chkVerdict').innerHTML = '<span class="result ' + (c.allPass ? 'ok' : 'bad') + '">' + escHtml(c.verdict) + '</span>';
-    $('chkFridge').textContent = (c.fridgeTemp === null ? '미입력' : E.formatNum(c.fridgeTemp, 1) + '°C') + (c.fridgeOk ? ' (적정)' : ' (이탈)');
-    $('chkFreezer').textContent = (c.freezerTemp === null ? '미입력' : E.formatNum(c.freezerTemp, 1) + '°C') + (c.freezerOk ? ' (적정)' : ' (이탈)');
-    $('chkMemo').textContent = c.memo || '특이사항 없음';
+    $('chkFridge').textContent = (c.fridgeTemp === null ? tr('미입력') : E.formatNum(c.fridgeTemp, 1) + '°C') + (c.fridgeOk ? tr(' (적정)') : tr(' (이탈)'));
+    $('chkFreezer').textContent = (c.freezerTemp === null ? tr('미입력') : E.formatNum(c.freezerTemp, 1) + '°C') + (c.freezerOk ? tr(' (적정)') : tr(' (이탈)'));
+    $('chkMemo').textContent = c.memo || tr('특이사항 없음');
     $('chkSign').textContent = c.inspector !== '-' ? c.inspector : '________';
 
     var rowsHtml = '';
@@ -1118,7 +1124,7 @@
         }
         rowsHtml +=
           '<td class="no">' + it.no + '</td>' +
-          '<td>' + escHtml(it.text) + (it.standard ? '<span class="item-std">기준: ' + escHtml(it.standard) + '</span>' : '') + '</td>' +
+          '<td>' + escHtml(it.text) + (it.standard ? '<span class="item-std">' + tr('기준: {s}', { s: escHtml(it.standard) }) + '</span>' : '') + '</td>' +
           '<td><span class="result ' + (it.ok ? 'ok' : 'bad') + '">' + escHtml(it.status) + '</span></td>' +
           '<td class="note">' + escHtml(it.note) + '</td>' +
           '</tr>';
@@ -1135,7 +1141,7 @@
           '<span class="chk-item-no">' + it.no + '</span>' +
           '<div class="chk-item-body">' +
             '<div class="chk-item-text">' + escHtml(it.text) + '</div>' +
-            '<div class="chk-item-std">' + (it.standard ? '기준: ' + escHtml(it.standard) + ' · ' : '') + escHtml(it.note) + '</div>' +
+            '<div class="chk-item-std">' + (it.standard ? tr('기준: {s}', { s: escHtml(it.standard) }) + ' · ' : '') + escHtml(it.note) + '</div>' +
           '</div>' +
           '<span class="result ' + (it.ok ? 'ok' : 'bad') + '">' + escHtml(it.status) + '</span>' +
           '</div>';
@@ -1154,7 +1160,7 @@
 
   function renderArchive() {
     var results = state.archive.map(function (inp) { return E.buildChecklist(inp); });
-    $('archiveCount').textContent = results.length + '일';
+    $('archiveCount').textContent = tr('{n}일', { n: results.length });
 
     if (!results.length) {
       $('archiveBody').innerHTML = '<tr class="empty"><td colspan="10">저장된 일별 점검 기록이 없습니다. [🗂️ 보관함에 저장] 버튼을 눌러 누적해보세요.</td></tr>';
@@ -1172,7 +1178,7 @@
         '<td>' + c.passCount + '/' + c.total + '</td>' +
         '<td><span class="result ' + (c.allPass ? 'ok' : 'bad') + '">' + escHtml(c.verdict) + '</span></td>' +
         '<td class="memo-cell" title="' + escHtml(c.memo || '') + '">' + escHtml(c.memo || '-') + '</td>' +
-        '<td class="num"><button type="button" class="btn-del" data-del-archive="' + idx + '" title="삭제">✕</button></td>' +
+        '<td class="num"><button type="button" class="btn-del" data-del-archive="' + idx + '" title="' + tr('삭제') + '">✕</button></td>' +
         '</tr>';
     }).join('');
   }
@@ -1215,8 +1221,8 @@
       if (savedStore.store) $('cStore').value = savedStore.store;
       if (savedStore.inspector) $('cInspector').value = savedStore.inspector;
     }
-    if (!$('cStore').value) $('cStore').value = '행복분식 강남점';
-    if (!$('cInspector').value) $('cInspector').value = '김사장';
+    if (!$('cStore').value) $('cStore').value = tr('행복분식 강남점');
+    if (!$('cInspector').value) $('cInspector').value = tr('김사장');
   }
 
   function bindEvents() {
@@ -1365,7 +1371,7 @@
       });
       editPayroll();
       closeDayModal();
-      showToast('📅 평일(월~금) 전체에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
+      showToast(tr('📅 평일(월~금) 전체에 {s} 일괄 적용!', { s: sh.off ? tr('휴무') : (sh.start + '~' + sh.end) }));
     });
 
     $('btnApplyWeekend').addEventListener('click', function () {
@@ -1377,13 +1383,13 @@
       });
       editPayroll();
       closeDayModal();
-      showToast('📅 주말(토·일) 전체에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
+      showToast(tr('📅 주말(토·일) 전체에 {s} 일괄 적용!', { s: sh.off ? tr('휴무') : (sh.start + '~' + sh.end) }));
     });
 
     $('btnApplySameDow').addEventListener('click', function () {
       var sh = currentEditorShift();
       var targetDow = state.calendar.days[state.selectedDayIdx].dow;
-      var dayName = E.DAY_NAMES[targetDow];
+      var dayName = E.dayName(targetDow);
       state.calendar.days.forEach(function (cd, i) {
         if (cd.dow === targetDow) {
           state.dailyShifts[i] = storeShift(sh);
@@ -1391,7 +1397,7 @@
       });
       editPayroll();
       closeDayModal();
-      showToast('📅 이번 달 모든 ' + dayName + '요일에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
+      showToast(tr('📅 이번 달 모든 {w}요일에 {s} 일괄 적용!', { w: dayName, s: sh.off ? tr('휴무') : (sh.start + '~' + sh.end) }));
     });
 
     $('btnSetDayOff').addEventListener('click', function () {
@@ -1399,7 +1405,7 @@
       applyEditorToSelectedDay();
       var cd = state.calendar.days[state.selectedDayIdx];
       closeDayModal();
-      showToast('🚫 ' + cd.date + '일(' + cd.dayName + ') 휴무 처리');
+      showToast(tr('🚫 {d}일({w}) 휴무 처리', { d: cd.date, w: cd.dayName }));
     });
 
     $('btnClearAllDays').addEventListener('click', function () {
@@ -1409,7 +1415,7 @@
       state.editor.off = true;
       state.editor.meals = null;
       editPayroll();
-      showToast('📅 이번 달 전체를 휴무(0시간)로 초기화했습니다.');
+      showToast(tr('📅 이번 달 전체를 휴무(0시간)로 초기화했습니다.'));
     });
 
     // 지급월 ◀ ▶ 버튼 (한글 "2026년 11월" 표기)
@@ -1433,12 +1439,12 @@
       var cur = curPayMonth();
       var has = {};
       E.recordMonths(state.workers).forEach(function (k) { has[k] = true; });
-      $('mpYearLabel').textContent = mpYear + '년';
+      $('mpYearLabel').textContent = tr('{y}년', { y: mpYear });
       var html = '';
       for (var mo = 1; mo <= 12; mo++) {
         var key = mpYear + '-' + pad2(mo);
         html += '<button type="button" class="mp-month' + (cur.y === mpYear && cur.m === mo ? ' current' : '') + (has[key] ? ' has' : '') +
-          '" data-mp="' + key + '">' + mo + '월</button>';
+          '" data-mp="' + key + '">' + tr('{m}월', { m: mo }) + '</button>';
       }
       $('mpGrid').innerHTML = html;
     }
@@ -1480,9 +1486,9 @@
       loadSelected();           // 그 알바생의 그 달 기록 (없으면 빈 달력)
       recalcPayroll();
       renderRoster();
-      var label = state.calendar.year + '년 ' + state.calendar.month + '월';
+      var label = tr('{y}년 {m}월', { y: state.calendar.year, m: state.calendar.month });
       showToast(w
-        ? ('📅 ' + w.name + '님 ' + label + (w.months[pm] ? ' 기록을 불러왔습니다' : ' — 아직 기록이 없어 비어 있습니다'))
+        ? ('📅 ' + tr('{n}님 {l}', { n: w.name, l: label }) + (w.months[pm] ? tr(' 기록을 불러왔습니다') : tr(' — 아직 기록이 없어 비어 있습니다')))
         : ('📅 ' + label));
     });
 
@@ -1528,7 +1534,7 @@
     $('moneyToggle').addEventListener('click', function () {   // 줄 돈은 기본 숨김, 눌러야 보임
       var on = document.body.classList.toggle('money-show');
       $('moneyToggle').setAttribute('aria-expanded', on ? 'true' : 'false');
-      $('moneyToggleTitle').textContent = on ? '줄 돈 숨기기' : '줄 돈 보기';
+      $('moneyToggleTitle').textContent = on ? tr('줄 돈 숨기기') : tr('줄 돈 보기');
     });
     document.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' && /set-open|add-open|slip-open|export-open/.test(document.body.className)) closeSheets();
@@ -1548,7 +1554,7 @@
     $('copyKakao').addEventListener('click', function () {
       if (!state.payroll) return;
       copyText(state.payroll.kakaoText).then(function (ok) {
-        showToast(ok ? '💬 카카오톡용 급여명세서가 클립보드에 복사되었습니다!' : '복사에 실패했습니다.');
+        showToast(ok ? tr('💬 카카오톡용 급여명세서가 클립보드에 복사되었습니다!') : tr('복사에 실패했습니다.'));
       });
     });
 
@@ -1565,22 +1571,22 @@
       $(id).addEventListener('blur', fillSettingsForm);   // 비우거나 잘못 넣었으면 적용된 값으로 되돌려 보여줌
     });
     $('btnSettingsReset').addEventListener('click', function () {
-      if (!window.confirm('세금·보험료 비율과 최저시급을 처음 값으로 되돌릴까요?')) return;
+      if (!window.confirm(tr('세금·보험료 비율과 최저시급을 처음 값으로 되돌릴까요?'))) return;
       state.settings = E.sanitizeSettings({});
       saveJson(KEYS.settings, state.settings);
       applySettings();
-      showToast('처음 값으로 되돌렸습니다.');
+      showToast(tr('처음 값으로 되돌렸습니다.'));
     });
 
     // 알바생 추가: 이름 + 계약서상 주 몇 일 + 시급 → 명단에 한 줄 생기고 바로 선택됨
     $('addWorkerForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
       var name = $('awName').value.trim();
-      if (!name) { showToast('이름을 입력해 주세요. 예) 홍길동'); $('awName').focus(); return; }
+      if (!name) { showToast(tr('이름을 입력해 주세요. 예) 홍길동')); $('awName').focus(); return; }
       var dup = state.workers.some(function (x) { return x.name === name; });
-      if (dup) { showToast('이미 있는 이름입니다. 구분되게 적어 주세요. 예) ' + name + '2'); $('awName').focus(); return; }
+      if (dup) { showToast(tr('이미 있는 이름입니다. 구분되게 적어 주세요. 예) {n}2', { n: name })); $('awName').focus(); return; }
       var wage = E.toNumber($('awWage').value, 0);
-      if (!(wage > 0)) { showToast('시급을 입력해 주세요. 예) 10320'); $('awWage').focus(); return; }
+      if (!(wage > 0)) { showToast(tr('시급을 입력해 주세요. 예) 10320')); $('awWage').focus(); return; }
       var cur = readPayrollForm();   // 식대·주휴·세금은 지금 화면의 설정으로 시작
       var w = E.createWorker(name, Number($('awDays').value), wage, {
         includeWeekly: cur.includeWeekly, includeMeal: cur.includeMeal,
@@ -1595,7 +1601,7 @@
       selectWorker(w.id);
       closeSheets();
       if (state.workers.length === 1) setTimeout(maybeAskPin, 700);
-      showToast('➕ ' + w.name + '님을 추가했습니다. 이름을 누르면 근무 기록을 입력할 수 있어요.');
+      showToast(tr('➕ {n}님을 추가했습니다. 이름을 누르면 근무 기록을 입력할 수 있어요.', { n: w.name }));
     });
 
     // 명단에서 이름을 누르면 그 알바생의 기록을 달력에 불러옴
@@ -1605,7 +1611,7 @@
         var id = del.getAttribute('data-del-worker');
         var idx = state.workers.findIndex(function (x) { return x.id === id; });
         if (idx < 0) return;
-        if (!window.confirm('"' + state.workers[idx].name + '"님과 지금까지의 모든 월 기록을 삭제할까요?\n(삭제하면 되돌릴 수 없습니다)')) return;
+        if (!window.confirm(tr('"{n}"님과 지금까지의 모든 월 기록을 삭제할까요?\n(삭제하면 되돌릴 수 없습니다)', { n: state.workers[idx].name }))) return;
         var gone = state.workers.splice(idx, 1)[0];
         saveWorkers();
         purgePunchRows([gone.code]);
@@ -1620,7 +1626,7 @@
       var wid = pick.getAttribute('data-pick-worker') || pick.getAttribute('data-wid');
       selectWorker(wid);
       var w = selWorker();
-      if (w) showToast('👤 ' + w.name + '님 ' + state.calendar.month + '월 ' + (w.months[$('pMonth').value] ? '기록을 불러왔습니다' : '— 아직 기록이 없어 비어 있습니다'));
+      if (w) showToast(tr('👤 {n}님 {m}월 ', { n: w.name, m: state.calendar.month }) + (w.months[$('pMonth').value] ? tr('기록을 불러왔습니다') : tr('— 아직 기록이 없어 비어 있습니다')));
     }
     $('rosterBody').addEventListener('click', onRosterClick);
     $('rosterCards').addEventListener('click', onRosterClick);
@@ -1637,21 +1643,21 @@
     function downloadRosterXlsx(ids, personal) {
       var inputs = allRecordInputs(ids);
       if (!inputs.length) {
-        showToast('저장된 근무 기록이 없습니다. 알바생을 추가하고 근무 시간을 입력해 주세요.');
+        showToast(tr('저장된 근무 기록이 없습니다. 알바생을 추가하고 근무 시간을 입력해 주세요.'));
         return;
       }
       var results = inputs.map(function (inp) { return E.calculatePayroll(inp); });
       if (personal) {
         var fn = E.personalFileName(results);
         triggerBlobDownload(E.payrollPersonalXlsx(results), fn);
-        showToast('📊 엑셀(.xlsx) 다운로드 완료: ' + fn);
+        showToast(tr('📊 엑셀(.xlsx) 다운로드 완료: {f}', { f: fn }));
         return;
       }
       var names = {};
       results.forEach(function (r) { names[r.name] = 1; });
       var nameList = Object.keys(names);
       var fname = nameList.length === 1
-        ? '알바_정산_' + nameList[0].replace(/[\\/:*?"<>|]/g, '') + '.xlsx'
+        ? tr('알바_정산_') + nameList[0].replace(/[\\/:*?"<>|]/g, '') + '.xlsx'
         : E.rosterFileName(results);
       downloadXlsx('./api/payroll/excel', { roster: inputs }, function () { return E.payrollRosterXlsx(results); }, fname);
     }
@@ -1663,10 +1669,10 @@
       $('exportList').innerHTML = state.workers.map(function (w) {
         var n = Object.keys(w.months).length;
         return '<label class="export-row' + (n ? '' : ' off') + '"><input type="checkbox" value="' + escHtml(w.id) + '"' + (n ? ' checked' : ' disabled') + '>' +
-          '<span class="export-name">' + escHtml(w.name) + '</span><small>' + (n ? n + '개월 기록' : '기록 없음') + '</small></label>';
+          '<span class="export-name">' + escHtml(w.name) + '</span><small>' + (n ? tr('{n}개월 기록', { n: n }) : tr('기록 없음')) + '</small></label>';
       }).join('');
       document.body.classList.remove('set-open', 'add-open', 'slip-open');
-      $('exportAllToggle').textContent = '전체 해제';
+      $('exportAllToggle').textContent = tr('전체 해제');
       document.body.classList.add('export-open');
       $('sheetBackdrop').hidden = false;
     }
@@ -1676,11 +1682,11 @@
       var boxes = $('exportList').querySelectorAll('input:not(:disabled)');
       var all = Array.prototype.every.call(boxes, function (b) { return b.checked; });
       boxes.forEach(function (b) { b.checked = !all; });
-      $('exportAllToggle').textContent = all ? '전체 선택' : '전체 해제';
+      $('exportAllToggle').textContent = all ? tr('전체 선택') : tr('전체 해제');
     });
     $('exportGo').addEventListener('click', function () {
       var ids = Array.prototype.map.call($('exportList').querySelectorAll('input:checked'), function (b) { return b.value; });
-      if (!ids.length) { showToast('엑셀로 받을 알바생을 한 명 이상 체크해 주세요.'); return; }
+      if (!ids.length) { showToast(tr('엑셀로 받을 알바생을 한 명 이상 체크해 주세요.')); return; }
       closeSheets();
       downloadRosterXlsx(ids, $('exportPersonal').checked);
     });
@@ -1688,7 +1694,7 @@
 
     $('btnRosterClear').addEventListener('click', function () {
       if (!state.workers.length) return;
-      if (!window.confirm('알바생 ' + state.workers.length + '명과 모든 월 기록을 지울까요?\n(지우면 되돌릴 수 없습니다. 먼저 백업 파일을 받아 두면 안전합니다)')) return;
+      if (!window.confirm(tr('알바생 {n}명과 모든 월 기록을 지울까요?\n(지우면 되돌릴 수 없습니다. 먼저 백업 파일을 받아 두면 안전합니다)', { n: state.workers.length }))) return;
       state.workers = [];
       state.selId = '';
       saveWorkers();
@@ -1696,7 +1702,7 @@
       loadSelected();
       recalcPayroll();
       renderRoster();
-      showToast('알바생 명단을 비웠습니다.');
+      showToast(tr('알바생 명단을 비웠습니다.'));
     });
 
     // 체크리스트 실시간 반응
@@ -1717,7 +1723,7 @@
       state.archive.push(c.input);
       saveJson(KEYS.archive, state.archive);
       renderArchive();
-      showToast('🗂️ 점검 보관함에 ' + (c.date || '오늘') + ' 점검표 저장 (' + c.verdict + ')');
+      showToast(tr('🗂️ 점검 보관함에 {d} 점검표 저장 ({v})', { d: c.date || tr('오늘'), v: c.verdict }));
     });
 
     $('archiveBody').addEventListener('click', function (ev) {
@@ -1725,7 +1731,7 @@
       if (!btn) return;
       var idx = Number(btn.getAttribute('data-del-archive'));
       if (idx >= 0 && idx < state.archive.length) {
-        if (!window.confirm('이 점검 기록을 삭제할까요?')) return;
+        if (!window.confirm(tr('이 점검 기록을 삭제할까요?'))) return;
         state.archive.splice(idx, 1);
         saveJson(KEYS.archive, state.archive);
         renderArchive();
@@ -1734,7 +1740,7 @@
 
     $('btnArchiveXlsx').addEventListener('click', function () {
       if (!state.archive.length) {
-        showToast('점검 보관함이 비어 있습니다. 먼저 보관함에 점검표를 저장해주세요.');
+        showToast(tr('점검 보관함이 비어 있습니다. 먼저 보관함에 점검표를 저장해주세요.'));
         return;
       }
       var results = state.archive.map(function (inp) { return E.buildChecklist(inp); });
@@ -1746,7 +1752,7 @@
       state.archive = [];
       saveJson(KEYS.archive, state.archive);
       renderArchive();
-      showToast('점검 보관함을 비웠습니다.');
+      showToast(tr('점검 보관함을 비웠습니다.'));
     });
   }
 
@@ -1857,10 +1863,10 @@
     var el = $('punchCloud');
     if (!el) return;
     var cls = 'punch-cloud', txt;
-    if (!connected) { cls += ' off'; txt = '☁️ 구글 저장 꺼짐 · 이 기기에만 저장 중'; }
-    else if (kind === 'needLogin' || kind === 'error') { cls += ' bad'; txt = '⚠️ 구글 로그인이 풀렸어요 · 사장님이 다시 연결해 주세요 (출퇴근은 이 기기에 저장돼요)'; }
-    else if (kind === 'saving') { txt = '⏳ 구글 시트에 저장 중…'; }
-    else { cls += ' ok'; txt = '✅ 구글 시트 연결됨' + (clock ? ' · 마지막 저장 ' + clock : ''); }
+    if (!connected) { cls += ' off'; txt = tr('☁️ 구글 저장 꺼짐 · 이 기기에만 저장 중'); }
+    else if (kind === 'needLogin' || kind === 'error') { cls += ' bad'; txt = tr('⚠️ 구글 로그인이 풀렸어요 · 사장님이 다시 연결해 주세요 (출퇴근은 이 기기에 저장돼요)'); }
+    else if (kind === 'saving') { txt = tr('⏳ 구글 시트에 저장 중…'); }
+    else { cls += ' ok'; txt = tr('✅ 구글 시트 연결됨') + (clock ? tr(' · 마지막 저장 {c}', { c: clock }) : ''); }
     el.className = cls;
     el.textContent = txt;
   }
@@ -1875,51 +1881,51 @@
     var clock = fmtClock(st && st.lastSaved);
     renderPunchCloud(connected, kind, clock);
 
-    if (!connected && kind !== 'saving') { btn.textContent = '☁️ 구글 저장'; btn.className = 'cloud-btn'; }
-    else if (kind === 'saving') { btn.textContent = '☁️ 저장 중…'; btn.className = 'cloud-btn'; }
-    else if (kind === 'needLogin' || kind === 'error') { btn.textContent = '⚠️ 다시 연결'; btn.className = 'cloud-btn bad'; }
-    else { btn.textContent = '☁️ 저장됨' + (clock ? ' ' + clock : ''); btn.className = 'cloud-btn ok'; }
+    if (!connected && kind !== 'saving') { btn.textContent = tr('☁️ 구글 저장'); btn.className = 'cloud-btn'; }
+    else if (kind === 'saving') { btn.textContent = tr('☁️ 저장 중…'); btn.className = 'cloud-btn'; }
+    else if (kind === 'needLogin' || kind === 'error') { btn.textContent = tr('⚠️ 다시 연결'); btn.className = 'cloud-btn bad'; }
+    else { btn.textContent = tr('☁️ 저장됨') + (clock ? ' ' + clock : ''); btn.className = 'cloud-btn ok'; }
 
     var html;
     if (!connected) {
       html =
-        '<p class="cloud-lead">알바생 근무 기록과 점검 기록을 <b>내 구글 드라이브</b>에 자동으로 저장합니다. 휴대폰을 바꾸거나 다른 컴퓨터에서 열어도 같은 기록을 볼 수 있어요.</p>' +
+        '<p class="cloud-lead">' + tr('알바생 근무 기록과 점검 기록을 <b>내 구글 드라이브</b>에 자동으로 저장합니다. 휴대폰을 바꾸거나 다른 컴퓨터에서 열어도 같은 기록을 볼 수 있어요.') + '</p>' +
         '<ul class="cloud-points">' +
-        '<li>내 구글 드라이브에 <b>"사장님 도우미 데이터"</b> 파일이 만들어집니다</li>' +
-        '<li>이 앱이 만든 파일 외에는 볼 수 없습니다</li>' +
-        '<li>저장된 내용은 개발자도 볼 수 없습니다</li>' +
-        '<li>언제든 연동을 끊을 수 있습니다</li>' +
+        '<li>' + tr('내 구글 드라이브에 <b>"사장님 도우미 데이터"</b> 파일이 만들어집니다') + '</li>' +
+        '<li>' + tr('이 앱이 만든 파일 외에는 볼 수 없습니다') + '</li>' +
+        '<li>' + tr('저장된 내용은 개발자도 볼 수 없습니다') + '</li>' +
+        '<li>' + tr('언제든 연동을 끊을 수 있습니다') + '</li>' +
         '</ul>' +
-        '<button type="button" class="btn btn-primary cloud-big" data-cloud="connect"' + (kind === 'saving' ? ' disabled' : '') + '>구글 계정으로 연동하기</button>' +
+        '<button type="button" class="btn btn-primary cloud-big" data-cloud="connect"' + (kind === 'saving' ? ' disabled' : '') + '>' + tr('구글 계정으로 연동하기') + '</button>' +
         (kind === 'error' && st.text ? '<p class="cloud-warn">' + escHtml(st.text) + '</p>' : '');
     } else {
       var head, cls = 'ok';
-      if (kind === 'saving') { head = '⏳ ' + escHtml(st.text || '저장 중…'); cls = ''; }
-      else if (kind === 'needLogin') { head = '⚠️ 구글 연결을 다시 해 주세요'; cls = 'bad'; }
-      else if (kind === 'error') { head = '⚠️ 저장하지 못했습니다'; cls = 'bad'; }
-      else { head = '✅ 구글 시트에 자동 저장 중'; }
+      if (kind === 'saving') { head = '⏳ ' + escHtml(st.text || tr('저장 중…')); cls = ''; }
+      else if (kind === 'needLogin') { head = tr('⚠️ 구글 연결을 다시 해 주세요'); cls = 'bad'; }
+      else if (kind === 'error') { head = tr('⚠️ 저장하지 못했습니다'); cls = 'bad'; }
+      else { head = tr('✅ 구글 시트에 자동 저장 중'); }
       html =
         '<p class="cloud-state ' + cls + '">' + head + '</p>' +
-        '<p class="cloud-sub">' + (clock ? '마지막 저장 ' + clock + ' · ' : '') + '내용을 바꾸면 몇 초 뒤 자동으로 저장됩니다.</p>' +
-        '<p class="cloud-sub">시트에는 달마다 탭이 만들어지고, 5년이 지난 달의 탭은 시트에서만 자동으로 정리됩니다. (이 기기의 기록은 지워지지 않습니다)</p>' +
+        '<p class="cloud-sub">' + (clock ? tr('마지막 저장 {c} · ', { c: clock }) : '') + tr('내용을 바꾸면 몇 초 뒤 자동으로 저장됩니다.') + '</p>' +
+        '<p class="cloud-sub">' + tr('시트에는 달마다 탭이 만들어지고, 5년이 지난 달의 탭은 시트에서만 자동으로 정리됩니다. (이 기기의 기록은 지워지지 않습니다)') + '</p>' +
         (st.notice ? '<p class="cloud-warn">' + escHtml(st.notice) + '</p>' : '') +
         ((kind === 'needLogin' || kind === 'error') && st.text ? '<p class="cloud-warn">' + escHtml(st.text) + '</p>' : '') +
         '<div class="cloud-actions">' +
         ((kind === 'needLogin' || kind === 'error')
-          ? '<button type="button" class="btn btn-primary" data-cloud="save">다시 연결하고 저장하기</button>'
-          : '<button type="button" class="btn btn-primary" data-cloud="save">지금 저장</button>') +
-        '<button type="button" class="btn" data-cloud="open">📄 구글 시트 열어보기</button>' +
-        '<button type="button" class="btn" data-cloud="load">⬇️ 시트에서 다시 불러오기</button>' +
-        '<button type="button" class="btn btn-ghost" data-cloud="off">연동 끊기</button>' +
+          ? '<button type="button" class="btn btn-primary" data-cloud="save">' + tr('다시 연결하고 저장하기') + '</button>'
+          : '<button type="button" class="btn btn-primary" data-cloud="save">' + tr('지금 저장') + '</button>') +
+        '<button type="button" class="btn" data-cloud="open">' + tr('📄 구글 시트 열어보기') + '</button>' +
+        '<button type="button" class="btn" data-cloud="load">' + tr('⬇️ 시트에서 다시 불러오기') + '</button>' +
+        '<button type="button" class="btn btn-ghost" data-cloud="off">' + tr('연동 끊기') + '</button>' +
         '</div>';
     }
     html +=
       '<div class="cloud-backup">' +
-      '<h3 class="cloud-backup-title">💾 백업 파일</h3>' +
-      '<p class="cloud-sub">구글 계정을 바꾸거나 다른 기기로 옮길 때 쓰세요. 모든 기록이 파일 하나로 저장됩니다.</p>' +
+      '<h3 class="cloud-backup-title">' + tr('💾 백업 파일') + '</h3>' +
+      '<p class="cloud-sub">' + tr('구글 계정을 바꾸거나 다른 기기로 옮길 때 쓰세요. 모든 기록이 파일 하나로 저장됩니다.') + '</p>' +
       '<div class="cloud-actions">' +
-      '<button type="button" class="btn" data-cloud="backup-save">⬇️ 백업 파일 내려받기</button>' +
-      '<button type="button" class="btn" data-cloud="backup-load">⬆️ 백업 파일 불러오기</button>' +
+      '<button type="button" class="btn" data-cloud="backup-save">' + tr('⬇️ 백업 파일 내려받기') + '</button>' +
+      '<button type="button" class="btn" data-cloud="backup-load">' + tr('⬆️ 백업 파일 불러오기') + '</button>' +
       '</div></div>';
     body.innerHTML = html;
   }
@@ -1934,7 +1940,7 @@
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
-    showToast('💾 백업 파일을 내려받았습니다 (' + state.workers.length + '명 · 점검 ' + state.archive.length + '일)');
+    showToast(tr('💾 백업 파일을 내려받았습니다 ({w}명 · 점검 {a}일)', { w: state.workers.length, a: state.archive.length }));
   }
 
   function backupRestore(file) {
@@ -1943,15 +1949,14 @@
     reader.onload = function () {
       var r = E.parseBackup(String(reader.result || ''));
       if (!r.ok) { window.alert(r.error); return; }
-      var msg = '백업 파일의 기록으로 바꿉니다.\n\n' +
-        '불러올 기록: 알바생 ' + r.counts.workers + '명 · 점검 보관함 ' + r.counts.archive + '일\n' +
-        '지금 화면의 기록: 알바생 ' + state.workers.length + '명 · 점검 보관함 ' + state.archive.length + '일 (사라집니다)\n\n계속할까요?';
+      var msg = tr('백업 파일의 기록으로 바꿉니다.\n\n불러올 기록: 알바생 {a}명 · 점검 보관함 {b}일\n지금 화면의 기록: 알바생 {c}명 · 점검 보관함 {d}일 (사라집니다)\n\n계속할까요?',
+        { a: r.counts.workers, b: r.counts.archive, c: state.workers.length, d: state.archive.length });
       if (!window.confirm(msg)) return;
       cloudApply(r.data);
       if (window.AlbaCloud) window.AlbaCloud.markDirty();
-      showToast('⬆️ 백업 파일을 불러왔습니다' + (r.counts.skipped ? ' (읽을 수 없는 ' + r.counts.skipped + '건 제외)' : ''));
+      showToast(tr('⬆️ 백업 파일을 불러왔습니다') + (r.counts.skipped ? tr(' (읽을 수 없는 {n}건 제외)', { n: r.counts.skipped }) : ''));
     };
-    reader.onerror = function () { window.alert('파일을 읽지 못했습니다.'); };
+    reader.onerror = function () { window.alert(tr('파일을 읽지 못했습니다.')); };
     reader.readAsText(file);
   }
 
@@ -1982,22 +1987,22 @@
       if (act === 'backup-save') { backupDownload(); return; }
       if (act === 'backup-load') { $('backupFile').click(); return; }
       if (act === 'connect') {
-        C.connect().then(function (ok) { if (ok) { showToast('☁️ 구글 시트 연동 완료'); adoptSheetPin(); } });
+        C.connect().then(function (ok) { if (ok) { showToast(tr('☁️ 구글 시트 연동 완료')); adoptSheetPin(); } });
       } else if (act === 'save') {
-        C.saveNow().then(function (ok) { if (ok) showToast('☁️ 구글 시트에 저장했습니다'); });
+        C.saveNow().then(function (ok) { if (ok) showToast(tr('☁️ 구글 시트에 저장했습니다')); });
       } else if (act === 'open') {
         var u = C.sheetUrl();
         if (u) window.open(u, '_blank', 'noopener');
       } else if (act === 'load') {
-        if (!window.confirm('구글 시트에 저장된 내용으로 이 화면의 기록을 바꿉니다.\n계속할까요?')) return;
+        if (!window.confirm(tr('구글 시트에 저장된 내용으로 이 화면의 기록을 바꿉니다.\n계속할까요?'))) return;
         C.loadFromSheet().then(function (r) {
           if (r === 'ok') adoptSheetPin();
-          showToast(r === 'ok' ? '⬇️ 구글 시트에서 불러왔습니다' : (r === 'empty' ? '시트에 저장된 기록이 없습니다' : '불러오지 못했습니다'));
+          showToast(r === 'ok' ? tr('⬇️ 구글 시트에서 불러왔습니다') : (r === 'empty' ? tr('시트에 저장된 기록이 없습니다') : tr('불러오지 못했습니다')));
         });
       } else if (act === 'off') {
-        if (!window.confirm('구글 연동을 끊을까요?\n이 기기의 기록과 구글 드라이브의 파일은 그대로 남습니다.')) return;
+        if (!window.confirm(tr('구글 연동을 끊을까요?\n이 기기의 기록과 구글 드라이브의 파일은 그대로 남습니다.'))) return;
         C.disconnect();
-        showToast('구글 연동을 끊었습니다');
+        showToast(tr('구글 연동을 끊었습니다'));
       }
     });
     $('backupFile').addEventListener('change', function (ev) {
@@ -2039,8 +2044,8 @@
     var locked = isLocked();
     document.body.classList.toggle('locked', locked);
     $('lockBtn').hidden = !pin;
-    $('lockBtn').textContent = locked ? '🔒 관리자' : '🔓 잠그기';
-    $('pinState').textContent = pin ? '· 설정됨' : '· 아직 없음';
+    $('lockBtn').textContent = locked ? tr('🔒 관리자') : tr('🔓 잠그기');
+    $('pinState').textContent = pin ? tr('· 설정됨') : tr('· 아직 없음');
     if (locked) openTab('punch');
   }
 
@@ -2065,12 +2070,12 @@
   function fmtHM(h) {
     var m = Math.round((Number(h) || 0) * 60);
     var hh = Math.floor(m / 60), mm = m % 60;
-    return hh + '시간' + (mm ? ' ' + mm + '분' : '');
+    return tr('{n}시간', { n: hh }) + (mm ? ' ' + tr('{n}분', { n: mm }) : '');
   }
   function tsOf(d) {
     return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
   }
-  function hmText(t) { var a = String(t).split(':'); return Number(a[0]) + '시 ' + a[1] + '분'; }
+  function hmText(t) { var a = String(t).split(':'); return tr('{h}시 {m}분', { h: Number(a[0]), m: a[1] }); }
 
   /* ---------- 시트 '출퇴근기록' 탭에 한 줄씩 덧붙임 (연동 중일 때) ---------- */
   var queueBusy = false;
@@ -2108,7 +2113,7 @@
     if (n) {
       saveWorkers();
       loadSelected(); recalcPayroll(); renderRoster();
-      showToast('출퇴근 기록 ' + n + '건을 시트 기록에서 복구했습니다');
+      showToast(tr('출퇴근 기록 {n}건을 시트 기록에서 복구했습니다', { n: n }));
     }
   }
 
@@ -2121,10 +2126,11 @@
     done.forEach(function (d) {
       enqueuePunch([tsOf(d.ts), d.worker.code, d.worker.name, '퇴근누락(무효)', '자동(자정)', '정상(자동)', '자정까지 퇴근을 찍지 않아 그날 출근(' + d.date + ' ' + d.start + ')을 무효·휴무로 처리']);
     });
-    showToast('🌙 퇴근을 안 찍어 ' + done.map(function (d) { return d.worker.name; }).join(', ') + '님의 어제 출근은 무효(휴무) 처리했습니다');
+    showToast(tr('🌙 퇴근을 안 찍어 {n}님의 어제 출근은 무효(휴무) 처리했습니다', { n: done.map(function (d) { return d.worker.name; }).join(', ') }));
   }
 
   /* ---------- 화면 보호기 (번인 방지) ---------- */
+  var EGG_TEXT = '진주 경상대점 맘스터치 매니저님 짱 ✨';   // 이스터에그 문구 (언어와 상관없이 그대로)
   var SAVER_KEY = 'alba.saverMin';
   var saverState = { last: Date.now(), on: false, moveTimer: null };
   function saverMinutes() {
@@ -2141,7 +2147,8 @@
     var d = new Date();
     $('saverTime').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
     var working = state.workers.filter(function (w) { return E.punchNext(w, d) === 'out'; }).length;
-    $('saverSub').textContent = (working ? '근무 중 ' + working + '명 · ' : '') + '화면을 누르면 돌아가요';
+    $('saverSub').textContent = Math.random() < 0.15 ? EGG_TEXT   // 이스터에그: 가끔 한 번씩
+      : (working ? tr('근무 중 {n}명 · ', { n: working }) : '') + tr('화면을 누르면 돌아가요');
   }
   function showSaver() {
     saverState.on = true;
@@ -2178,14 +2185,14 @@
     if (!box) return;
     var now = new Date();
     if (!state.workers.length) {
-      box.innerHTML = '<p class="punch-empty">등록된 알바생이 없습니다.<br>사장님께 알려 주세요.</p>';
+      box.innerHTML = '<p class="punch-empty">' + tr('등록된 알바생이 없습니다.<br>사장님께 알려 주세요.') + '</p>';
       return;
     }
     box.innerHTML = state.workers.map(function (w) {
       var working = E.punchNext(w, now) === 'out';
       var chip = working
-        ? '<span class="punch-chip on">근무 중 · ' + escHtml(w.punch.time) + ' 출근</span>'
-        : '<span class="punch-chip">퇴근 상태</span>';
+        ? '<span class="punch-chip on">' + tr('근무 중 · {t} 출근', { t: escHtml(w.punch.time) }) + '</span>'
+        : '<span class="punch-chip">' + tr('퇴근 상태') + '</span>';
       return '<button type="button" class="punch-row' + (working ? ' on' : '') + '" data-punch="' + escHtml(w.id) + '">' +
         '<span class="punch-name">' + escHtml(w.name) + '</span>' + chip + '</button>';
     }).join('');
@@ -2196,8 +2203,8 @@
     var el = $('punchTime');
     if (!el) return;
     el.textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
-    var wd = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
-    $('punchDate').textContent = d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + wd + ')';
+    var wd = E.dayName((d.getDay() + 6) % 7);
+    $('punchDate').textContent = tr('{y}년 {m}월 {d}일 ({w})', { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), w: wd });
   }
 
   function openPunchPw(w) {
@@ -2205,9 +2212,9 @@
     var next = E.punchNext(w, new Date());
     $('punchPwName').textContent = w.name;
     $('punchPwState').textContent = next === 'out'
-      ? ('지금 ' + hmText(w.punch.time) + '에 출근해 있어요. 비밀번호를 입력하면 퇴근이 찍혀요.')
-      : '비밀번호를 입력하면 출근이 찍혀요.';
-    $('punchPwOk').textContent = next === 'out' ? '퇴근 찍기' : '출근 찍기';
+      ? tr('지금 {t}에 출근해 있어요. 비밀번호를 입력하면 퇴근이 찍혀요.', { t: hmText(w.punch.time) })
+      : tr('비밀번호를 입력하면 출근이 찍혀요.');
+    $('punchPwOk').textContent = next === 'out' ? tr('퇴근 찍기') : tr('출근 찍기');
     var inp = $('punchPwInput');
     inp.value = '';
     inp.setAttribute('inputmode', /^\d+$/.test(w.password || '') ? 'numeric' : 'text');
@@ -2226,20 +2233,20 @@
     punchState.target = w;
     var now = new Date();
     if (punchState.lockUntil > now.getTime()) {
-      $('punchPwErr').textContent = '잠시 후에 다시 해 주세요. (' + Math.ceil((punchState.lockUntil - now.getTime()) / 1000) + '초)';
+      $('punchPwErr').textContent = tr('잠시 후에 다시 해 주세요. ({n}초)', { n: Math.ceil((punchState.lockUntil - now.getTime()) / 1000) });
       return;
     }
     var typed = $('punchPwInput').value.trim();
-    if (!w.password) { $('punchPwErr').textContent = '이 알바생은 아직 비밀번호가 없어요. 사장님께 알려 주세요. (급여 계산 → 설정에서 정할 수 있어요)'; return; }
+    if (!w.password) { $('punchPwErr').textContent = tr('이 알바생은 아직 비밀번호가 없어요. 사장님께 알려 주세요. (급여 계산 → 설정에서 정할 수 있어요)'); return; }
     if (!typed || typed !== w.password) {
       punchState.fails++;
       enqueuePunch([tsOf(now), w.code, w.name, '', '이름+비밀번호', '비밀번호 오류', punchState.fails + '번째 연속 실패']);
       if (punchState.fails >= 5) {
         punchState.lockUntil = now.getTime() + 30000;
         punchState.fails = 0;
-        $('punchPwErr').textContent = '여러 번 틀렸어요. 30초 뒤에 다시 해 주세요.';
+        $('punchPwErr').textContent = tr('여러 번 틀렸어요. 30초 뒤에 다시 해 주세요.');
       } else {
-        $('punchPwErr').textContent = '비밀번호가 맞지 않아요.';
+        $('punchPwErr').textContent = tr('비밀번호가 맞지 않아요.');
       }
       $('punchPwInput').value = '';
       $('punchPwInput').focus();
@@ -2249,7 +2256,7 @@
     runAutoClose();   // 어제 퇴근 안 찍은 사람이 있으면 먼저 자정 퇴근으로 정리
     var r = E.applyPunch(w, now);
     closePunchPw();
-    if (r.kind === 'too_soon') { showToast('방금 찍었어요. 잠시 뒤에 다시 눌러 주세요.'); return; }
+    if (r.kind === 'too_soon') { showToast(tr('방금 찍었어요. 잠시 뒤에 다시 눌러 주세요.')); return; }
     saveWorkers();
     // 열려 있던 급여 화면과 명단도 새 기록으로 맞춤
     if (w.id === state.selId) { loadSelected(); recalcPayroll(); }
@@ -2324,7 +2331,7 @@
   }
   function initSoundSettings() {
     var c = loadSnd();
-    var opts = SND_ORDER.map(function (k) { return '<option value="' + k + '">' + SOUNDS[k].label + '</option>'; }).join('');
+    var opts = SND_ORDER.map(function (k) { return '<option value="' + k + '">' + tr(SOUNDS[k].label) + '</option>'; }).join('');
     $('sndIn').innerHTML = opts; $('sndOut').innerHTML = opts;
     $('sndIn').value = c.inId; $('sndOut').value = c.outId; $('sndVol').value = c.vol;
     $('sndVolLabel').textContent = c.vol + '%';
@@ -2343,15 +2350,15 @@
     var sum = E.monthSummary(w, pm);
     var isIn = r.kind === 'in';
     $('punchResIcon').textContent = isIn ? '☀️' : '🌙';
-    $('punchResTitle').textContent = isIn ? '출근했어요' : '퇴근했어요. 수고하셨어요!';
-    $('punchResWho').textContent = w.name + '님 · ' + hmText(isIn ? r.start : r.end);
+    $('punchResTitle').textContent = isIn ? tr('출근했어요') : tr('퇴근했어요. 수고하셨어요!');
+    $('punchResWho').textContent = tr('{n}님 · {t}', { n: w.name, t: hmText(isIn ? r.start : r.end) });
     var lines = [];
     if (!isIn) {
       var sh = r.empty ? null : E.workerShifts(w, pm)[Number(r.date.slice(8)) - 1];
-      if (sh && !sh.off) lines.push('<div>오늘 <b>' + fmtHM(E.calcShiftHours(sh.start, sh.end, sh.breakMinutes)) + '</b> 일했어요 (' + sh.start + '~' + sh.end + ')</div>');
+      if (sh && !sh.off) lines.push('<div>' + tr('오늘 <b>{h}</b> 일했어요 ({s}~{e})', { h: fmtHM(E.calcShiftHours(sh.start, sh.end, sh.breakMinutes)), s: sh.start, e: sh.end }) + '</div>');
     }
-    lines.push('<div>이번 달 <b>' + sum.workDays + '일</b> · 누적 <b>' + fmtHM(sum.totalHours) + '</b></div>');
-    if (isIn) lines.push('<small>오늘 근무는 퇴근을 찍으면 더해져요</small>');
+    lines.push('<div>' + tr('이번 달 <b>{d}일</b> · 누적 <b>{h}</b>', { d: sum.workDays, h: fmtHM(sum.totalHours) }) + '</div>');
+    if (isIn) lines.push('<small>' + tr('오늘 근무는 퇴근을 찍으면 더해져요') + '</small>');
     if (r.note) lines.push('<small>' + escHtml(r.note) + '</small>');
     $('punchResStats').innerHTML = lines.join('');
     var bar = $('punchTimerBar');
@@ -2378,13 +2385,13 @@
   var PIN_ASKED_KEY = 'alba.pinAsked';
   function commitPin(v) {
     var wasSet = !!getPin();
-    try { localStorage.setItem(PIN_KEY, v); } catch (e) { showToast('이 기기에 저장하지 못했습니다.'); return; }
+    try { localStorage.setItem(PIN_KEY, v); } catch (e) { showToast(tr('이 기기에 저장하지 못했습니다.')); return; }
     try { localStorage.setItem(PIN_ASKED_KEY, '1'); } catch (e) {}
     var C = window.AlbaCloud;
     if (C) C.setAdminPin(v);
-    var hint = (C && C.isConnected()) ? '' : ' 구글 저장을 켜 두면 잊어도 시트에서 다시 정할 수 있어요.';
-    if (wasSet) { applyLockUi(); bumpIdle(); showToast('관리자 비밀번호를 바꿨어요.' + hint); }
-    else { lockNow(); showToast('관리자 비밀번호를 정했어요. 지금부터 잠깁니다.' + hint); }
+    var hint = (C && C.isConnected()) ? '' : tr(' 구글 저장을 켜 두면 잊어도 시트에서 다시 정할 수 있어요.');
+    if (wasSet) { applyLockUi(); bumpIdle(); showToast(tr('관리자 비밀번호를 바꿨어요.') + hint); }
+    else { lockNow(); showToast(tr('관리자 비밀번호를 정했어요. 지금부터 잠깁니다.') + hint); }
   }
   function maybeAskPin() {
     var asked = false;
@@ -2401,7 +2408,7 @@
       if (v.length < 4 || getPin()) return;
       try { localStorage.setItem(PIN_KEY, v); localStorage.setItem(PIN_ASKED_KEY, '1'); } catch (e) { return; }
       lockNow();
-      showToast('구글 시트의 관리자 비밀번호가 적용되어 잠겼어요.');
+      showToast(tr('구글 시트의 관리자 비밀번호가 적용되어 잠겼어요.'));
     }).catch(function () {});
   }
 
@@ -2417,7 +2424,7 @@
       if (!b) return;
       var w = state.workers.filter(function (x) { return x.id === b.getAttribute('data-punch'); })[0];
       if (!w) return;
-      if (!w.password) { showToast(w.name + '님은 아직 출퇴근 비밀번호가 없어요. 사장님께 정해 달라고 하세요.'); return; }
+      if (!w.password) { showToast(tr('{n}님은 아직 출퇴근 비밀번호가 없어요. 사장님께 정해 달라고 하세요.', { n: w.name })); return; }
       openPunchPw(w);
     });
     $('punchPwForm').addEventListener('submit', function (ev) { ev.preventDefault(); punchSubmit(); });
@@ -2437,7 +2444,7 @@
         openTab('payroll');
         bumpIdle();
       } else {
-        $('adminPinErr').textContent = '비밀번호가 맞지 않아요.';
+        $('adminPinErr').textContent = tr('비밀번호가 맞지 않아요.');
         $('adminPinInput').value = '';
         $('adminPinInput').focus();
       }
@@ -2453,29 +2460,29 @@
 
     $('btnPinSave').addEventListener('click', function () {
       var v = $('sAdminPin').value.trim();
-      if (v.length < 4) { showToast('관리자 비밀번호는 4자 이상으로 정해 주세요.'); return; }
+      if (v.length < 4) { showToast(tr('관리자 비밀번호는 4자 이상으로 정해 주세요.')); return; }
       var msg = getPin()
-        ? '관리자 비밀번호를 바꿉니다. 계속할까요?'
-        : '정하면 지금 바로 잠기고, 출퇴근 화면만 보이게 됩니다.\n다시 열 때는 위의 [🔒 관리자]를 눌러 이 비밀번호를 입력하세요.\n\n계속할까요?';
+        ? tr('관리자 비밀번호를 바꿉니다. 계속할까요?')
+        : tr('정하면 지금 바로 잠기고, 출퇴근 화면만 보이게 됩니다.\n다시 열 때는 위의 [🔒 관리자]를 눌러 이 비밀번호를 입력하세요.\n\n계속할까요?');
       if (!window.confirm(msg)) return;
       $('sAdminPin').value = '';
       commitPin(v);
     });
     $('btnPinClear').addEventListener('click', function () {
-      if (!getPin()) { showToast('정해 둔 관리자 비밀번호가 없어요.'); return; }
-      if (!window.confirm('관리자 비밀번호를 없앨까요?\n없애면 누구나 급여 화면을 볼 수 있어요.')) return;
+      if (!getPin()) { showToast(tr('정해 둔 관리자 비밀번호가 없어요.')); return; }
+      if (!window.confirm(tr('관리자 비밀번호를 없앨까요?\n없애면 누구나 급여 화면을 볼 수 있어요.'))) return;
       try { localStorage.removeItem(PIN_KEY); } catch (e) {}
       if (window.AlbaCloud) window.AlbaCloud.setAdminPin('');
       applyLockUi();
       bumpIdle();
-      showToast('관리자 비밀번호를 없앴어요.');
+      showToast(tr('관리자 비밀번호를 없앴어요.'));
     });
 
     // 처음 안내 창
     $('pinSetupForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
       var v = $('pinSetupInput').value.trim();
-      if (v.length < 4) { $('pinSetupErr').textContent = '4자 이상으로 정해 주세요.'; return; }
+      if (v.length < 4) { $('pinSetupErr').textContent = tr('4자 이상으로 정해 주세요.'); return; }
       $('pinSetup').hidden = true;
       $('pinSetupInput').value = '';
       commitPin(v);
@@ -2490,19 +2497,19 @@
     $('adminPinForgot').addEventListener('click', function () {
       var C = window.AlbaCloud, err = $('adminPinErr');
       if (!C || !C.isConnected()) {
-        err.textContent = '구글 저장이 연결되어 있지 않아 시트에서 복구할 수 없어요.';
+        err.textContent = tr('구글 저장이 연결되어 있지 않아 시트에서 복구할 수 없어요.');
         return;
       }
-      err.textContent = '시트에서 확인하는 중…';
+      err.textContent = tr('시트에서 확인하는 중…');
       C.readAdminPin('user').then(function (v) {
         v = String(v || '').trim();
-        if (v.length < 4) { err.textContent = '구글 시트의 "관리자" 탭 B1 칸에 새 비밀번호(4자 이상)를 적은 뒤 다시 눌러 주세요.'; return; }
-        if (v === getPin()) { err.textContent = '시트의 비밀번호가 지금 앱의 비밀번호와 같아요. 시트 "관리자" 탭에서 확인하거나 새 값으로 고친 뒤 다시 눌러 주세요.'; return; }
+        if (v.length < 4) { err.textContent = tr('구글 시트의 "관리자" 탭 B1 칸에 새 비밀번호(4자 이상)를 적은 뒤 다시 눌러 주세요.'); return; }
+        if (v === getPin()) { err.textContent = tr('시트의 비밀번호가 지금 앱의 비밀번호와 같아요. 시트 "관리자" 탭에서 확인하거나 새 값으로 고친 뒤 다시 눌러 주세요.'); return; }
         try { localStorage.setItem(PIN_KEY, v); } catch (e) {}
         $('adminPinInput').value = '';
-        err.textContent = '시트에 적힌 비밀번호로 바꿨어요. 그 비밀번호를 입력하세요.';
+        err.textContent = tr('시트에 적힌 비밀번호로 바꿨어요. 그 비밀번호를 입력하세요.');
       }).catch(function () {
-        err.textContent = '시트를 읽지 못했어요. 인터넷과 구글 로그인을 확인해 주세요. (시트에 "관리자" 탭이 없으면 앱에서 비밀번호를 다시 정해야 해요)';
+        err.textContent = tr('시트를 읽지 못했어요. 인터넷과 구글 로그인을 확인해 주세요. (시트에 "관리자" 탭이 없으면 앱에서 비밀번호를 다시 정해야 해요)');
       });
     });
 
@@ -2520,6 +2527,43 @@
 
   // 버전 표시 (엔진 빌드가 package.json 버전을 넣어 줌)
   if (window.ALBA_VERSION) Array.prototype.forEach.call(document.querySelectorAll('.ver-text'), function (el) { el.textContent = 'v' + window.ALBA_VERSION; });
+  /* 언어를 바꾸면 앱이 만든 화면 조각을 새 언어로 다시 그림 (입력값은 그대로) */
+  window.addEventListener('alba:lang', function () {
+    var checked = Array.prototype.map.call(document.querySelectorAll('#chkFormList input:checked'), function (el) { return el.value; });
+    buildChecklistForm();
+    checked.forEach(function (v) { var el = document.querySelector('#chkFormList input[value="' + v + '"]'); if (el) el.checked = true; });
+    var si = $('sndIn'), so = $('sndOut');
+    if (si && so) {
+      var iv = si.value, ov = so.value;
+      var opts = SND_ORDER.map(function (k) { return '<option value="' + k + '">' + tr(SOUNDS[k].label) + '</option>'; }).join('');
+      si.innerHTML = opts; so.innerHTML = opts; si.value = iv; so.value = ov;
+    }
+    syncThemeBtn(); syncFontBtn(); checkServerHealth();
+    renderPresets(); renderTimeEditor();
+    recalcPayroll(); recalcChecklist(); renderRoster(); renderArchive();
+    renderPunch(); tickClock();
+    if (window.AlbaCloud && window.AlbaCloud.getStatus) renderCloudUi(window.AlbaCloud.getStatus());
+  });
+
+  /* 이스터에그: 앱 제목을 빠르게 7번 누르면 팝업 */
+  (function () {
+    var h1 = document.querySelector('.brand h1'), n = 0, last = 0;
+    if (!h1) return;
+    h1.addEventListener('click', function () {
+      var now = Date.now();
+      n = now - last < 1200 ? n + 1 : 1; last = now;
+      if (n < 7) return;
+      n = 0;
+      var old = document.getElementById('eggPop'); if (old) old.remove();
+      var d = document.createElement('div');
+      d.id = 'eggPop'; d.className = 'egg-pop'; d.setAttribute('data-no-i18n', '');
+      d.innerHTML = '<div class="egg-box"><div class="egg-emoji">🍔</div><div class="egg-text">' + EGG_TEXT.replace(' ✨', '') + '</div><div class="egg-sub">👍 ✨</div></div>';
+      d.addEventListener('click', function () { d.remove(); });
+      document.body.appendChild(d);
+      setTimeout(function () { if (d.parentNode) d.remove(); }, 3500);
+    });
+  })();
+
   syncThemeBtn();
   syncFontBtn();
   initTabs();

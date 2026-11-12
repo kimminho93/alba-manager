@@ -35,7 +35,7 @@
         s.src = 'https://accounts.google.com/gsi/client';
         s.async = true;
         s.onload = function () { resolve(); };
-        s.onerror = function () { gisPromise = null; reject(new Error('구글 로그인 창을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.')); };
+        s.onerror = function () { gisPromise = null; reject(new Error(tr('구글 로그인 창을 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.'))); };
         w.document.head.appendChild(s);
       });
       return gisPromise;
@@ -80,6 +80,7 @@
   'use strict';
 
   var META_KEY = 'alba.cloud.v1';
+  function tr(s, v) { var E = (typeof window !== 'undefined' && window.AlbaEngine) || null; return E && E.t ? E.t(s, v) : (v ? s.replace(/\{(\w+)\}/g, function (m, k) { return v[k] === undefined ? m : v[k]; }) : s); }
   var FILE_NAME = '사장님 도우미 데이터';
   var LEGACY_TABS = ['정산 명단'];   // 예전 버전이 만들던 탭 (저장할 때 정리)
   var SHEET_DATA = '데이터';
@@ -117,12 +118,12 @@
 
   function friendly(e) {
     var m = String((e && e.message) || e || '');
-    if (/popup_closed|popup_failed|access_denied/.test(m)) return '구글 로그인이 취소되었습니다.';
-    if (/interaction_required|login_required|consent_required|immediate_failed/.test(m)) return '구글 로그인이 필요합니다.';
-    if (/^http 403/i.test(m)) return '구글에서 접근이 거절되었습니다. 잠시 후 다시 시도해 주세요.';
-    if (/^http 429/i.test(m)) return '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.';
-    if (/Failed to fetch|NetworkError|network/i.test(m)) return '인터넷 연결을 확인해 주세요.';
-    return m || '알 수 없는 오류';
+    if (/popup_closed|popup_failed|access_denied/.test(m)) return tr('구글 로그인이 취소되었습니다.');
+    if (/interaction_required|login_required|consent_required|immediate_failed/.test(m)) return tr('구글 로그인이 필요합니다.');
+    if (/^http 403/i.test(m)) return tr('구글에서 접근이 거절되었습니다. 잠시 후 다시 시도해 주세요.');
+    if (/^http 429/i.test(m)) return tr('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.');
+    if (/Failed to fetch|NetworkError|network/i.test(m)) return tr('인터넷 연결을 확인해 주세요.');
+    return m || tr('알 수 없는 오류');
   }
 
   /* ---------------- 토큰 ---------------- */
@@ -144,7 +145,7 @@
     refreshTimer = setT(function () {
       refreshTimer = null;
       if (!meta.connected) return;
-      fetchToken('silent').then(function () { setStatus('saved', ''); }).catch(function () { setStatus('needLogin', '구글 로그인이 필요합니다.'); });
+      fetchToken('silent').then(function () { setStatus('saved', ''); }).catch(function () { setStatus('needLogin', tr('구글 로그인이 필요합니다.')); });
     }, wait);
   }
   function fetchToken(mode) {
@@ -354,7 +355,7 @@
       meta.stamp = stamp;
       meta.dirty = false;
       meta.lastSaved = deps.now();
-      notice = removedOld ? ('5년이 지난 ' + removedOld + '개 달의 탭을 구글 시트에서 정리했습니다. (이 기기의 기록은 그대로입니다)') : '';
+      notice = removedOld ? tr('5년이 지난 {n}개 달의 탭을 구글 시트에서 정리했습니다. (이 기기의 기록은 그대로입니다)', { n: removedOld }) : '';
       writeMeta();
     });
   }
@@ -393,10 +394,10 @@
   /* ---------------- 공개 기능 ---------------- */
   function connect() {
     if (!deps.available()) {
-      setStatus('error', '이 기능은 인터넷 주소(https)로 접속했을 때만 사용할 수 있습니다.');
+      setStatus('error', tr('이 기능은 인터넷 주소(https)로 접속했을 때만 사용할 수 있습니다.'));
       return Promise.resolve(false);
     }
-    setStatus('saving', '구글 연결 중…');
+    setStatus('saving', tr('구글 연결 중…'));
     return getToken(meta.connected ? 'user' : 'first').then(function () {
       return ensureSheet('user');
     }).then(function () {
@@ -415,7 +416,7 @@
       if (remote && hasContent(remote.data)) {
         var same = JSON.stringify(remote.data) === JSON.stringify(local);
         if (!same && hasContent(local)) {
-          var useRemote = host.confirm('이 구글 계정에 저장된 기록이 이미 있습니다.\n\n[확인] 구글 시트에 저장된 기록을 불러옵니다 (이 기기의 기록은 대체됩니다)\n[취소] 이 기기의 기록을 구글 시트에 저장합니다 (시트의 기존 기록은 대체됩니다)');
+          var useRemote = host.confirm(tr('이 구글 계정에 저장된 기록이 이미 있습니다.\n\n[확인] 구글 시트에 저장된 기록을 불러옵니다 (이 기기의 기록은 대체됩니다)\n[취소] 이 기기의 기록을 구글 시트에 저장합니다 (시트의 기존 기록은 대체됩니다)'));
           if (useRemote) return applyRemote(remote);
           else return push('user');
         } else if (!same) {
@@ -444,7 +445,7 @@
   function resume() {
     if (!meta.connected || !meta.sheetId) { setStatus('off'); return Promise.resolve(); }
     if (!deps.available()) { setStatus('off'); return Promise.resolve(); }
-    setStatus('saving', '구글 시트 확인 중…');
+    setStatus('saving', tr('구글 시트 확인 중…'));
     return getToken('silent').then(function () {
       return withSheetRetry(function () { return pull('silent'); }, 'silent');
     }).then(function (remote) {
@@ -462,7 +463,7 @@
     if (!meta.connected) return Promise.resolve(false);
     if (saving) { again = true; return Promise.resolve(false); }
     saving = true;
-    setStatus('saving', '저장 중…');
+    setStatus('saving', tr('저장 중…'));
     return withSheetRetry(function () { return push(mode); }, mode).then(function () {
       setStatus('saved', '');
       return true;
@@ -543,7 +544,7 @@
   }
 
   function loadFromSheet() {
-    setStatus('saving', '불러오는 중…');
+    setStatus('saving', tr('불러오는 중…'));
     return getToken('user').then(function () {
       return withSheetRetry(function () { return pull('user'); }, 'user');
     }).then(function (remote) {

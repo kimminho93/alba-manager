@@ -629,6 +629,7 @@
   return {
     DAY_NAMES: DAY_NAMES,
     dayName: dayNm,
+    moneyText: W,
     TAX_TYPES: TAX_TYPES,
     parseTimeMinutes: parseTimeMinutes,
     minutesToTime: minutesToTime,

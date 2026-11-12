@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611130300">
+  <link rel="stylesheet" href="./style.css?v=202611131200">
 </head>
 <body>
   <header class="app-header">
@@ -34,6 +34,7 @@
     <div class="header-actions">
       <button id="lockBtn" class="cloud-btn lock-btn" type="button" hidden>🔒 관리자</button>
       <button id="cloudBtn" class="cloud-btn" type="button" aria-label="구글 시트에 저장 설정">☁️ 구글 저장</button>
+      <button id="langBtn" class="icon-btn lang-btn" type="button" aria-label="언어 / Language">🌐 EN</button>
       <button id="fontToggle" class="icon-btn font-btn" type="button" aria-label="글자 크게 보기 켜기/끄기" aria-pressed="false">가+</button>
       <button id="themeToggle" class="icon-btn" type="button" aria-label="다크/라이트 모드 전환">🌙</button>
     </div>
@@ -215,8 +216,8 @@
                 <table class="month-cal-table" aria-label="월별 출퇴근 달력">
                   <thead>
                     <tr>
-                      <th>월</th><th>화</th><th>수</th><th>목</th><th>금</th>
-                      <th class="sat">토</th><th class="sun">일</th>
+                      <th data-en="Mon">월</th><th data-en="Tue">화</th><th data-en="Wed">수</th><th data-en="Thu">목</th><th data-en="Fri">금</th>
+                      <th class="sat" data-en="Sat">토</th><th class="sun" data-en="Sun">일</th>
                     </tr>
                   </thead>
                   <tbody id="monthCalBody"></tbody>
@@ -416,8 +417,12 @@
         <div class="set-note">출퇴근 화면을 하루 종일 켜 두는 매장용입니다. 아무도 안 만지면 화면이 어두워지고 시계가 천천히 움직여 화면이 눌어붙는 것(번인)을 줄입니다. 화면을 한 번 누르면 돌아옵니다. 출근·퇴근 처리와 자정 처리는 그대로 동작합니다.</div>
         <div class="snd-row"><label for="saverMin">보호기 시작</label><select id="saverMin"><option value="0">사용 안 함</option><option value="1">1분 후</option><option value="3">3분 후</option><option value="5">5분 후</option><option value="10">10분 후</option><option value="30">30분 후</option></select></div>
 
+        <h3 class="set-title">언어 <span class="muted">· Language</span></h3>
+        <div class="snd-row"><label for="sLang">화면 언어</label><select id="sLang" data-no-i18n><option value="ko">한국어</option><option value="en">English</option></select></div>
+        <div class="set-note">처음에는 휴대폰·브라우저 언어를 따라갑니다. 영어로 바꾸면 화면, 사용 방법, 점검표, 카톡 명세서·엑셀 파일도 영어로 나옵니다.</div>
+
         <h3 class="set-title">앱 정보</h3>
-        <div class="set-note">사장님 도우미 <b class="ver-text">v1.0.0</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
+        <div class="set-note">사장님 도우미 <b class="ver-text">v1.1.0</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
 
         <h3 class="set-title">최저시급</h3>
         <label class="field set-field"><span>올해 최저시급 (원) <em class="hint">새 알바생을 추가할 때 기본 시급으로 들어갑니다</em></span>
@@ -664,7 +669,7 @@
 
   <footer class="app-footer">
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
-    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.0.0</span></div>
+    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.1.0</span></div>
   </footer>
 
   <!-- 출퇴근: 비밀번호 입력 -->
@@ -892,8 +897,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611130300"></script>
-  <script src="./gsync.js?v=202611130300"></script>
-  <script src="./app.js?v=202611130300"></script>
+  <script src="./engine.js?v=202611131200"></script>
+  <script src="./lang_web.js?v=202611131200"></script>
+  <script src="./i18n.js?v=202611131200"></script>
+  <script src="./gsync.js?v=202611131200"></script>
+  <script src="./app.js?v=202611131200"></script>
 </body>
 </html>
