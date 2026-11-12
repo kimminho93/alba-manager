@@ -19,7 +19,8 @@
     theme: 'alba.theme',
     roster: 'alba.roster.v1',
     archive: 'alba.archive.v1',
-    store: 'alba.store.v1'
+    store: 'alba.store.v1',
+    presets: 'alba.timePresets.v1'
   };
 
   var MINUTE_STEPS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
@@ -194,6 +195,170 @@
       showToast('📊 엑셀(.xlsx) 다운로드 완료: ' + filename);
     }
   }
+
+  /* ==========================================================
+     빠른 시간대 프리셋 (사용자 정의 · 최대 20개 · localStorage 저장)
+     ========================================================== */
+  var PRESET_MAX = 20;
+  var DEFAULT_PRESETS = [
+    { name: '오전', start: '09:00', end: '14:00', breakMin: 0 },
+    { name: '미들', start: '10:00', end: '15:00', breakMin: 0 },
+    { name: '오후', start: '13:00', end: '18:00', breakMin: 0 },
+    { name: '야간', start: '18:00', end: '23:00', breakMin: 0 },
+    { name: '풀타임', start: '09:00', end: '18:00', breakMin: 60 }
+  ];
+  var presetState = { list: [], editMode: false, editingIdx: -1 };
+
+  function loadPresets() {
+    var saved = loadJson(KEYS.presets, null);
+    var list = Array.isArray(saved) ? saved : DEFAULT_PRESETS;
+    presetState.list = list.filter(function (p) {
+      return p && /^\d{1,2}:\d{2}$/.test(p.start) && /^\d{1,2}:\d{2}$/.test(p.end);
+    }).slice(0, PRESET_MAX).map(function (p) {
+      return { name: String(p.name || '').slice(0, 8), start: p.start, end: p.end, breakMin: Number(p.breakMin) || 0 };
+    });
+  }
+
+  function savePresets() { saveJson(KEYS.presets, presetState.list); }
+
+  function presetHours(p) {
+    var st = parseHM(p.start, 9, 0), et = parseHM(p.end, 14, 0);
+    var mins = (et.h * 60 + et.m) - (st.h * 60 + st.m) - (p.breakMin || 0);
+    var h = Math.max(0, mins) / 60;
+    return (Math.round(h * 10) / 10) + 'h';
+  }
+
+  function renderPresets() {
+    var box = $('presetList');
+    if (!box) return;
+    var html = presetState.list.map(function (p, i) {
+      var label = (p.name ? escHtml(p.name) + ' ' : '') + escHtml(p.start) + '~' + escHtml(p.end) +
+        ' (' + presetHours(p) + (p.breakMin ? ', 휴게' + p.breakMin + '분' : '') + ')';
+      var tools = presetState.editMode
+        ? '<span class="preset-tools"><button type="button" class="preset-tool" data-act="edit" data-i="' + i + '" title="수정">✏️</button>' +
+          '<button type="button" class="preset-tool" data-act="del" data-i="' + i + '" title="삭제">✕</button></span>'
+        : '';
+      return '<span class="preset-item"><button type="button" class="chip preset-chip" data-i="' + i + '">' + label + '</button>' + tools + '</span>';
+    }).join('');
+    html += '<button type="button" class="chip preset-chip chip-off" data-off="true">🚫 휴무</button>';
+    box.innerHTML = html;
+
+    var full = presetState.list.length >= PRESET_MAX;
+    $('presetCount').textContent = presetState.list.length + '/' + PRESET_MAX;
+    $('presetAddBtn').disabled = full;
+    $('presetAddBtn').title = full ? '최대 ' + PRESET_MAX + '개까지 만들 수 있어요' : '시간대 추가 (최대 ' + PRESET_MAX + '개)';
+    $('presetEditToggle').classList.toggle('active', presetState.editMode);
+    $('presetEditToggle').textContent = presetState.editMode ? '✔ 편집 완료' : '✏️ 편집';
+  }
+
+  function openPresetForm(idx) {
+    presetState.editingIdx = idx;
+    var p = idx >= 0 ? presetState.list[idx] : { name: '', start: '09:00', end: '14:00', breakMin: 0 };
+    $('presetName').value = p.name;
+    $('presetStart').value = pad2(parseHM(p.start, 9, 0).h) + ':' + pad2(parseHM(p.start, 9, 0).m);
+    $('presetEnd').value = pad2(parseHM(p.end, 14, 0).h) + ':' + pad2(parseHM(p.end, 14, 0).m);
+    var sel = $('presetBreak');
+    if (!Array.prototype.some.call(sel.options, function (o) { return Number(o.value) === p.breakMin; })) {
+      var opt = document.createElement('option');
+      opt.value = String(p.breakMin);
+      opt.textContent = '휴게 ' + p.breakMin + '분';
+      sel.appendChild(opt);
+    }
+    sel.value = String(p.breakMin);
+    $('presetSaveBtn').textContent = idx >= 0 ? '수정 저장' : '추가';
+    $('presetForm').hidden = false;
+    $('presetName').focus();
+  }
+
+  function closePresetForm() {
+    presetState.editingIdx = -1;
+    $('presetForm').hidden = true;
+  }
+
+  function initTimePresets() {
+    loadPresets();
+    renderPresets();
+
+    // 칩 클릭: 적용 / 수정 / 삭제
+    $('presetList').addEventListener('click', function (ev) {
+      var tool = ev.target.closest('.preset-tool');
+      if (tool) {
+        var ti = Number(tool.getAttribute('data-i'));
+        if (tool.getAttribute('data-act') === 'del') {
+          presetState.list.splice(ti, 1);
+          savePresets();
+          closePresetForm();
+          renderPresets();
+          showToast('🗑 시간대를 삭제했습니다.');
+        } else {
+          openPresetForm(ti);
+        }
+        return;
+      }
+      var chip = ev.target.closest('.preset-chip');
+      if (!chip) return;
+      if (chip.getAttribute('data-off') === 'true') {
+        state.editor.off = true;
+        applyEditorToSelectedDay();
+        showToast('🚫 선택된 날짜를 휴무로 설정했습니다.');
+        return;
+      }
+      var p = presetState.list[Number(chip.getAttribute('data-i'))];
+      if (!p) return;
+      var st = parseHM(p.start, 9, 0);
+      var et = parseHM(p.end, 14, 0);
+      state.editor.startHour = st.h;
+      state.editor.startMin = st.m;
+      state.editor.endHour = et.h;
+      state.editor.endMin = et.m;
+      state.editor.breakMinutes = p.breakMin || 0;
+      state.editor.off = false;
+      applyEditorToSelectedDay();
+    });
+
+    $('presetAddBtn').addEventListener('click', function () {
+      if (presetState.list.length >= PRESET_MAX) {
+        showToast('시간대는 최대 ' + PRESET_MAX + '개까지 만들 수 있어요.');
+        return;
+      }
+      openPresetForm(-1);
+    });
+
+    $('presetEditToggle').addEventListener('click', function () {
+      presetState.editMode = !presetState.editMode;
+      if (!presetState.editMode) closePresetForm();
+      renderPresets();
+    });
+
+    $('presetCancelBtn').addEventListener('click', closePresetForm);
+
+    $('presetForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var start = $('presetStart').value;
+      var end = $('presetEnd').value;
+      if (!start || !end) { showToast('출근/퇴근 시각을 입력해 주세요.'); return; }
+      var st = parseHM(start, 9, 0), et = parseHM(end, 14, 0);
+      var sMin = st.h * 60 + st.m;
+      var eMin = et.h * 60 + et.m;
+      if (eMin === 0) { eMin = 24 * 60; end = '24:00'; } // 00:00 퇴근은 자정(24:00)으로 처리
+      var brk = Number($('presetBreak').value) || 0;
+      if (eMin <= sMin) { showToast('퇴근 시각은 출근 시각보다 늦어야 해요.'); return; }
+      if (eMin - sMin <= brk) { showToast('휴게시간이 근무시간보다 길어요.'); return; }
+      var item = { name: $('presetName').value.trim().slice(0, 8), start: start, end: end, breakMin: brk };
+      if (presetState.editingIdx >= 0) {
+        presetState.list[presetState.editingIdx] = item;
+        showToast('✏️ 시간대를 수정했습니다.');
+      } else {
+        if (presetState.list.length >= PRESET_MAX) { showToast('최대 ' + PRESET_MAX + '개까지 가능합니다.'); return; }
+        presetState.list.push(item);
+        showToast('＋ 시간대를 추가했습니다. (' + presetState.list.length + '/' + PRESET_MAX + ')');
+      }
+      savePresets();
+      closePresetForm();
+      renderPresets();
+    });
+  }
+
 
   /* ==========================================================
      월별 실제 달력 & 출퇴근 시각(시/분) 드롭다운 스크롤 선택기
@@ -518,7 +683,7 @@
       totalHours: E.toNumber($('pTotal').value, 0),
       weekHours: w,
       dailyShifts: state.dailyShifts.map(function (s) { return Object.assign({}, s); }),
-      lateMinutes: E.toNumber($('pLate').value, 0),
+      lateMinutes: 0, // 지각·조퇴 입력은 UI에서 제거됨 (항상 0)
       includeWeekly: $('pWeekly').checked,
       includeMeal: $('pMeal').checked,
       mealMinHours: E.toNumber($('pMealMinHours').value, 4),
@@ -568,7 +733,6 @@
       $('pW4').value = each;
     }
 
-    $('pLate').value = parsed.lateMinutes || 0;
     $('pWeekly').checked = parsed.includeWeekly !== false;
     if (parsed.includeMeal !== null && parsed.includeMeal !== undefined) {
       $('pMeal').checked = !!parsed.includeMeal;
@@ -945,26 +1109,8 @@
       applyEditorToSelectedDay();
     });
 
-    // 빠른 시간대 프리셋 칩
-    document.querySelectorAll('.preset-chip').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        if (chip.getAttribute('data-off') === 'true') {
-          state.editor.off = true;
-          applyEditorToSelectedDay();
-          showToast('🚫 선택된 날짜를 휴무로 설정했습니다.');
-          return;
-        }
-        var st = parseHM(chip.getAttribute('data-start'), 9, 0);
-        var et = parseHM(chip.getAttribute('data-end'), 14, 0);
-        state.editor.startHour = st.h;
-        state.editor.startMin = st.m;
-        state.editor.endHour = et.h;
-        state.editor.endMin = et.m;
-        state.editor.breakMinutes = Number(chip.getAttribute('data-break') || 0);
-        state.editor.off = false;
-        applyEditorToSelectedDay();
-      });
-    });
+    // 빠른 시간대 프리셋 (사용자 정의, 최대 20개)
+    initTimePresets();
 
     // 적용 범위 버튼들
     $('btnApplySelectedDay').addEventListener('click', function () {
@@ -1064,7 +1210,7 @@
     });
 
     // 급여 폼 실시간 반응
-    ['pName', 'pWage', 'pTotal', 'pW1', 'pW2', 'pW3', 'pW4', 'pW5', 'pW6', 'pLate', 'pMealMinHours', 'pMealAmount', 'pMealDays'].forEach(function (id) {
+    ['pName', 'pWage', 'pTotal', 'pW1', 'pW2', 'pW3', 'pW4', 'pW5', 'pW6', 'pMealMinHours', 'pMealAmount', 'pMealDays'].forEach(function (id) {
       $(id).addEventListener('input', recalcPayroll);
     });
     ['pWeekMode', 'pWeekly', 'pMeal'].forEach(function (id) {

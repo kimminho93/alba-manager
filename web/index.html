@@ -49,7 +49,7 @@
         <div class="parser-sub">
           <div class="chips">
             <span class="chips-label">예시</span>
-            <button type="button" class="chip" data-example="철수 이번 달 총 62시간, 시급 10,000원 지각 20분">철수 62시간 · 지각 20분</button>
+            <button type="button" class="chip" data-example="철수 이번 달 총 62시간, 시급 10,000원">철수 62시간 · 시급 10,000원</button>
             <button type="button" class="chip" data-example="영희 80시간 만원">영희 80시간 만원</button>
             <button type="button" class="chip" data-example="민수 주 14시간 시급 11,000원 주휴미포함">민수 주 14시간 · 주휴미포함</button>
             <button type="button" class="chip" data-example="지민 평일 5시간 시급 10,500원 4시간 이상 식대 8,000원">지민 평일 5h · 식대 8,000원</button>
@@ -117,10 +117,6 @@
             </div>
             <p class="muted small">합계 <b id="weeksSum">60</b>시간 · 주 15시간 이상인 주만 주휴수당 대상</p>
           </div>
-
-          <label class="field"><span>지각·조퇴 (분)</span>
-            <div class="input-unit"><input id="pLate" type="number" inputmode="numeric" min="0" step="5" value="0"><b>분</b></div>
-          </label>
 
           <div class="field"><span>세금 공제</span>
             <div class="segmented" role="radiogroup">
@@ -206,13 +202,31 @@
 
               <!-- 원클릭 시간대 프리셋 -->
               <div class="preset-bar">
-                <span class="preset-label">빠른 시간대</span>
-                <button type="button" class="chip preset-chip" data-start="09:00" data-end="14:00" data-break="0">오전 09:00~14:00 (5h)</button>
-                <button type="button" class="chip preset-chip" data-start="10:00" data-end="15:00" data-break="0">미들 10:00~15:00 (5h)</button>
-                <button type="button" class="chip preset-chip" data-start="13:00" data-end="18:00" data-break="0">오후 13:00~18:00 (5h)</button>
-                <button type="button" class="chip preset-chip" data-start="18:00" data-end="23:00" data-break="0">야간 18:00~23:00 (5h)</button>
-                <button type="button" class="chip preset-chip" data-start="09:00" data-end="18:00" data-break="60">풀타임 09:00~18:00 (휴게1h→8h)</button>
-                <button type="button" class="chip preset-chip chip-off" data-off="true">🚫 휴무</button>
+                <div class="preset-head">
+                  <span class="preset-label">빠른 시간대 <small id="presetCount" class="preset-count">0/20</small></span>
+                  <div class="preset-actions">
+                    <button type="button" class="chip preset-add" id="presetAddBtn" title="시간대 추가 (최대 20개)">＋ 시간대 추가</button>
+                    <button type="button" class="chip preset-edit-toggle" id="presetEditToggle" title="시간대 수정/삭제 모드">✏️ 편집</button>
+                  </div>
+                </div>
+                <div class="preset-list" id="presetList"></div>
+
+                <!-- 시간대 추가/수정 폼 -->
+                <form class="preset-form" id="presetForm" hidden autocomplete="off">
+                  <input type="text" id="presetName" maxlength="8" placeholder="이름 (예: 마감)" aria-label="시간대 이름">
+                  <input type="time" id="presetStart" value="09:00" aria-label="출근 시각">
+                  <span class="preset-tilde">~</span>
+                  <input type="time" id="presetEnd" value="14:00" aria-label="퇴근 시각">
+                  <select id="presetBreak" aria-label="휴게시간">
+                    <option value="0">휴게 없음</option>
+                    <option value="30">휴게 30분</option>
+                    <option value="60">휴게 1시간</option>
+                    <option value="90">휴게 1시간 30분</option>
+                    <option value="120">휴게 2시간</option>
+                  </select>
+                  <button type="submit" class="btn btn-primary btn-sm" id="presetSaveBtn">저장</button>
+                  <button type="button" class="btn btn-sm" id="presetCancelBtn">취소</button>
+                </form>
               </div>
 
               <!-- 출근 / 퇴근 클릭 시 아래로 스크롤바가 열리는 드롭다운 타임피커 -->
