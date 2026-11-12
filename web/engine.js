@@ -1826,34 +1826,32 @@
       merges: ['A1:N1', 'A2:N2'], tabColor: 'FF3563F0', freezeRows: 4, landscape: true, rowHeights: { 0: 40, 1: 24 } };
   }
 
-  /* [월 근무기록] 날짜 순으로 그날 출근한 사람의 출근·퇴근·근무시간·식대 */
+  /* [월 근무기록] 날짜 순으로 그날 출근한 사람의 출근·퇴근·근무시간·식대 + 그 사람의 누적 근무일수/시간
+   *  (사람별 총합은 [정산] 탭에 있으므로 이 탭에는 별도 합계 목록을 두지 않고, 누적 열의 마지막 값이 개인별 총합) */
   function payrollMonthAttendanceSheet(g) {
     var COLS = 12;
     var recs = [];
     var skipped = [];
-    g.list.forEach(function (r) {
+    g.list.forEach(function (r, ri) {
       if (r.mode !== 'daily' || !Array.isArray(r.days) || !r.days.length) { skipped.push(r.name); return; }
       r.days.forEach(function (d) {
         if (d.off || d.hours <= 0) return;
-        recs.push({ r: r, d: d, key: d.dateStr || String(d.index + 1).padStart(3, '0') });
+        recs.push({ r: r, ri: ri, d: d, key: d.dateStr || String(d.index + 1).padStart(3, '0') });
       });
     });
     recs.sort(function (a, b) { return a.key < b.key ? -1 : (a.key > b.key ? 1 : (a.r.name < b.r.name ? -1 : (a.r.name > b.r.name ? 1 : 0))); });
 
-    // 날짜별 합계(인원·시간)
-    var byDate = {};
-    recs.forEach(function (x) {
-      var t = byDate[x.key] = byDate[x.key] || { n: 0, h: 0 };
-      t.n++; t.h = M.round2(t.h + x.d.hours);
-    });
+    var perDate = {};
+    recs.forEach(function (x) { perDate[x.key] = (perDate[x.key] || 0) + 1; });
 
     var rows = [];
     rows.push([S('band', g.title + ' 근무기록  (날짜별 출근한 사람)')].concat(fill(COLS - 1, 'band')));
-    rows.push([S('sub', '날짜 순으로, 그날 출근한 사람의 출근·퇴근 시각과 근무시간·식대를 정리했습니다. 제목 행의 ▼ 버튼으로 이름·날짜별로 걸러볼 수 있습니다.')].concat(fill(COLS - 1, 'sub')));
+    rows.push([S('sub', '날짜 순으로 그날 출근한 사람의 출근·퇴근 시각, 근무시간, 식대를 정리했습니다. "누적" 열은 그 사람이 그날까지 일한 일수·시간이며, 마지막 값이 그 사람의 총 근무일수·시간입니다 ([정산] 탭에도 있습니다). 제목 행 ▼ 버튼으로 이름·날짜별로 걸러볼 수 있습니다.')].concat(fill(COLS - 1, 'sub')));
     rows.push([]);
-    rows.push([H('날짜'), H('요일'), H('주차'), H('이름'), H('출근'), H('퇴근'), H('휴게(분)'), H('근무시간(h)'), H('식대 지급'), H('식대(원)'), H('그날 출근 인원'), H('그날 총 근무시간(h)')]);
+    rows.push([H('날짜'), H('요일'), H('이름'), H('출근'), H('퇴근'), H('휴게(분)'), H('근무시간(h)'), H('누적 근무일수'), H('누적 근무시간(h)'), H('식대 지급'), H('식대(원)'), H('그날 출근 인원')]);
     var headerRow = rows.length;
-    var lastKey = null, zebra = false, totH = 0, totMeal = 0, mealN = 0;
+    var lastKey = null, zebra = false;
+    var cum = {};
     recs.forEach(function (x) {
       var d = x.d, r = x.r;
       var first = x.key !== lastKey;
@@ -1861,46 +1859,27 @@
       var z = zebra ? 'Z' : '';
       var cT = zebra ? 'cTextZ' : 'cText';
       var meal = r.includeMeal && d.mealEligible;
-      totH += d.hours; if (meal) { totMeal += r.mealAmount; mealN++; }
+      var c = cum[x.ri] = cum[x.ri] || { days: 0, hours: 0 };
+      c.days += 1; c.hours = M.round2(c.hours + d.hours);
       var dateStyle = d.dayIndex === 6 ? 'cSun' : (d.dayIndex === 5 ? 'cSat' : cT);
       rows.push([
-        S(dateStyle, d.dateStr ? md(d.dateStr) : ''), S(dateStyle, d.dayName || ''), S(cT, d.week + '주차'), S(cT, r.name),
+        S(dateStyle, d.dateStr ? md(d.dateStr) : ''), S(dateStyle, d.dayName || ''), S(cT, r.name),
         S(cT, d.start), S(cT, d.end), S(cT, d.breakMinutes || 0), S('hours' + z, d.hours),
+        S(cT, c.days + '일'), S('hours' + z, c.hours),
         r.includeMeal ? (meal ? S('okC', '지급') : S(cT, '기준 미달')) : S(cT, '미포함'),
         meal ? S('moneyC' + z, r.mealAmount) : S(cT, '-'),
-        first ? S(cT, byDate[x.key].n + '명') : S(cT, ''),
-        first ? S('hours' + z, byDate[x.key].h) : S(cT, '')
+        first ? S(cT, perDate[x.key] + '명') : S(cT, '')
       ]);
     });
     var lastData = rows.length;
-    var peopleDays = recs.length;
-    rows.push([S('tot', '합계'), S('tot', ''), S('tot', ''), S('tot', '연 ' + peopleDays + '명·일'), S('tot', ''), S('tot', ''), S('tot', ''),
-      S('hoursTot', M.round2(totH)), S('tot', mealN + '일'), S('moneyCBold', totMeal), S('tot', Object.keys(byDate).length + '일'), S('tot', '')]);
-
-    // 사람별 합계
-    rows.push([]);
-    rows.push([S('section', '■ 사람별 합계 (총 근무일수 · 총 근무시간)')].concat(fill(COLS - 1, 'section')));
-    var secRow = rows.length;
-    rows.push([H('이름'), H(''), H('총 근무일수'), H('총 근무시간(h)'), H('식대 지급일'), H('식대 합계(원)')].concat(fill(COLS - 6, 'plain')));
-    g.list.forEach(function (r) {
-      if (skipped.indexOf(r.name) >= 0) return;
-      rows.push([S('cText', r.name), S('cText', ''), S('cText', r.workDays + '일'), S('hours', r.totalHours),
-        S('cText', r.includeMeal ? r.mealDays + '일' : '미포함'), S('moneyC', r.includeMeal ? r.mealAllowance : 0)].concat(fill(COLS - 6, 'plain')));
-    });
+    var merges = ['A1:L1', 'A2:L2'];
     if (skipped.length) {
       rows.push([]);
       rows.push([S('sub', '※ 날짜별 기록이 없는 입력 방식(주차별·월 합계)이라 제외된 사람: ' + skipped.join(', '))].concat(fill(COLS - 1, 'sub')));
+      merges.push('A' + rows.length + ':L' + rows.length);
     }
-    var merges = ['A1:L1', 'A2:L2', 'A' + secRow + ':L' + secRow];
-    // 사람별 합계 표의 이름 칸(A:B) 병합, 안내 문구 줄은 전체 병합
-    for (var mr = secRow + 1; mr <= rows.length; mr++) {
-      var row = rows[mr - 1];
-      if (!row || !row.length || !row[0]) continue;
-      if (row[0].s === 'cText' || row[0].s === 'header') merges.push('A' + mr + ':B' + mr);
-      else if (row[0].s === 'sub') merges.push('A' + mr + ':L' + mr);
-    }
-    return { name: g.key + ' 근무기록', rows: rows, colWidths: [10, 8, 9, 12, 10, 10, 10, 13, 11, 11, 14, 17],
-      merges: merges, tabColor: 'FF10915A', freezeRows: headerRow, rowHeights: { 0: 40, 1: 36 },
+    return { name: g.key + ' 근무기록', rows: rows, colWidths: [10, 8, 12, 10, 10, 10, 13, 14, 16, 11, 11, 14],
+      merges: merges, tabColor: 'FF10915A', freezeRows: headerRow, rowHeights: { 0: 40, 1: 52 },
       autoFilter: 'A' + headerRow + ':L' + lastData };
   }
 

@@ -144,6 +144,20 @@ test('월별 실제 달력 주차(buildMonthCalendar) & 출퇴근 시각(calcShi
   assert.strictEqual(r.weeks.length, 6);
 });
 
+test('식대는 하루에 1번만 지급 (하루 근무시간이 길어도 중복 지급 안 됨)', () => {
+  const shifts = [];
+  for (let d = 1; d <= 30; d++) shifts.push({ off: d !== 2 && d !== 3, start: d === 2 ? '06:00' : '09:00', end: d === 2 ? '23:00' : '13:00', breakMinutes: 0 });
+  const r = E.calculatePayroll({ name: '식대', hourlyWage: 10000, mode: 'daily', payMonth: '2026-11', dailyShifts: shifts,
+    includeMeal: true, mealMinHours: 4, mealAmount: 8000, tax: 'none' });
+  assert.strictEqual(r.mealDays, 2);          // 17시간 근무한 날도, 4시간 근무한 날도 각각 1번
+  assert.strictEqual(r.mealAllowance, 16000);
+  // 기준(4시간)에 못 미치면 지급 안 됨
+  shifts[2] = { off: false, start: '09:00', end: '12:59', breakMinutes: 0 };
+  const r2 = E.calculatePayroll({ name: '식대', hourlyWage: 10000, mode: 'daily', payMonth: '2026-11', dailyShifts: shifts,
+    includeMeal: true, mealMinHours: 4, mealAmount: 8000, tax: 'none' });
+  assert.strictEqual(r2.mealDays, 1);
+});
+
 test('주 5일 약속인데 4일만 출근한 주는 주휴수당 없음 (일별 모드)', () => {
   // 4주 모두 월~목 5시간(4일 = 20시간, 15h 이상이지만 약속한 5일 미충족) -> 주휴 0원
   const dailyHours = [];
@@ -309,11 +323,15 @@ test('정산 명단 엑셀: 월별 탭(정산/근무기록/주휴판정) + 전�
   assert.deepStrictEqual(sheets.map((x) => x.name),
     ['전체 요약', '2026-10 정산', '2026-10 근무기록', '2026-10 주휴판정', '2026-11 정산', '2026-11 근무기록', '2026-11 주휴판정']);
   const text = (sh) => sh.rows.map((row) => row.map((c) => (c && typeof c === 'object' ? c.v : c)).join('|')).join('\n');
-  // 11월 근무기록: 한 날짜(11/2)에 3명이 출근한 기록과 그날 인원/시간
+  // 11월 근무기록: 한 날짜(11/2)에 3명이 출근한 기록, 개인별 누적 근무일수/시간, 그날 출근 인원
   const att = text(sheets[5]);
-  assert.ok(/11\/2\|월\|2주차\|민수\|09:00\|14:00/.test(att));
-  assert.ok(/3명\|15/.test(att));
-  assert.ok(/■ 사람별 합계/.test(att));
+  assert.ok(/11\/2\|월\|민수\|09:00\|14:00/.test(att));
+  assert.ok(/11\/2\|월\|철수\|09:00\|14:00\|0\|5\|1일\|5\|/.test(att));   // 철수 첫 출근: 누적 1일·5h
+  assert.ok(/3명/.test(att));
+  assert.ok(!/사람별 합계/.test(att));                                  // 정산 탭과 중복되는 목록은 두지 않음
+  // 철수 11월 마지막 행의 누적 = 정산 결과(근무일수·근무시간)
+  const cheol = list.find((r) => r.name === '철수' && r.payMonth === '2026-11');
+  assert.ok(att.indexOf('|' + cheol.workDays + '일|' + cheol.totalHours + '|') >= 0);
   // 정산 탭의 합계: 근무일수 = 사람별 출근일수의 합
   const days11 = list.filter((r) => r.payMonth === '2026-11').reduce((s, r) => s + r.workDays, 0);
   assert.ok(new RegExp('합계\\|3명\\|\\|\\|' + days11 + '일').test(text(sheets[4])));
