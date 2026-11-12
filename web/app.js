@@ -530,9 +530,7 @@
 
     if (cd) {
       $('selDayBadge').textContent = cal.month + '월 ' + cd.date + '일 (' + cd.dayName + ') · ' + cd.week + '주차';
-      $('selDayTitle').textContent = sh.off
-        ? '현재 휴무일입니다 (시간을 선택하면 근무일로 변경됩니다)'
-        : (sh.start + ' 출근 ~ ' + sh.end + ' 퇴근' + (sh.breakMinutes ? ' (휴게 ' + sh.breakMinutes + '분)' : ''));
+      $('selDayTitle').textContent = sh.off ? '휴무일 · 시간을 고르면 근무일로 바뀌어요' : '근무일';
     }
 
     var minMeal = E.toNumber($('pMealMinHours').value, 4);
@@ -987,6 +985,20 @@
     $('rosterTotal').textContent = E.formatWon(sum.totalNet) + '원';
     $('rosterMonthLabel').textContent = pm.slice(0, 4) + '년 ' + Number(pm.slice(5)) + '월';
     renderChips();
+
+    $('rosterCards').innerHTML = results.map(function (r, idx) {
+      var w = state.workers[idx];
+      var hasRec = !!(w.months && w.months[pm]);
+      var sel = w.id === state.selId;
+      return '<div class="rcard' + (sel ? ' on' : '') + '">' +
+        '<button type="button" class="rcard-main" data-pick-worker="' + escHtml(w.id) + '">' +
+          '<span class="rcard-name">' + escHtml(r.name) + (sel ? ' <em>보는 중</em>' : '') + '</span>' +
+          '<span class="rcard-sub">' + (hasRec ? (E.formatNum(r.totalHours, 2) + '시간 · 식대 ' + (r.includeMeal ? r.mealDays + '회' : '없음')) : '기록 없음') + '</span>' +
+        '</button>' +
+        '<b class="rcard-amt m-amt">' + E.formatWon(r.net) + '원</b>' +
+        '<button type="button" class="rcard-del" data-del-worker="' + escHtml(w.id) + '" aria-label="' + escHtml(r.name) + ' 삭제">✕</button>' +
+        '</div>';
+    }).join('');
 
     if (!results.length) {
       $('rosterBody').innerHTML = '<tr class="empty"><td colspan="11">아직 알바생이 없습니다. 위에서 이름·일하는 날·시급을 넣고 [➕ 알바생 추가]를 눌러주세요.</td></tr>';
@@ -1510,6 +1522,11 @@
       document.body.classList.add('slip-open');
     });
     $('slipClose').addEventListener('click', closeSheets);
+    $('moneyToggle').addEventListener('click', function () {   // 줄 돈은 기본 숨김, 눌러야 보임
+      var on = document.body.classList.toggle('money-show');
+      $('moneyToggle').setAttribute('aria-expanded', on ? 'true' : 'false');
+      $('moneyToggleTitle').textContent = on ? '줄 돈 숨기기' : '줄 돈 보기';
+    });
     document.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' && /set-open|add-open|slip-open/.test(document.body.className)) closeSheets();
     });
@@ -1575,7 +1592,7 @@
     });
 
     // 명단에서 이름을 누르면 그 알바생의 기록을 달력에 불러옴
-    $('rosterBody').addEventListener('click', function (ev) {
+    function onRosterClick(ev) {
       var del = ev.target.closest('[data-del-worker]');
       if (del) {
         var id = del.getAttribute('data-del-worker');
@@ -1596,7 +1613,9 @@
       selectWorker(wid);
       var w = selWorker();
       if (w) showToast('👤 ' + w.name + '님 ' + state.calendar.month + '월 ' + (w.months[$('pMonth').value] ? '기록을 불러왔습니다' : '— 아직 기록이 없어 비어 있습니다'));
-    });
+    }
+    $('rosterBody').addEventListener('click', onRosterClick);
+    $('rosterCards').addEventListener('click', onRosterClick);
 
     function allRecordInputs() {
       var list = [];

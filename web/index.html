@@ -169,6 +169,10 @@
 
         <!-- 우측 프리뷰 & 일별 출퇴근 시간표 대형 보드 카드 -->
         <div class="card preview-card">
+          <button id="moneyToggle" type="button" class="set-row money-toggle" aria-expanded="false">
+            <span class="set-row-text"><b id="moneyToggleTitle">줄 돈 보기</b><small>금액은 눌러야 보여요</small></span>
+            <span class="set-row-chev" aria-hidden="true">›</span>
+          </button>
           <div class="banner pay-banner">
             <p id="bannerText">계산 중…</p>
             <button id="copyKakao" type="button" class="btn btn-kakao">💬 카톡 명세서 복사</button>
@@ -241,7 +245,7 @@
         <div class="archive-head">
           <h2 class="card-title">📋 정산 명단 <span id="rosterCount" class="count">0명</span></h2>
           <div class="archive-actions">
-            <span class="total-pill"><span id="rosterMonthLabel">이번 달</span> 입금 합계 <b id="rosterTotal">0원</b></span>
+            <span class="total-pill"><span id="rosterMonthLabel">이번 달</span> 입금 합계 <b id="rosterTotal" class="m-amt">0원</b></span>
             <button id="btnRosterXlsx" type="button" class="btn">📊 명단 전체 엑셀(.xlsx) 다운로드</button>
             <button id="btnRosterClear" type="button" class="btn btn-ghost">전체 지우기</button>
           </div>
@@ -266,7 +270,8 @@
           <button id="btnAddWorker" type="submit" class="btn btn-primary">➕ 알바생 추가</button>
         </form>
         <p class="roster-hint">이름을 누르면 그 알바생의 근무 기록이 위 달력에 나타납니다. 고치면 바로 저장됩니다.</p>
-        <div class="table-wrap">
+        <div id="rosterCards" class="roster-cards"></div>
+        <div class="table-wrap roster-table-wrap">
           <table class="list-table">
             <thead>
               <tr><th>#</th><th>성명</th><th>지급월</th><th class="num">근무</th><th class="num">시급</th><th class="num">주휴수당</th><th class="num">식대</th><th class="num">세전총액</th><th class="num">공제</th><th class="num">실수령액</th><th></th></tr>

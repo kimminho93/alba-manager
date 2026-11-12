@@ -2027,6 +2027,8 @@ body.modal-open { overflow: hidden; }
 .sheet-backdrop[hidden] { display: none !important; }
 .set-sheet { display: contents; }
 .l-ph { display: none; }
+.roster-cards { display: none; }
+.money-toggle { display: none; }
 
 @media print { .worker-chips, .empty-card, .set-row, .sheet-backdrop { display: none !important; } }
 
@@ -2151,3 +2153,70 @@ body.modal-open { overflow: hidden; }
   body.no-workers #tab-payroll .archive { display: contents; }
   body.no-workers #tab-payroll .archive > :not(#addWorkerForm) { display: none; }
 }
+
+/* ---------- 날짜 눌렀을 때 나오는 팝업 정리 (폰·PC 공통) ---------- */
+.day-sheet { padding: 8px 16px 14px; }
+.day-sheet::before { content: ''; display: block; width: 40px; height: 5px; margin: 4px auto 6px; border-radius: 3px; background: var(--line); }
+.day-close { float: none; position: absolute; top: 10px; right: 12px; width: 40px; height: 40px; border: 0; background: var(--card-2); }
+.day-sheet .time-editor-head { flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px 48px 8px 2px; margin: 0; }
+.day-sheet .selected-day-title { flex-direction: column; align-items: flex-start; gap: 2px; }
+.day-sheet .sel-badge { order: 1; padding: 0; background: none; color: var(--text); font-size: 22px; font-weight: 800; }
+.day-sheet .selected-day-title strong { order: 2; font-size: 14px; font-weight: 500; color: var(--muted); }
+.day-sheet .editor-calc-pill { padding: 0; border: 0; background: none; font-size: 15px; color: var(--muted); }
+.day-sheet .editor-calc-pill b { font-size: 15px; }
+/* 시간 고르기: 출근 / 퇴근 한 줄씩 */
+.day-sheet .time-pickers-grid { grid-template-columns: 1fr; gap: 8px; }
+.day-sheet .time-picker-box { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: var(--card-2); border: 0; }
+.day-sheet .tp-header { flex: none; width: auto; white-space: nowrap; margin: 0; font-size: 15px; color: var(--text); }
+.day-sheet .tp-sub { display: none; }
+.day-sheet .tp-dropdown-row { flex: 1; min-width: 0; }
+.day-sheet .scroll-select-btn { padding: 10px 12px; min-height: 48px; background: var(--card); }
+/* 식대 / 휴게 */
+.day-sheet .meal-pick { margin: 10px 0 0; padding: 10px 12px; gap: 10px; }
+.day-sheet .meal-pick-note { font-size: 13px; }
+.day-sheet .break-selector > span { display: block; margin: 12px 0 6px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.day-sheet .break-btns { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.day-sheet .break-btns::-webkit-scrollbar { display: none; }
+.day-sheet .break-btns .chip { flex: none; min-height: 40px; }
+.day-sheet .preset-bar { border-bottom: 0; padding-bottom: 6px; margin-bottom: 4px; }
+.day-sheet .preset-head { flex-wrap: nowrap; }
+.day-sheet .preset-add, .day-sheet .preset-edit-toggle { padding: 6px 10px; font-size: 14px; min-height: 40px; border-color: transparent; background: var(--card-2); }
+
+@media (max-width: 560px) {
+  /* 빠른 시간대: 한 줄로 옆으로 밀어서 고름 */
+  .day-sheet .preset-list { flex-wrap: nowrap; overflow-x: auto; max-height: none; margin: 0 -16px; padding: 2px 16px; scrollbar-width: none; }
+  .day-sheet .preset-list::-webkit-scrollbar { display: none; }
+  .day-sheet .preset-list > * { flex: none; }
+  .day-sheet .preset-chip { padding: 8px 14px; white-space: nowrap; }
+  .day-sheet .preset-add { font-size: 0; }
+  .day-sheet .preset-add::before { content: '＋ 추가'; font-size: 14px; }
+  .day-sheet .preset-edit-toggle { font-size: 0; }
+  .day-sheet .preset-edit-toggle::before { content: '✏️ 편집'; font-size: 14px; }
+
+  /* 줄 돈: 기본 숨김, 눌러야 보임 / 달력 바로 아래 */
+  #scheduleBoard { order: 2; }
+  .money-toggle { display: flex; order: 3; }
+  .pay-banner, .pay-actions { display: none; }
+  body.money-show .pay-banner { display: block; order: 4; }
+  body.money-show .pay-actions { display: grid; order: 5; }
+  body.money-show .money-toggle { border-radius: 20px 20px 0 0; border-bottom-color: transparent; }
+  .pay-banner { padding-top: 6px; border-radius: 0; }
+  /* 금액 가림 (명단·합계) */
+  body:not(.money-show) .m-amt { font-size: 0 !important; }
+  body:not(.money-show) .m-amt::after { content: '•••••원'; font-size: 16px; letter-spacing: 1px; color: var(--muted); }
+
+  /* 정산 명단: 표 대신 카드 목록 */
+  .roster-table-wrap, .roster-hint { display: none; }
+  .roster-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .rcard { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 4px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
+  .rcard.on { border-color: var(--primary); background: var(--primary-weak); }
+  .rcard-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 10px; min-height: 48px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  .rcard-name { font-size: 17px; font-weight: 800; }
+  .rcard-name em { font-style: normal; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--primary); color: var(--primary-ink); font-size: 12px; font-weight: 700; vertical-align: 2px; }
+  .rcard-sub { font-size: 14px; color: var(--muted); }
+  .rcard-amt { font-size: 16px; font-weight: 800; white-space: nowrap; }
+  .rcard-del { flex: none; width: 44px; height: 44px; border: 0; border-radius: 12px; background: none; color: var(--muted); font-size: 16px; cursor: pointer; }
+  .archive-head { display: block; }
+  .archive-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+}
+@media print { .roster-cards, .money-toggle { display: none !important; } }
