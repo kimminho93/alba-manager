@@ -18,11 +18,15 @@ const HEADER =
   ' * 브라우저 내장 엔진: window.AlbaEngine (서버 없이 100% 동일 계산)\n' +
   ' */\n';
 
+function version() {
+  return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+}
+
 function bundle() {
   return HEADER + ORDER.map((f) => {
     const src = fs.readFileSync(path.join(ROOT, 'src', f), 'utf8').replace(/^\uFEFF/, '').trim();
     return '\n/* ===== src/' + f + ' ===== */\n' + src + '\n';
-  }).join('');
+  }).join('') + "\n/* ===== 버전 (package.json 의 version) ===== */\n;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '" + version() + "';\n";
 }
 
 function build(opts) {

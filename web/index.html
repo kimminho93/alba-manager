@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611130250">
+  <link rel="stylesheet" href="./style.css?v=202611130300">
 </head>
 <body>
   <header class="app-header">
@@ -416,6 +416,9 @@
         <div class="set-note">출퇴근 화면을 하루 종일 켜 두는 매장용입니다. 아무도 안 만지면 화면이 어두워지고 시계가 천천히 움직여 화면이 눌어붙는 것(번인)을 줄입니다. 화면을 한 번 누르면 돌아옵니다. 출근·퇴근 처리와 자정 처리는 그대로 동작합니다.</div>
         <div class="snd-row"><label for="saverMin">보호기 시작</label><select id="saverMin"><option value="0">사용 안 함</option><option value="1">1분 후</option><option value="3">3분 후</option><option value="5">5분 후</option><option value="10">10분 후</option><option value="30">30분 후</option></select></div>
 
+        <h3 class="set-title">앱 정보</h3>
+        <div class="set-note">사장님 도우미 <b class="ver-text">v1.0.0</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
+
         <h3 class="set-title">최저시급</h3>
         <label class="field set-field"><span>올해 최저시급 (원) <em class="hint">새 알바생을 추가할 때 기본 시급으로 들어갑니다</em></span>
           <input id="sMinWage" type="number" inputmode="numeric" min="0" step="10">
@@ -661,6 +664,7 @@
 
   <footer class="app-footer">
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
+    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.0.0</span></div>
   </footer>
 
   <!-- 출퇴근: 비밀번호 입력 -->
@@ -888,8 +892,8 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611130250"></script>
-  <script src="./gsync.js?v=202611130250"></script>
-  <script src="./app.js?v=202611130250"></script>
+  <script src="./engine.js?v=202611130300"></script>
+  <script src="./gsync.js?v=202611130300"></script>
+  <script src="./app.js?v=202611130300"></script>
 </body>
 </html>

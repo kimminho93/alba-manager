@@ -713,3 +713,11 @@ test('자정 직후 출근(00:06→00:30 올림)도 근무 중으로 표시', ()
   assert.strictEqual(E.punchNext(w, new Date(2026, 10, 13, 0, 7, 0)), 'out');
   assert.strictEqual(E.autoCloseOpen([w], new Date(2026, 10, 13, 0, 8, 0)).length, 0);   // 오늘 출근은 무효 처리 안 됨
 });
+
+test('버전: 엔진 번들의 ALBA_VERSION이 package.json 버전과 같다', () => {
+  const fs = require('fs'), path = require('path');
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  const src = fs.readFileSync(path.join(__dirname, '..', 'web', 'engine.js'), 'utf8');
+  assert.ok(src.indexOf("ALBA_VERSION = '" + pkg.version + "'") > 0);
+  assert.ok(/^\d+\.\d+\.\d+$/.test(pkg.version));
+});

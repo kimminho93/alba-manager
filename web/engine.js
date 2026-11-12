@@ -2798,3 +2798,6 @@
     archiveFileName: archiveFileName
   };
 });
+
+/* ===== 버전 (package.json 의 version) ===== */
+;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.0.0';

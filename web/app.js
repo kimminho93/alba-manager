@@ -2518,6 +2518,8 @@
     setTimeout(flushPunchQueue, 4000);
   }
 
+  // 버전 표시 (엔진 빌드가 package.json 버전을 넣어 줌)
+  if (window.ALBA_VERSION) Array.prototype.forEach.call(document.querySelectorAll('.ver-text'), function (el) { el.textContent = 'v' + window.ALBA_VERSION; });
   syncThemeBtn();
   syncFontBtn();
   initTabs();

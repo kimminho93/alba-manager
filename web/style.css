@@ -2359,3 +2359,5 @@ body.on-punch .app-footer, body.locked .app-footer { display: none; }
 .saver-time { font-size: 64px; font-weight: 800; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
 .saver-sub { margin-top: 6px; font-size: 15px; color: #3b3f4d; }
 @media print { .saver { display: none !important; } }
+
+.app-ver { margin-top: 6px; font-size: 12px; opacity: .7; }
