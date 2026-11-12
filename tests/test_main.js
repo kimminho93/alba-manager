@@ -361,6 +361,24 @@ test('알바생 기록: 기록 없는 달은 빈 달력(0시간)·지난 달 설
   assert.deepStrictEqual(E.recordMonths([w]), ['2026-10', '2026-11', '2026-12']);
 });
 
+test('알바생 고유 코드: 새로 만들면 자동 부여, 서로 겹치지 않고, 백업·정리 후에도 유지, 없던 사람은 채움', () => {
+  const a = E.createWorker('가', 5, 10320), b = E.createWorker('나', 5, 10320);
+  assert.ok(/^[A-HJ-NP-Z2-9]{8}$/.test(a.code), a.code);
+  assert.notStrictEqual(a.code, b.code);
+  const kept = E.normalizeWorkers([a, b]);
+  assert.strictEqual(kept[0].code, a.code);
+  assert.strictEqual(kept[1].code, b.code);
+  // 같은 코드가 두 번 있으면 뒤 사람 코드를 새로 부여
+  const dup = E.normalizeWorkers([a, Object.assign({}, b, { code: a.code })]);
+  assert.notStrictEqual(dup[0].code, dup[1].code);
+  // 코드가 없던 예전 데이터에는 새로 채움
+  const old = E.normalizeWorkers([{ id: 'x1', name: '옛날', contractDays: 5, wage: 10000, months: {} }]);
+  assert.ok(/^[A-Z0-9]{8}$/.test(old[0].code));
+  // 백업 왕복
+  const back = E.parseBackup(E.buildBackup({ workers: [a], archive: [], presets: [], store: {}, settings: {} }, new Date()));
+  assert.strictEqual(back.data.workers[0].code, a.code);
+});
+
 test('예전 정산 명단(이름+달 한 줄씩) → 알바생별 월 기록으로 자동 변환', () => {
   const sh = (end) => E.emptyShifts('2026-11').map((s, i) => (i < 5 ? { off: false, start: '09:00', end, breakMinutes: 0 } : s));
   const old = [

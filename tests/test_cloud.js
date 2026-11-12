@@ -150,7 +150,7 @@ function makeDevice(google, opts) {
     assert.strictEqual(await a.cloud.connect(), true);
     assert.strictEqual(Object.keys(g.files).length, 1);
     assert.strictEqual(g.files.sheet1.title, '사장님 도우미 데이터');
-    assert.deepStrictEqual(g.tabNames('sheet1'), ['2026-11', '2026-10', '알바생', '점검 보관함', '데이터']);
+    assert.deepStrictEqual(g.tabNames('sheet1'), ['2026-11', '2026-10', '알바생', '출퇴근기록', '점검 보관함', '데이터']);
     assert.deepStrictEqual(g.rows('sheet1', '2026-11').slice(2), [['철수', 2], ['영희', 3]]);
     assert.ok(g.rows('sheet1', '데이터').length >= 3);
     assert.ok(g.files.sheet1.tabs[0].formats > 0);     // 머리글 서식
@@ -194,7 +194,7 @@ function makeDevice(google, opts) {
     a.data.workers[0].months['2026-11'] = { net: 5 };
     a.cloud.markDirty();
     await a.cloud.saveNow();
-    assert.deepStrictEqual(g.tabNames('sheet1'), ['2026-11', '2026-10', '알바생', '점검 보관함', '데이터']);
+    assert.deepStrictEqual(g.tabNames('sheet1'), ['2026-11', '2026-10', '알바생', '출퇴근기록', '점검 보관함', '데이터']);
   });
 
   await test('알바생을 지워 기록이 없어진 달의 탭은 시트에서도 사라짐', async () => {
@@ -230,6 +230,40 @@ function makeDevice(google, opts) {
     // 데이터 탭(앱 원본)에는 오래된 달도 남아 있어 다른 기기로 옮길 때 사라지지 않음
     const raw = g.rows('sheet1', '데이터').slice(2).map(r => r[0]).join('');
     assert.ok(raw.indexOf('2021-11') >= 0);
+  });
+
+  await test('출퇴근기록 탭: 머리글만 만들고, 밖에서 추가한 기록은 이후 저장에도 지우거나 덮어쓰지 않음', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', { '2026-11': { net: 2 } })];
+    await a.cloud.connect();
+    assert.ok(g.tabNames('sheet1').includes('출퇴근기록'));
+    assert.strictEqual(g.rows('sheet1', '출퇴근기록')[0][1], '알바생 고유코드');
+    // 출퇴근 프로그램이 한 줄 추가했다고 가정
+    g.files.sheet1.tabs.find(t => t.title === '출퇴근기록').rows.push(['2026-11-12 09:01', 'ABCD2345', '철수', '출근', 'QR', '']);
+    g.writes.length = 0;
+    a.data.workers[0].months['2026-11'].net = 77;
+    a.cloud.markDirty();
+    await a.cloud.saveNow();
+    assert.ok(!g.writes.includes('출퇴근기록'));
+    assert.strictEqual(g.rows('sheet1', '출퇴근기록').length, 2);
+    assert.strictEqual(g.rows('sheet1', '출퇴근기록')[1][2], '철수');
+    // 순서: 알바생 바로 뒤
+    const names = g.tabNames('sheet1');
+    assert.strictEqual(names[names.indexOf('알바생') + 1], '출퇴근기록');
+  });
+
+  await test('예전에 만든 시트(출퇴근기록 탭 없음)도 다음 저장 때 탭이 생김', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', { '2026-11': { net: 2 } })];
+    await a.cloud.connect();
+    g.files.sheet1.tabs = g.files.sheet1.tabs.filter(t => t.title !== '출퇴근기록');
+    a.data.workers[0].months['2026-11'].net = 3;
+    a.cloud.markDirty();
+    await a.cloud.saveNow();
+    assert.ok(g.tabNames('sheet1').includes('출퇴근기록'));
+    assert.strictEqual(g.rows('sheet1', '출퇴근기록').length, 1);
   });
 
   await test('예전 버전이 만든 "정산 명단" 탭은 새 저장 때 정리됨', async () => {
@@ -354,7 +388,7 @@ function makeDevice(google, opts) {
     assert.strictEqual(await a.cloud.saveNow(), true);
     assert.ok(g.files.sheet2);
     assert.strictEqual(g.rows('sheet2', '2026-11').length, 4);
-    assert.deepStrictEqual(g.tabNames('sheet2'), ['2026-11', '알바생', '점검 보관함', '데이터']);
+    assert.deepStrictEqual(g.tabNames('sheet2'), ['2026-11', '알바생', '출퇴근기록', '점검 보관함', '데이터']);
   });
 
   await test('내용을 바꾸면 3초 뒤 자동 저장이 실행됨 (같은 내용이면 저장하지 않음)', async () => {

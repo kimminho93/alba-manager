@@ -1331,6 +1331,23 @@
     return 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
+  /* 알바생 고유 코드: 출퇴근 QR 등에서 이름 대신 쓰는 값 (헷갈리는 글자 0/O/1/I 제외, 8자리) */
+  var CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function newCode() {
+    var out = '';
+    var buf = null;
+    try {
+      var c = (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto : (typeof globalThis !== 'undefined' ? globalThis.crypto : null);
+      if (c && c.getRandomValues) { buf = new Uint8Array(8); c.getRandomValues(buf); }
+    } catch (e) { buf = null; }
+    for (var i = 0; i < 8; i++) {
+      var r = buf ? buf[i] : Math.floor(Math.random() * 256);
+      out += CODE_CHARS.charAt(r % CODE_CHARS.length);
+    }
+    return out;
+  }
+  var CODE_RE = /^[A-Z0-9]{6,16}$/;
+
   /* 한 달 기록 정리 (payroll 엔진의 입력 검사를 그대로 활용) */
   function normalizeRecord(raw, payMonth) {
     raw = isObj(raw) ? raw : {};
@@ -1368,6 +1385,7 @@
     var w = Math.max(0, Math.round(Number(wage)));
     var worker = {
       id: newId(),
+      code: newCode(),
       name: cleanName(name) || '알바생',
       contractDays: cd,
       wage: isFinite(w) && String(wage) !== '' ? w : DEFAULT_SETTINGS.wage,
@@ -1392,6 +1410,7 @@
   function normalizeWorkers(list) {
     var out = [];
     var seen = {};
+    var seenCode = {};
     (Array.isArray(list) ? list : []).slice(0, MAX_WORKERS).forEach(function (raw) {
       if (!isObj(raw)) return;
       var name = cleanName(raw.name);
@@ -1407,7 +1426,10 @@
       }
       var cd = Math.min(7, Math.max(1, Math.round(Number(raw.contractDays) || DEFAULT_SETTINGS.contractDays)));
       var wage = Math.max(0, Math.round(Number(raw.wage)));
-      var item = { id: id, name: name, contractDays: cd, wage: isFinite(wage) ? wage : DEFAULT_SETTINGS.wage, months: months };
+      var code = typeof raw.code === 'string' && CODE_RE.test(raw.code) && !seenCode[raw.code] ? raw.code : newCode();
+      while (seenCode[code]) code = newCode();
+      seenCode[code] = true;
+      var item = { id: id, code: code, name: name, contractDays: cd, wage: isFinite(wage) ? wage : DEFAULT_SETTINGS.wage, months: months };
       var dflt = cleanDefaults(raw.defaults);
       if (dflt) item.defaults = dflt;
       out.push(item);
@@ -1553,6 +1575,7 @@
     RETAIN_MONTHS: RETAIN_MONTHS,
     emptyShifts: emptyShifts,
     createWorker: createWorker,
+    newWorkerCode: newCode,
     normalizeWorkers: normalizeWorkers,
     migrateRoster: migrateRoster,
     workerSettings: workerSettings,

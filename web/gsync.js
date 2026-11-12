@@ -6,7 +6,8 @@
  *  - 구글 로그인 스크립트(accounts.google.com)는 사용자가 연동을 켠 뒤에만 불러옵니다.
  *  - 저장 위치: "사장님 도우미 데이터" 스프레드시트
  *       [2026-11] 같은 월별 탭 : 그 달 정산 요약 + 날짜별 근무 기록 (바뀐 달만 다시 씀)
- *       [알바생] [점검 보관함]  : 사람이 보기 쉬운 표 (앱이 자동으로 다시 씀)
+ *       [알바생] [점검 보관함]  : 사람이 보기 쉬운 표 (앱이 자동으로 다시 씀, 알바생 탭에 고유코드 포함)
+ *       [출퇴근기록]            : 출퇴근 프로그램이 한 줄씩 추가할 자리 (앱은 머리글만 만들고 이후 건드리지 않음)
  *       [데이터]                : 앱이 읽는 원본 (수정하지 마세요)
  *  - 월별 탭은 5년(60개월)이 지나면 시트에서만 자동 정리합니다. (앱 안의 기록은 지우지 않음)
  *  - 여러 기기에서 쓰면 마지막에 저장한 내용이 우선합니다.
@@ -82,6 +83,8 @@
   var FILE_NAME = '사장님 도우미 데이터';
   var LEGACY_TABS = ['정산 명단'];   // 예전 버전이 만들던 탭 (저장할 때 정리)
   var SHEET_DATA = '데이터';
+  var SHEET_PUNCH = '출퇴근기록';   // 나중에 출퇴근 프로그램이 한 줄씩 추가하는 탭 (앱은 처음에 머리글만 만들고 그 뒤로는 건드리지 않음)
+  var PUNCH_HEAD = ['기록시각', '알바생 고유코드', '이름', '구분(출근/퇴근)', '입력방식', '메모'];
   var MONTH_TAB = /^\d{4}-\d{2}$/;
   var RETAIN_MONTHS = 60;
   var CHUNK = 40000;
@@ -219,6 +222,11 @@
 
     // 시트에 둘 탭: 5년 이내 월 탭 + 그 외 표 탭 (오래된 월 탭은 시트에서만 뺌)
     var wanted = (tables.sheets || []).filter(function (t) { return !MONTH_TAB.test(t.name) || t.name >= cutoff; });
+    // 알바생 탭 바로 뒤에 둔다: 이미 있으면 내용은 절대 다시 쓰지 않는다 (createOnly)
+    var punchTab = { name: SHEET_PUNCH, rows: [PUNCH_HEAD], bold: [0], createOnly: true };
+    var wi = -1;
+    wanted.forEach(function (t, k) { if (t.name === '알바생') wi = k; });
+    wanted.splice(wi >= 0 ? wi + 1 : wanted.length, 0, punchTab);
     wanted.push({ name: SHEET_DATA, rows: [['사장님 도우미 데이터 — 이 탭은 앱이 사용하는 저장 공간입니다. 수정하지 마세요.'], [stamp]].concat(chunks), bold: [], always: true });
     var wantedNames = {};
     wanted.forEach(function (t) { wantedNames[t.name] = true; });
@@ -265,6 +273,7 @@
     }).then(function () {
       // 바뀐 탭만 골라서 쓴다 (새로 만든 탭은 무조건)
       var changed = wanted.filter(function (t) {
+        if (t.createOnly) return created[t.name] !== undefined;
         return t.always || created[t.name] !== undefined || lastTabs[t.name] !== tabKey(t);
       });
       if (!changed.length) return null;
