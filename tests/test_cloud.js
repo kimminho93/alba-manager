@@ -70,11 +70,13 @@ function makeGoogle() {
           const name = d.range.split('!')[0];
           const t = tab(name);
           if (!t) throw new Error('없는 탭 쓰기: ' + name);
-          t.rows = d.values;
+          d.values.forEach((row, k) => { t.rows[k] = row; });   // 시작 칸부터 덮어씀 (아래 줄은 그대로)
           g.writes.push(name);
         });
         return res(200, {});
       }
+      const hm = /^\/values\/(.+)!A1:Z1$/.exec(rest);
+      if (hm) { const t = tab(hm[1]); return res(200, t && t.rows[0] ? { values: [t.rows[0]] } : {}); }
       const vm = /^\/values\/(.+)!A1:A300$/.exec(rest);
       if (vm) { const t = tab(vm[1]); return res(200, { values: t ? t.rows : [] }); }
     }
@@ -239,6 +241,7 @@ function makeDevice(google, opts) {
     await a.cloud.connect();
     assert.ok(g.tabNames('sheet1').includes('출퇴근기록'));
     assert.strictEqual(g.rows('sheet1', '출퇴근기록')[0][1], '알바생 고유코드');
+    assert.strictEqual(g.rows('sheet1', '출퇴근기록')[0][5], '처리결과');
     // 출퇴근 프로그램이 한 줄 추가했다고 가정
     g.files.sheet1.tabs.find(t => t.title === '출퇴근기록').rows.push(['2026-11-12 09:01', 'ABCD2345', '철수', '출근', 'QR', '']);
     g.writes.length = 0;
@@ -264,6 +267,24 @@ function makeDevice(google, opts) {
     await a.cloud.saveNow();
     assert.ok(g.tabNames('sheet1').includes('출퇴근기록'));
     assert.strictEqual(g.rows('sheet1', '출퇴근기록').length, 1);
+  });
+
+  await test('예전 머리글(처리결과 열 없음)의 출퇴근기록 탭은 머리글 첫 줄만 고치고 아래 기록은 그대로 둠', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', { '2026-11': { net: 2 } })];
+    await a.cloud.connect();
+    const tab = g.files.sheet1.tabs.find(t => t.title === '출퇴근기록');
+    tab.rows = [['기록시각', '알바생 고유코드', '이름', '구분(출근/퇴근)', '입력방식', '메모'], ['2026-11-12 09:01', 'ABCD2345', '철수', '출근', 'QR', '']];
+    const b = makeDevice(g);                       // 새 실행(확인 기록 없음)
+    await b.cloud.connect();
+    b.data.workers[0].months['2026-11'].net = 5;
+    b.cloud.markDirty();
+    await b.cloud.saveNow();
+    const rows = g.rows('sheet1', '출퇴근기록');
+    assert.strictEqual(rows[0][5], '처리결과');
+    assert.strictEqual(rows[1][2], '철수');
+    assert.strictEqual(rows[1][3], '출근');
   });
 
   await test('예전 버전이 만든 "정산 명단" 탭은 새 저장 때 정리됨', async () => {

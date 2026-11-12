@@ -379,6 +379,17 @@ test('알바생 고유 코드: 새로 만들면 자동 부여, 서로 겹치지 
   assert.strictEqual(back.data.workers[0].code, a.code);
 });
 
+test('알바생 비밀번호: 정리(앞뒤 공백 제거, 20자), 비어 있으면 저장 안 함, 백업 왕복', () => {
+  const w = E.createWorker('가', 5, 10320);
+  w.password = '  1234  ';
+  const kept = E.normalizeWorkers([w, Object.assign({}, E.createWorker('나', 5, 10320), { password: '   ' })]);
+  assert.strictEqual(kept[0].password, '1234');
+  assert.strictEqual(kept[1].password, undefined);
+  assert.strictEqual(E.cleanPassword('a'.repeat(30)).length, 20);
+  const back = E.parseBackup(E.buildBackup({ workers: kept, archive: [], presets: [], store: {}, settings: {} }, new Date()));
+  assert.strictEqual(back.data.workers[0].password, '1234');
+});
+
 test('예전 정산 명단(이름+달 한 줄씩) → 알바생별 월 기록으로 자동 변환', () => {
   const sh = (end) => E.emptyShifts('2026-11').map((s, i) => (i < 5 ? { off: false, start: '09:00', end, breakMinutes: 0 } : s));
   const old = [

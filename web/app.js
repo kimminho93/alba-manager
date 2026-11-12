@@ -894,6 +894,8 @@
     if (!w) s.wage = state.settings.minWage;
     $('pName').value = w ? w.name : '';
     $('pName').disabled = !w;
+    $('pPw').value = w && w.password ? w.password : '';
+    $('pPw').disabled = !w;
     $('noWorkerNote').hidden = !!w;
     $('pWage').value = s.wage;
     state.contractDays = s.contractDays;
@@ -1434,6 +1436,15 @@
         : ('📅 ' + label));
     });
 
+    // 출퇴근 비밀번호: 알바생 정보에 저장 (월 기록과 무관)
+    $('pPw').addEventListener('input', function () {
+      var w = selWorker();
+      if (!w) return;
+      var pw = E.cleanPassword($('pPw').value);
+      if (pw) w.password = pw; else delete w.password;
+      saveWorkers();
+    });
+
     // 급여 폼 실시간 반응
     ['pName', 'pWage', 'pMealMinHours', 'pMealAmount'].forEach(function (id) {
       $(id).addEventListener('input', editPayroll);
@@ -1652,9 +1663,9 @@
     });
     sheets.sort(function (x, y) { return x.sortKey < y.sortKey ? 1 : -1; });   // 최근 달이 앞에
 
-    var wrows = [['이름', '고유코드', '계약서상 주 근무일', '시급(원)', '기록이 있는 달']];
+    var wrows = [['이름', '고유코드', '비밀번호', '계약서상 주 근무일', '시급(원)', '기록이 있는 달']];
     state.workers.forEach(function (w) {
-      wrows.push([w.name, w.code || '', '주 ' + w.contractDays + '일', w.wage, Object.keys(w.months).length + '개월']);
+      wrows.push([w.name, w.code || '', w.password || '', '주 ' + w.contractDays + '일', w.wage, Object.keys(w.months).length + '개월']);
     });
     sheets.push({ name: '알바생', rows: wrows.length > 1 ? wrows : [['(등록된 알바생이 없습니다)']], bold: [0] });
 

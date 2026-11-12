@@ -95,6 +95,11 @@
     return String(s === null || s === undefined ? '' : s).trim().slice(0, 20);
   }
 
+  /* 출퇴근 QR을 볼 때 알바생이 입력하는 비밀번호 (선택, 20자까지) */
+  function cleanPassword(s) {
+    return String(s === null || s === undefined ? '' : s).trim().slice(0, 20);
+  }
+
   /** 알바생 한 명 만들기 (이름·주 계약일수·시급) */
   function createWorker(name, contractDays, wage, defaults) {
     var cd = Math.min(7, Math.max(1, Math.round(Number(contractDays) || DEFAULT_SETTINGS.contractDays)));
@@ -146,6 +151,8 @@
       while (seenCode[code]) code = newCode();
       seenCode[code] = true;
       var item = { id: id, code: code, name: name, contractDays: cd, wage: isFinite(wage) ? wage : DEFAULT_SETTINGS.wage, months: months };
+      var pw = cleanPassword(raw.password);
+      if (pw) item.password = pw;
       var dflt = cleanDefaults(raw.defaults);
       if (dflt) item.defaults = dflt;
       out.push(item);
@@ -292,6 +299,7 @@
     emptyShifts: emptyShifts,
     createWorker: createWorker,
     newWorkerCode: newCode,
+    cleanPassword: cleanPassword,
     normalizeWorkers: normalizeWorkers,
     migrateRoster: migrateRoster,
     workerSettings: workerSettings,

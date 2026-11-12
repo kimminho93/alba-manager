@@ -84,7 +84,7 @@
   var LEGACY_TABS = ['정산 명단'];   // 예전 버전이 만들던 탭 (저장할 때 정리)
   var SHEET_DATA = '데이터';
   var SHEET_PUNCH = '출퇴근기록';   // 나중에 출퇴근 프로그램이 한 줄씩 추가하는 탭 (앱은 처음에 머리글만 만들고 그 뒤로는 건드리지 않음)
-  var PUNCH_HEAD = ['기록시각', '알바생 고유코드', '이름', '구분(출근/퇴근)', '입력방식', '메모'];
+  var PUNCH_HEAD = ['기록시각', '알바생 고유코드', '이름', '구분(출근/퇴근)', '입력방식', '처리결과', '메모'];
   var MONTH_TAB = /^\d{4}-\d{2}$/;
   var RETAIN_MONTHS = 60;
   var CHUNK = 40000;
@@ -95,6 +95,7 @@
   var token = null, tokenExp = 0;
   var saveTimer = null, saving = false, again = false;
   var lastJson = null;         // 마지막으로 시트와 맞춘 데이터(JSON 문자열)
+  var punchHeaderOk = {};      // 시트 id → 이번 실행에서 출퇴근기록 머리글을 확인했는지
   var lastTabs = {};           // 탭 이름 → 마지막으로 시트에 쓴 내용(JSON). 바뀐 탭만 다시 쓰기 위함
   var notice = '';             // 시트 정리 안내 (5년 지난 월 탭 삭제 등)
   var status = { kind: 'off', text: '' };
@@ -269,6 +270,19 @@
           if (existing[name] !== undefined) orderReqs.push({ updateSheetProperties: { properties: { sheetId: existing[name], index: idx }, fields: 'index' } });
         });
         return orderReqs.length ? api('POST', SHEETS + '/' + id + ':batchUpdate', { requests: orderReqs }, mode) : null;
+      });
+    }).then(function () {
+      // 예전에 만든 '출퇴근기록' 탭의 머리글이 새 열 구성과 다르면 첫 줄만 고친다 (아래 기록은 건드리지 않음)
+      if (punchHeaderOk[id] || created[SHEET_PUNCH] !== undefined) { punchHeaderOk[id] = true; return null; }
+      var rng = encodeURIComponent(SHEET_PUNCH + '!A1:Z1');
+      return api('GET', SHEETS + '/' + id + '/values/' + rng, undefined, mode).then(function (r) {
+        var cur = (r.values && r.values[0]) || [];
+        var same = cur.length === PUNCH_HEAD.length && PUNCH_HEAD.every(function (h, k) { return cur[k] === h; });
+        punchHeaderOk[id] = true;
+        if (same) return null;
+        return api('POST', SHEETS + '/' + id + '/values:batchUpdate', {
+          valueInputOption: 'RAW', data: [{ range: SHEET_PUNCH + '!A1', values: [PUNCH_HEAD] }]
+        }, mode);
       });
     }).then(function () {
       // 바뀐 탭만 골라서 쓴다 (새로 만든 탭은 무조건)
@@ -459,6 +473,7 @@
     deps.storage.remove(META_KEY);
     lastJson = null;
     lastTabs = {};
+    punchHeaderOk = {};
     notice = '';
     setStatus('off');
   }
