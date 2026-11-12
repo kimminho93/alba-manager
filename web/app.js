@@ -2145,26 +2145,81 @@
     showPunchResult(w, r, now);
   }
 
-  var audioCtx = null;
-  function playChime(isIn) {
+  /* ---------- 출퇴근 알림음: 크기 · 소리 종류(출근/퇴근 따로) ---------- */
+  var SND_KEY = 'alba.sound';
+  var SOUNDS = {
+    up:    { label: '차임 (올라가는 음)', n: [[660, 0, .22], [880, .18, .3]] },
+    down:  { label: '차임 (내려가는 음)', n: [[880, 0, .22], [660, .18, .3]] },
+    dingdong: { label: '딩동', n: [[784, 0, .35], [622, .32, .5]] },
+    bell:  { label: '벨', n: [[1175, 0, .9, 'bell'], [1568, .12, .8, 'bell']] },
+    beep:  { label: '삐빅 (또렷함)', n: [[1000, 0, .12, 'square'], [1000, .2, .12, 'square']] },
+    triple:{ label: '삐삐삐 (아주 또렷함)', n: [[1200, 0, .1, 'square'], [1200, .16, .1, 'square'], [1200, .32, .1, 'square']] },
+    fanfare: { label: '팡파르', n: [[523, 0, .16], [659, .14, .16], [784, .28, .16], [1047, .42, .4]] },
+    soft:  { label: '부드러운 소리', n: [[440, 0, .6, 'triangle'], [554, .3, .7, 'triangle']] },
+    none:  { label: '소리 없음', n: [] }
+  };
+  var SND_ORDER = ['up', 'down', 'dingdong', 'bell', 'beep', 'triple', 'fanfare', 'soft', 'none'];
+  function loadSnd() {
+    var d = { vol: 90, inId: 'up', outId: 'down' };
     try {
+      var o = JSON.parse(localStorage.getItem(SND_KEY) || '{}');
+      if (typeof o.vol === 'number' && o.vol >= 0 && o.vol <= 100) d.vol = o.vol;
+      if (SOUNDS[o.inId]) d.inId = o.inId;
+      if (SOUNDS[o.outId]) d.outId = o.outId;
+    } catch (e) {}
+    return d;
+  }
+  function saveSnd(d) { try { localStorage.setItem(SND_KEY, JSON.stringify(d)); } catch (e) {} }
+
+  var audioCtx = null;
+  function playSound(id, volPct) {
+    try {
+      var snd = SOUNDS[id];
+      if (!snd || !snd.n.length || volPct <= 0) return;
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       if (!audioCtx) audioCtx = new AC();
       if (audioCtx.state === 'suspended') audioCtx.resume();
-      var notes = isIn ? [660, 880] : [880, 660];   // 출근: 올라가는 소리 / 퇴근: 내려가는 소리
+      var master = audioCtx.createGain();
+      master.gain.value = volPct / 100;
+      var comp = audioCtx.createDynamicsCompressor();   // 커져도 소리가 깨지지 않게
+      master.connect(comp); comp.connect(audioCtx.destination);
       var t0 = audioCtx.currentTime + 0.02;
-      notes.forEach(function (f, i) {
-        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
-        o.type = 'sine'; o.frequency.value = f;
-        var t = t0 + i * 0.18;
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
-        o.connect(g); g.connect(audioCtx.destination);
-        o.start(t); o.stop(t + 0.36);
+      snd.n.forEach(function (nt) {
+        var type = nt[3] || 'sine';
+        var peak = type === 'square' ? 0.45 : 0.95;
+        var parts = type === 'bell' ? [[1, 1], [2.76, .35], [5.4, .15]] : [[1, 1]];
+        parts.forEach(function (pt) {
+          var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+          o.type = type === 'bell' ? 'sine' : type;
+          o.frequency.value = nt[0] * pt[0];
+          var t = t0 + nt[1], d = nt[2];
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(peak * pt[1], t + 0.015);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+          o.connect(g); g.connect(master);
+          o.start(t); o.stop(t + d + 0.05);
+        });
       });
     } catch (e) { /* 소리를 못 내도 출퇴근 처리는 그대로 */ }
+  }
+  function playChime(isIn) {
+    var c = loadSnd();
+    playSound(isIn ? c.inId : c.outId, c.vol);
+  }
+  function initSoundSettings() {
+    var c = loadSnd();
+    var opts = SND_ORDER.map(function (k) { return '<option value="' + k + '">' + SOUNDS[k].label + '</option>'; }).join('');
+    $('sndIn').innerHTML = opts; $('sndOut').innerHTML = opts;
+    $('sndIn').value = c.inId; $('sndOut').value = c.outId; $('sndVol').value = c.vol;
+    $('sndVolLabel').textContent = c.vol + '%';
+    function cur() { return { vol: Number($('sndVol').value), inId: $('sndIn').value, outId: $('sndOut').value }; }
+    $('sndVol').addEventListener('input', function () { $('sndVolLabel').textContent = $('sndVol').value + '%'; });
+    $('sndVol').addEventListener('change', function () { saveSnd(cur()); playChime(true); });
+    $('sndIn').addEventListener('change', function () { saveSnd(cur()); playChime(true); });
+    $('sndOut').addEventListener('change', function () { saveSnd(cur()); playChime(false); });
+    $('sndInTest').addEventListener('click', function () { playChime(true); });
+    $('sndOutTest').addEventListener('click', function () { playChime(false); });
   }
 
   function showPunchResult(w, r, now) {
@@ -2236,6 +2291,7 @@
   }
 
   function initPunch() {
+    initSoundSettings();
     tickClock();
     setInterval(function () { tickClock(); renderPunch(); }, 15000);
 

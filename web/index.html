@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611130010">
+  <link rel="stylesheet" href="./style.css?v=202611130030">
 </head>
 <body>
   <header class="app-header">
@@ -154,7 +154,7 @@
               <input id="pMeal" type="checkbox" checked>
               <span class="weekly-text">
                 <b>🍚 식대 추가 지급</b>
-                <small id="mealSummaryText">점심·저녁 식사 시간에 일한 날 식대를 추가 지급합니다</small>
+                <small id="mealSummaryText">점심·저녁 식사 시간에 일한 날 식대를 추가 지급합니다 (실비라 세금 계산에서 제외)</small>
               </span>
             </label>
             <div id="mealConfig" class="meal-config">
@@ -405,6 +405,12 @@
           <button id="btnPinClear" type="button" class="btn btn-ghost">없애기</button>
         </div>
 
+        <h3 class="set-title">출퇴근 알림음 <small class="pin-state">· 이 기기에만 적용</small></h3>
+        <div class="set-note">출근·퇴근을 찍으면 나는 소리입니다. 매장이 시끄러우면 크기를 높이고, 출근과 퇴근 소리를 다르게 정할 수 있어요.</div>
+        <div class="snd-row"><label for="sndVol">소리 크기</label><input id="sndVol" type="range" min="0" max="100" step="5"><b id="sndVolLabel" class="snd-val">80%</b></div>
+        <div class="snd-row"><label for="sndIn">☀️ 출근 소리</label><select id="sndIn"></select><button id="sndInTest" type="button" class="btn">▶ 듣기</button></div>
+        <div class="snd-row"><label for="sndOut">🌙 퇴근 소리</label><select id="sndOut"></select><button id="sndOutTest" type="button" class="btn">▶ 듣기</button></div>
+
         <h3 class="set-title">최저시급</h3>
         <label class="field set-field"><span>올해 최저시급 (원) <em class="hint">새 알바생을 추가할 때 기본 시급으로 들어갑니다</em></span>
           <input id="sMinWage" type="number" inputmode="numeric" min="0" step="10">
@@ -615,6 +621,7 @@
             <ol>
               <li>알바생마다 <b>[정산 설정]</b>(컴퓨터는 왼쪽 입력칸)의 <b>"출퇴근 비밀번호"</b>를 정해 줍니다. 비밀번호가 없는 알바생은 출퇴근을 찍을 수 없습니다.</li>
               <li><b>⚙️ 설정 → 관리자 비밀번호</b>를 정합니다. 처음 직원을 추가하면 안내창이 뜨는데, 바로 정하거나 <b>[나중에]</b>를 눌러 나중에 정해도 됩니다. 정하면 평소에는 <b>⏱️ 출퇴근 화면만</b> 보이고, 급여·위생·설정은 <b>[🔒 관리자]</b>를 눌러 비밀번호를 입력해야 열립니다. 아무것도 안 하면 10분 뒤 자동으로 다시 잠깁니다.</li>
+              <li><b>⚙️ 설정 → 출퇴근 알림음</b>에서 소리 크기를 키우고, 출근과 퇴근 소리를 각각 다른 소리로 고를 수 있습니다. (매장 기기에서 정하세요)</li>
               <li><b>잊어버렸다면?</b> 구글 저장을 켜 두면 구글 시트의 <b>관리자</b> 탭 오른쪽 칸(B1)에 비밀번호가 적혀 있습니다. 그 칸을 새 비밀번호로 고친 뒤, 잠금 창에서 <b>[비밀번호를 잊었어요]</b>를 누르면 적용됩니다.</li>
               <li>비밀번호를 잊으면 열 방법이 없으니 <b>구글 저장이나 백업 파일</b>을 꼭 해 두세요.</li>
             </ol>
@@ -868,8 +875,8 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611130010"></script>
-  <script src="./gsync.js?v=202611130010"></script>
-  <script src="./app.js?v=202611130010"></script>
+  <script src="./engine.js?v=202611130030"></script>
+  <script src="./gsync.js?v=202611130030"></script>
+  <script src="./app.js?v=202611130030"></script>
 </body>
 </html>

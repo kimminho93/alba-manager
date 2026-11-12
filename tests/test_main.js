@@ -644,3 +644,12 @@ test('출퇴근: 출근 중 상태(punch)는 저장·불러오기 정리에서�
 });
 
 console.log('\n총 ' + passed + '개 단위 테스트 통과!\n');
+
+test('식대는 실비: 세금·보험료 계산에서 제외하고 실수령액에는 더한다', () => {
+  const base = { name: '가', hourlyWage: 10000, contractDays: 5, mode: 'weekly', weeklyHours: [10], tax: '3.3', includeWeekly: false };
+  const a = E.calculatePayroll(Object.assign({}, base, { includeMeal: false }));
+  const b = E.calculatePayroll(Object.assign({}, base, { includeMeal: true, mealDays: 2, mealAmount: 5000, mealMinHours: 4 }));
+  assert.strictEqual(b.tax.total, a.tax.total);          // 식대가 있어도 공제액은 같다
+  assert.strictEqual(b.taxBase, a.gross);
+  assert.strictEqual(b.net, a.net + b.mealAllowance);    // 식대는 그대로 더해진다
+});

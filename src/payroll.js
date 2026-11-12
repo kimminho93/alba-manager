@@ -397,7 +397,8 @@
     });
     rows.push({
       kind: 'subtotal', section: '공제', label: '공제 합계 (' + r.tax.label + ')', amount: r.tax.total, sign: -1,
-      formula: r.tax.type === 'none' ? '공제 없음' : r.tax.lines.map(function (l) { return won(l.amount); }).join(' + ')
+      formula: r.tax.type === 'none' ? '공제 없음' : r.tax.lines.map(function (l) { return won(l.amount); }).join(' + ') +
+        (r.mealAllowance > 0 ? '  ※ 식대(실비) ' + won(r.mealAllowance) + '원은 제외한 ' + won(r.taxBase) + '원 기준' : '')
     });
     rows.push({
       kind: 'total', section: '실지급', label: '실수령액 (차인지급액)', amount: r.net, sign: 1,
@@ -414,11 +415,11 @@
     L.push('▪ 기본급: ' + won(r.basePay) + '원');
     L.push('▪ 주휴수당: ' + won(r.weeklyAllowance) + '원 (' + (r.includeWeekly ? '포함' : '미포함') + ')');
     if (r.includeMeal || r.mealAllowance > 0) {
-      L.push('▪ 식대: ' + won(r.mealAllowance) + '원 (' + r.mealDays + '회 × ' + won(r.mealAmount) + '원)');
+      L.push('▪ 식대(실비): ' + won(r.mealAllowance) + '원 (' + r.mealDays + '회 × ' + won(r.mealAmount) + '원)');
     }
     if (r.lateMinutes > 0) L.push('▪ 지각·조퇴 차감: -' + won(r.lateDeduction) + '원 (' + r.lateMinutes + '분)');
     L.push('▪ 세전 지급총액: ' + won(r.gross) + '원');
-    L.push('▪ 공제 [' + r.tax.label + ']: -' + won(r.tax.total) + '원');
+    L.push('▪ 공제 [' + r.tax.label + ']: -' + won(r.tax.total) + '원' + (r.tax.type !== 'none' && r.mealAllowance > 0 ? ' (식대 제외 ' + won(r.taxBase) + '원 기준)' : ''));
     if (r.tax.type !== 'none') {
       r.tax.lines.forEach(function (l) { L.push('   · ' + l.label + ' ' + won(l.amount) + '원'); });
     }
@@ -582,7 +583,9 @@
 
     var lateDeduction = lateDeductionFor(inp.lateMinutes, wage);
     var gross = Math.max(0, basePay - lateDeduction + weeklyAllowance + mealAllowance);
-    var tax = calcTax(inp.tax, gross);
+    // 식대는 실비로 보고 세금·보험료 계산에서 뺀다
+    var taxBase = Math.max(0, gross - mealAllowance);
+    var tax = calcTax(inp.tax, taxBase);
     var net = gross - tax.total;
 
     var r = {
@@ -609,6 +612,7 @@
       lateMinutes: inp.lateMinutes,
       lateDeduction: lateDeduction,
       gross: gross,
+      taxBase: taxBase,
       tax: tax,
       net: net
     };

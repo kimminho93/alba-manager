@@ -2339,3 +2339,10 @@ body.on-punch .app-footer, body.locked .app-footer { display: none; }
   .archive-head { flex-direction: column; align-items: stretch; gap: 10px; }
   .archive-actions { flex-wrap: wrap; }
 }
+
+.snd-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.snd-row label { flex: none; width: 7.5em; font-weight: 700; }
+.snd-row input[type=range] { flex: 1; min-width: 0; height: 36px; accent-color: var(--primary); }
+.snd-row select { flex: 1; min-width: 0; min-height: 46px; font: inherit; font-size: 16px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+.snd-row .btn { flex: none; min-height: 46px; }
+.snd-val { flex: none; width: 3.2em; text-align: right; }
