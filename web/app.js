@@ -2124,6 +2124,54 @@
     showToast('🌙 퇴근을 안 찍어 ' + done.map(function (d) { return d.worker.name; }).join(', ') + '님의 어제 출근은 무효(휴무) 처리했습니다');
   }
 
+  /* ---------- 화면 보호기 (번인 방지) ---------- */
+  var SAVER_KEY = 'alba.saverMin';
+  var saverState = { last: Date.now(), on: false, moveTimer: null };
+  function saverMinutes() {
+    try { var v = localStorage.getItem(SAVER_KEY); if (v === null) return 3; v = Number(v); return v >= 0 && v <= 120 ? v : 3; } catch (e) { return 3; }
+  }
+  function saverMove() {
+    var box = $('saverBox');
+    var w = window.innerWidth, h = window.innerHeight;
+    var bw = box.offsetWidth || 260, bh = box.offsetHeight || 110;
+    box.style.left = Math.round(Math.random() * Math.max(0, w - bw - 20) + 10) + 'px';
+    box.style.top = Math.round(Math.random() * Math.max(0, h - bh - 20) + 10) + 'px';
+  }
+  function saverTick() {
+    var d = new Date();
+    $('saverTime').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    var working = state.workers.filter(function (w) { return E.punchNext(w, d) === 'out'; }).length;
+    $('saverSub').textContent = (working ? '근무 중 ' + working + '명 · ' : '') + '화면을 누르면 돌아가요';
+  }
+  function showSaver() {
+    saverState.on = true;
+    saverTick(); $('saver').hidden = false; saverMove();
+    saverState.moveTimer = setInterval(function () { saverTick(); saverMove(); }, 20000);
+  }
+  function hideSaver() {
+    saverState.on = false;
+    if (saverState.moveTimer) { clearInterval(saverState.moveTimer); saverState.moveTimer = null; }
+    $('saver').hidden = true;
+  }
+  function initSaver() {
+    $('saverMin').value = String(saverMinutes());
+    $('saverMin').addEventListener('change', function () {
+      try { localStorage.setItem(SAVER_KEY, $('saverMin').value); } catch (e) {}
+      saverState.last = Date.now();
+    });
+    function touch() { saverState.last = Date.now(); }
+    ['pointerdown', 'keydown', 'touchstart', 'mousemove'].forEach(function (t) { document.addEventListener(t, function (ev) {
+      if (saverState.on) { if (t !== 'mousemove') { ev.preventDefault(); ev.stopPropagation(); hideSaver(); touch(); } return; }   // 깨우는 첫 터치는 화면 버튼을 누르지 않게 막음
+      touch();
+    }, true); });
+    setInterval(function () {
+      var min = saverMinutes();
+      var onPunch = $('tab-punch').classList.contains('active');
+      if (saverState.on && (!min || !onPunch)) { hideSaver(); return; }
+      if (!saverState.on && min && onPunch && Date.now() - saverState.last >= min * 60000) showSaver();
+    }, 5000);
+  }
+
   /* ---------- 출퇴근 화면 ---------- */
   function renderPunch() {
     var box = $('punchList');
@@ -2359,6 +2407,7 @@
 
   function initPunch() {
     initSoundSettings();
+    initSaver();
     runAutoClose();
     tickClock();
     setInterval(function () { tickClock(); runAutoClose(); renderPunch(); }, 15000);

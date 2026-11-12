@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611130215">
+  <link rel="stylesheet" href="./style.css?v=202611130230">
 </head>
 <body>
   <header class="app-header">
@@ -412,6 +412,10 @@
         <div class="snd-row"><label for="sndIn">☀️ 출근 소리</label><select id="sndIn"></select><button id="sndInTest" type="button" class="btn">▶ 듣기</button></div>
         <div class="snd-row"><label for="sndOut">🌙 퇴근 소리</label><select id="sndOut"></select><button id="sndOutTest" type="button" class="btn">▶ 듣기</button></div>
 
+        <h3 class="set-title">화면 보호기 (번인 방지) <small class="pin-state">· 이 기기에만 적용</small></h3>
+        <div class="set-note">출퇴근 화면을 하루 종일 켜 두는 매장용입니다. 아무도 안 만지면 화면이 어두워지고 시계가 천천히 움직여 화면이 눌어붙는 것(번인)을 줄입니다. 화면을 한 번 누르면 돌아옵니다. 출근·퇴근 처리와 자정 처리는 그대로 동작합니다.</div>
+        <div class="snd-row"><label for="saverMin">보호기 시작</label><select id="saverMin"><option value="0">사용 안 함</option><option value="1">1분 후</option><option value="3">3분 후</option><option value="5">5분 후</option><option value="10">10분 후</option><option value="30">30분 후</option></select></div>
+
         <h3 class="set-title">최저시급</h3>
         <label class="field set-field"><span>올해 최저시급 (원) <em class="hint">새 알바생을 추가할 때 기본 시급으로 들어갑니다</em></span>
           <input id="sMinWage" type="number" inputmode="numeric" min="0" step="10">
@@ -625,6 +629,7 @@
               <li><b>자정까지 퇴근을 안 찍으면</b> 출근 중인 사람은 그날 <b>출근이 무효(휴무)로 처리</b>됩니다. 퇴근을 꼭 찍어 주세요. 잊었다면 사장님이 달력에서 그날 시간을 직접 넣어 주세요. (시트 기록에는 "퇴근누락(무효)·자동(자정)"으로 남습니다) 다시 로그인하거나 시트에서 불러오면 시트의 출퇴근 기록을 읽어 출근/퇴근 상태도 되살립니다.</li>
               <li>출퇴근 화면 맨 아래에 <b>구글 저장 연결 상태</b>가 보입니다. 빨간 글씨 "구글 로그인이 풀렸어요"가 보이면 사장님이 [🔒 관리자]로 들어가 구글을 다시 연결해 주세요. 새로고침해도 로그인·관리자 잠금 해제는 약 10분(구글은 약 1시간) 동안 유지됩니다.</li>
               <li>알바생이나 명단을 지우면 시트의 <b>출퇴근기록</b> 탭에서도 그 사람 줄이 함께 지워집니다.</li>
+              <li>출퇴근 화면을 계속 켜 두면 <b>화면 보호기</b>가 작동합니다(기본 3분). 화면이 어두워지고 시계가 천천히 움직여 번인을 줄여요. 한 번 누르면 돌아옵니다. <b>⚙️ 설정 → 화면 보호기</b>에서 시간을 바꾸거나 끌 수 있습니다.</li>
               <li><b>⚙️ 설정 → 출퇴근 알림음</b>에서 소리 크기를 키우고, 출근과 퇴근 소리를 각각 다른 소리로 고를 수 있습니다. (매장 기기에서 정하세요)</li>
               <li><b>잊어버렸다면?</b> 구글 저장을 켜 두면 구글 시트의 <b>관리자</b> 탭 오른쪽 칸(B1)에 비밀번호가 적혀 있습니다. 그 칸을 새 비밀번호로 고친 뒤, 잠금 창에서 <b>[비밀번호를 잊었어요]</b>를 누르면 적용됩니다.</li>
               <li>비밀번호를 잊으면 열 방법이 없으니 <b>구글 저장이나 백업 파일</b>을 꼭 해 두세요.</li>
@@ -728,6 +733,10 @@
       <button type="button" id="exportAllToggle" class="btn">전체 선택</button>
       <button type="button" id="exportGo" class="btn btn-primary">엑셀 받기</button>
     </div>
+  </div>
+  <!-- 화면 보호기: 아무도 안 만지면 어둡게 + 시계가 천천히 이동 -->
+  <div id="saver" class="saver" hidden aria-hidden="true">
+    <div id="saverBox" class="saver-box"><div id="saverTime" class="saver-time">--:--</div><div id="saverSub" class="saver-sub">화면을 누르면 돌아가요</div></div>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
@@ -879,8 +888,8 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611130215"></script>
-  <script src="./gsync.js?v=202611130215"></script>
-  <script src="./app.js?v=202611130215"></script>
+  <script src="./engine.js?v=202611130230"></script>
+  <script src="./gsync.js?v=202611130230"></script>
+  <script src="./app.js?v=202611130230"></script>
 </body>
 </html>
