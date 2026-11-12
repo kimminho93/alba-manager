@@ -75,6 +75,14 @@ function makeGoogle() {
         });
         return res(200, {});
       }
+      const bm = /^\/values\/(.+)!B1$/.exec(rest);
+      if (bm) {
+        const t = tab(bm[1]);
+        if (!t) return res(400, {});
+        if ((opt.method || 'GET') === 'PUT') { t.rows[0] = t.rows[0] || []; t.rows[0][1] = JSON.parse(opt.body).values[0][0]; return res(200, {}); }
+        const v = t.rows[0] && t.rows[0][1];
+        return res(200, v === undefined || v === '' ? {} : { values: [[v]] });
+      }
       const am = /^\/values\/(.+)!A:G:append$/.exec(decodeURIComponent(rest.split('?')[0]));
       if (am) {
         const t = tab(am[1]);
@@ -140,6 +148,7 @@ function makeDevice(google, opts) {
   dev.clock = clock;
   dev.store = store;
   dev.cloud.init({
+    getAdminPin: () => dev.pin || '',
     getData: () => JSON.parse(JSON.stringify(dev.data)),
     getTables: () => tablesFor(dev.data),
     applyData: d => { dev.data = JSON.parse(JSON.stringify(d)); },
@@ -279,6 +288,33 @@ function makeDevice(google, opts) {
     a.cloud.markDirty();
     await a.cloud.saveNow();
     assert.strictEqual(g.rows('sheet1', '출퇴근기록').length, 3);
+  });
+
+  await test('관리자 비밀번호: 시트 관리자 탭 B1에 적히고, 사장님이 시트에서 고친 값은 앱이 덮어쓰지 않으며, 읽어 올 수 있음', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', { '2026-11': { net: 2 } })];
+    await a.cloud.connect();
+    assert.ok(!g.tabNames('sheet1').includes('관리자'));          // 비밀번호가 없으면 탭도 없음
+    a.pin = '1234';
+    await a.cloud.setAdminPin('1234');                              // 탭이 아직 없으니 저장하면서 만들어짐
+    assert.ok(g.tabNames('sheet1').includes('관리자'));
+    assert.strictEqual(g.rows('sheet1', '관리자')[0][1], '1234');
+    const names = g.tabNames('sheet1');
+    assert.strictEqual(names[names.indexOf('출퇴근기록') + 1], '관리자');
+    g.rows('sheet1', '관리자')[0][1] = 'abcd';                      // 사장님이 시트에서 직접 고침
+    a.data.workers[0].months['2026-11'].net = 50;
+    a.cloud.markDirty();
+    await a.cloud.saveNow();
+    assert.strictEqual(await a.cloud.readAdminPin('user'), 'abcd');  // 일반 저장이 덮어쓰지 않음
+    await a.cloud.setAdminPin('9999');                              // 앱에서 바꾸면 B1 칸이 갱신
+    assert.strictEqual(g.rows('sheet1', '관리자')[0][1], '9999');
+    a.pin = '';                                                      // 이 기기에서 비밀번호가 사라져도(저장소 삭제 등) 시트 탭은 지우지 않음
+    a.data.workers[0].months['2026-11'].net = 51;
+    a.cloud.markDirty();
+    await a.cloud.saveNow();
+    assert.ok(g.tabNames('sheet1').includes('관리자'));
+    assert.strictEqual(await a.cloud.readAdminPin('user'), '9999');
   });
 
   await test('예전에 만든 시트(출퇴근기록 탭 없음)도 다음 저장 때 탭이 생김', async () => {

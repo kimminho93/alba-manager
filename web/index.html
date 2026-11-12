@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611122309">
+  <link rel="stylesheet" href="./style.css?v=202611121200">
 </head>
 <body>
   <header class="app-header">
@@ -398,7 +398,7 @@
         <p class="guide-lead">세금·보험료 비율은 해마다 바뀔 수 있습니다. 바뀌면 여기서 고치세요. <b>고치는 즉시 계산에 반영</b>됩니다.</p>
 
         <h3 class="set-title">관리자 비밀번호 <small id="pinState" class="pin-state"></small></h3>
-        <div class="set-note">정하면 <b>비밀번호를 입력해야 급여 계산·위생 점검·설정·사용 방법</b>을 볼 수 있고, 평소에는 <b>출퇴근 화면만</b> 보입니다. 매장 공용 기기에 두고 알바생이 출퇴근을 찍게 할 때 정해 두세요. 10분 동안 아무것도 안 하면 자동으로 다시 잠깁니다.<br>비밀번호를 잊으면 열 방법이 없으니 <b>구글 저장이나 백업 파일</b>을 꼭 해 두세요.</div>
+        <div class="set-note">정하면 <b>비밀번호를 입력해야 급여 계산·위생 점검·설정·사용 방법</b>을 볼 수 있고, 평소에는 <b>출퇴근 화면만</b> 보입니다. 매장 공용 기기에 두고 알바생이 출퇴근을 찍게 할 때 정해 두세요. 10분 동안 아무것도 안 하면 자동으로 다시 잠깁니다.<br>잊었다면 <b>구글 시트의 "관리자" 탭</b>에서 확인하거나 새 값으로 고친 뒤, 잠금 창의 <b>[비밀번호를 잊었어요]</b>를 누르면 됩니다. (<b>구글 저장</b>을 켜 둔 경우)</div>
         <div class="pin-row">
           <input id="sAdminPin" type="password" inputmode="text" maxlength="20" autocomplete="new-password" placeholder="새 관리자 비밀번호 (4자 이상)" aria-label="새 관리자 비밀번호">
           <button id="btnPinSave" type="button" class="btn btn-primary">정하기</button>
@@ -614,7 +614,8 @@
             <p class="guide-step-title">① 준비 (사장님이 한 번만)</p>
             <ol>
               <li>알바생마다 <b>[정산 설정]</b>(컴퓨터는 왼쪽 입력칸)의 <b>"출퇴근 비밀번호"</b>를 정해 줍니다. 비밀번호가 없는 알바생은 출퇴근을 찍을 수 없습니다.</li>
-              <li><b>⚙️ 설정 → 관리자 비밀번호</b>를 정합니다. 그러면 평소에는 <b>⏱️ 출퇴근 화면만</b> 보이고, 급여·위생·설정은 <b>[🔒 관리자]</b>를 눌러 비밀번호를 입력해야 열립니다. 아무것도 안 하면 10분 뒤 자동으로 다시 잠깁니다.</li>
+              <li><b>⚙️ 설정 → 관리자 비밀번호</b>를 정합니다. 처음 직원을 추가하면 안내창이 뜨는데, 바로 정하거나 <b>[나중에]</b>를 눌러 나중에 정해도 됩니다. 정하면 평소에는 <b>⏱️ 출퇴근 화면만</b> 보이고, 급여·위생·설정은 <b>[🔒 관리자]</b>를 눌러 비밀번호를 입력해야 열립니다. 아무것도 안 하면 10분 뒤 자동으로 다시 잠깁니다.</li>
+              <li><b>잊어버렸다면?</b> 구글 저장을 켜 두면 구글 시트의 <b>관리자</b> 탭 오른쪽 칸(B1)에 비밀번호가 적혀 있습니다. 그 칸을 새 비밀번호로 고친 뒤, 잠금 창에서 <b>[비밀번호를 잊었어요]</b>를 누르면 적용됩니다.</li>
               <li>비밀번호를 잊으면 열 방법이 없으니 <b>구글 저장이나 백업 파일</b>을 꼭 해 두세요.</li>
             </ol>
             <p class="guide-step-title">② 알바생이 찍는 방법</p>
@@ -674,6 +675,21 @@
     </div>
   </div>
 
+  <!-- 처음 안내: 관리자 비밀번호 정하기 (나중에 설정에서도 가능) -->
+  <div id="pinSetup" class="punch-modal" hidden>
+    <div class="punch-modal-backdrop" data-pinsetup-close></div>
+    <form id="pinSetupForm" class="punch-card" autocomplete="off" onsubmit="return false">
+      <div class="punch-card-name">관리자 비밀번호를 정할까요?</div>
+      <p class="punch-card-state">정하면 평소에는 <b>출퇴근 화면만</b> 보이고, 급여·위생·설정은 이 비밀번호를 입력해야 열려요. 알바생이 매장 기기에서 출퇴근을 찍게 하려면 꼭 정해 두세요.<br><small>구글 저장을 켜 두면 잊어도 시트에서 다시 정할 수 있어요.</small></p>
+      <input id="pinSetupInput" type="password" maxlength="20" autocomplete="new-password" placeholder="4자 이상" aria-label="새 관리자 비밀번호">
+      <p id="pinSetupErr" class="punch-err" role="alert"></p>
+      <div class="punch-btns">
+        <button type="button" class="btn" data-pinsetup-close>나중에</button>
+        <button type="submit" class="btn btn-primary">정하기</button>
+      </div>
+    </form>
+  </div>
+
   <!-- 관리자 비밀번호 입력 -->
   <div id="adminPin" class="punch-modal" hidden>
     <div class="punch-modal-backdrop" data-admin-close></div>
@@ -686,6 +702,7 @@
         <button type="button" class="btn" data-admin-close>취소</button>
         <button type="submit" class="btn btn-primary">열기</button>
       </div>
+      <button type="button" id="adminPinForgot" class="btn-link">비밀번호를 잊었어요</button>
     </form>
   </div>
 
@@ -850,8 +867,8 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611122309"></script>
-  <script src="./gsync.js?v=202611122309"></script>
-  <script src="./app.js?v=202611122309"></script>
+  <script src="./engine.js?v=202611121200"></script>
+  <script src="./gsync.js?v=202611121200"></script>
+  <script src="./app.js?v=202611121200"></script>
 </body>
 </html>

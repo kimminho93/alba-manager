@@ -85,6 +85,7 @@
   var SHEET_DATA = '데이터';
   var SHEET_PUNCH = '출퇴근기록';   // 나중에 출퇴근 프로그램이 한 줄씩 추가하는 탭 (앱은 처음에 머리글만 만들고 그 뒤로는 건드리지 않음)
   var PUNCH_HEAD = ['기록시각', '알바생 고유코드', '이름', '구분(출근/퇴근)', '입력방식', '처리결과', '메모'];
+  var SHEET_ADMIN = '관리자';       // 관리자 비밀번호 복구용 탭: B1 칸이 비밀번호 (사장님이 시트에서 고치면 앱의 '시트에서 다시 불러오기'로 적용)
   var MONTH_TAB = /^\d{4}-\d{2}$/;
   var RETAIN_MONTHS = 60;
   var CHUNK = 40000;
@@ -228,9 +229,18 @@
     var wi = -1;
     wanted.forEach(function (t, k) { if (t.name === '알바생') wi = k; });
     wanted.splice(wi >= 0 ? wi + 1 : wanted.length, 0, punchTab);
+    var adminPin = host.getAdminPin ? String(host.getAdminPin() || '') : '';
+    if (adminPin) {
+      // 관리자 탭은 처음 만들 때만 적고, 그 뒤로는 앱이 덮어쓰지 않음 (사장님이 시트에서 고친 값을 지키기 위해)
+      wanted.splice(wanted.indexOf(punchTab) + 1, 0, {
+        name: SHEET_ADMIN, bold: [0], createOnly: true,
+        rows: [['관리자 비밀번호', adminPin], ['※ 잊었다면 위 오른쪽 칸을 새 비밀번호(4자 이상)로 고치세요. 그다음 매장 기기의 잠금 창에서 [비밀번호를 잊었어요]를 누르면 적용됩니다.']]
+      });
+    }
     wanted.push({ name: SHEET_DATA, rows: [['사장님 도우미 데이터 — 이 탭은 앱이 사용하는 저장 공간입니다. 수정하지 마세요.'], [stamp]].concat(chunks), bold: [], always: true });
     var wantedNames = {};
     wanted.forEach(function (t) { wantedNames[t.name] = true; });
+    wantedNames[SHEET_ADMIN] = true;   // 이 기기에 비밀번호가 없어도(저장소를 지운 경우 등) 시트의 복구용 탭은 지우지 않음
 
     var removedOld = 0;
     var existing = {};
@@ -454,6 +464,23 @@
     return api('POST', url, { values: rows }, 'silent');
   }
 
+  /* 관리자 비밀번호 복구: 시트 '관리자' 탭 B1 칸 읽기/쓰기 */
+  function readAdminPin(mode) {
+    if (!meta.connected || !meta.sheetId) return Promise.reject(new Error('not connected'));
+    var rng = encodeURIComponent(SHEET_ADMIN + '!B1');
+    return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + rng, undefined, mode || 'silent').then(function (r) {
+      var v = r && r.values && r.values[0] && r.values[0][0];
+      return v === undefined || v === null ? '' : String(v).trim();
+    });
+  }
+  function setAdminPin(pin) {
+    if (!meta.connected || !meta.sheetId) return Promise.resolve(false);
+    var rng = encodeURIComponent(SHEET_ADMIN + '!B1');
+    return api('PUT', SHEETS + '/' + meta.sheetId + '/values/' + rng + '?valueInputOption=RAW', { values: [[pin || '']] }, 'silent')
+      .then(function () { return true; })
+      .catch(function () { return doSave('silent'); });   // 탭이 아직 없으면 다음 저장이 만들면서 현재 비밀번호를 적음
+  }
+
   function saveNow() {
     if (saveTimer) { clearT(saveTimer); saveTimer = null; }
     return doSave('user');
@@ -494,6 +521,8 @@
     markDirty: markDirty,
     saveNow: saveNow,
     appendPunch: appendPunch,
+    readAdminPin: readAdminPin,
+    setAdminPin: setAdminPin,
     loadFromSheet: loadFromSheet,
     disconnect: disconnect,
     isConnected: function () { return !!meta.connected; },

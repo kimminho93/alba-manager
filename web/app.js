@@ -1593,6 +1593,7 @@
       $('awPw').value = '';
       selectWorker(w.id);
       closeSheets();
+      if (state.workers.length === 1) setTimeout(maybeAskPin, 700);
       showToast('➕ ' + w.name + '님을 추가했습니다. 이름을 누르면 근무 기록을 입력할 수 있어요.');
     });
 
@@ -1940,6 +1941,7 @@
       getTables: cloudTables,
       applyData: cloudApply,
       confirm: function (m) { return window.confirm(m); },
+      getAdminPin: function () { return getPin(); },
       onStatus: function (st) { renderCloudUi(st); if (st && st.kind === 'saved') flushPunchQueue(); }
     });
 
@@ -1957,7 +1959,7 @@
       if (act === 'backup-save') { backupDownload(); return; }
       if (act === 'backup-load') { $('backupFile').click(); return; }
       if (act === 'connect') {
-        C.connect().then(function (ok) { if (ok) showToast('☁️ 구글 시트 연동 완료'); });
+        C.connect().then(function (ok) { if (ok) { showToast('☁️ 구글 시트 연동 완료'); adoptSheetPin(); } });
       } else if (act === 'save') {
         C.saveNow().then(function (ok) { if (ok) showToast('☁️ 구글 시트에 저장했습니다'); });
       } else if (act === 'open') {
@@ -1966,6 +1968,7 @@
       } else if (act === 'load') {
         if (!window.confirm('구글 시트에 저장된 내용으로 이 화면의 기록을 바꿉니다.\n계속할까요?')) return;
         C.loadFromSheet().then(function (r) {
+          if (r === 'ok') adoptSheetPin();
           showToast(r === 'ok' ? '⬇️ 구글 시트에서 불러왔습니다' : (r === 'empty' ? '시트에 저장된 기록이 없습니다' : '불러오지 못했습니다'));
         });
       } else if (act === 'off') {
@@ -2173,6 +2176,36 @@
   }
   function closeAdminPin() { $('adminPin').hidden = true; $('adminPinInput').value = ''; }
 
+  var PIN_ASKED_KEY = 'alba.pinAsked';
+  function commitPin(v) {
+    var wasSet = !!getPin();
+    try { localStorage.setItem(PIN_KEY, v); } catch (e) { showToast('이 기기에 저장하지 못했습니다.'); return; }
+    try { localStorage.setItem(PIN_ASKED_KEY, '1'); } catch (e) {}
+    var C = window.AlbaCloud;
+    if (C) C.setAdminPin(v);
+    var hint = (C && C.isConnected()) ? '' : ' 구글 저장을 켜 두면 잊어도 시트에서 다시 정할 수 있어요.';
+    if (wasSet) { applyLockUi(); bumpIdle(); showToast('관리자 비밀번호를 바꿨어요.' + hint); }
+    else { lockNow(); showToast('관리자 비밀번호를 정했어요. 지금부터 잠깁니다.' + hint); }
+  }
+  function maybeAskPin() {
+    var asked = false;
+    try { asked = !!localStorage.getItem(PIN_ASKED_KEY); } catch (e) {}
+    if (getPin() || asked || !state.workers.length) return;
+    $('pinSetupErr').textContent = '';
+    $('pinSetup').hidden = false;
+  }
+  function adoptSheetPin() {
+    var C = window.AlbaCloud;
+    if (getPin() || !C || !C.isConnected()) return;
+    C.readAdminPin('silent').then(function (v) {
+      v = String(v || '').trim();
+      if (v.length < 4 || getPin()) return;
+      try { localStorage.setItem(PIN_KEY, v); localStorage.setItem(PIN_ASKED_KEY, '1'); } catch (e) { return; }
+      lockNow();
+      showToast('구글 시트의 관리자 비밀번호가 적용되어 잠겼어요.');
+    }).catch(function () {});
+  }
+
   function initPunch() {
     tickClock();
     setInterval(function () { tickClock(); renderPunch(); }, 15000);
@@ -2213,6 +2246,7 @@
       if (!$('punchPw').hidden) closePunchPw();
       if (!$('punchResult').hidden) closePunchResult();
       if (!$('adminPin').hidden) closeAdminPin();
+      if (!$('pinSetup').hidden) { $('pinSetup').hidden = true; try { localStorage.setItem(PIN_ASKED_KEY, '1'); } catch (e2) {} }
     });
 
     $('btnPinSave').addEventListener('click', function () {
@@ -2222,20 +2256,58 @@
         ? '관리자 비밀번호를 바꿉니다. 계속할까요?'
         : '정하면 지금 바로 잠기고, 출퇴근 화면만 보이게 됩니다.\n다시 열 때는 위의 [🔒 관리자]를 눌러 이 비밀번호를 입력하세요.\n\n계속할까요?';
       if (!window.confirm(msg)) return;
-      var wasSet = !!getPin();
-      try { localStorage.setItem(PIN_KEY, v); } catch (e) { showToast('이 기기에 저장하지 못했습니다.'); return; }
       $('sAdminPin').value = '';
-      if (wasSet) { applyLockUi(); bumpIdle(); showToast('관리자 비밀번호를 바꿨어요.'); }
-      else { lockNow(); showToast('관리자 비밀번호를 정했어요. 지금부터 잠깁니다.'); }
+      commitPin(v);
     });
     $('btnPinClear').addEventListener('click', function () {
       if (!getPin()) { showToast('정해 둔 관리자 비밀번호가 없어요.'); return; }
       if (!window.confirm('관리자 비밀번호를 없앨까요?\n없애면 누구나 급여 화면을 볼 수 있어요.')) return;
       try { localStorage.removeItem(PIN_KEY); } catch (e) {}
+      if (window.AlbaCloud) window.AlbaCloud.setAdminPin('');
       applyLockUi();
       bumpIdle();
       showToast('관리자 비밀번호를 없앴어요.');
     });
+
+    // 처음 안내 창
+    $('pinSetupForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var v = $('pinSetupInput').value.trim();
+      if (v.length < 4) { $('pinSetupErr').textContent = '4자 이상으로 정해 주세요.'; return; }
+      $('pinSetup').hidden = true;
+      $('pinSetupInput').value = '';
+      commitPin(v);
+    });
+    $('pinSetup').addEventListener('click', function (ev) {
+      if (!ev.target.closest('[data-pinsetup-close]')) return;
+      $('pinSetup').hidden = true;
+      try { localStorage.setItem(PIN_ASKED_KEY, '1'); } catch (e) {}   // 한 번만 물어봄. 필요하면 설정에서 정함
+    });
+
+    // 비밀번호를 잊었을 때: 사장님이 구글 시트 '관리자' 탭에서 고친 값을 다시 불러옴 (화면에 비밀번호를 보여주지는 않음)
+    $('adminPinForgot').addEventListener('click', function () {
+      var C = window.AlbaCloud, err = $('adminPinErr');
+      if (!C || !C.isConnected()) {
+        err.textContent = '구글 저장이 연결되어 있지 않아 시트에서 복구할 수 없어요.';
+        return;
+      }
+      err.textContent = '시트에서 확인하는 중…';
+      C.readAdminPin('user').then(function (v) {
+        v = String(v || '').trim();
+        if (v.length < 4) { err.textContent = '구글 시트의 "관리자" 탭 B1 칸에 새 비밀번호(4자 이상)를 적은 뒤 다시 눌러 주세요.'; return; }
+        if (v === getPin()) { err.textContent = '시트의 비밀번호가 지금 앱의 비밀번호와 같아요. 시트 "관리자" 탭에서 확인하거나 새 값으로 고친 뒤 다시 눌러 주세요.'; return; }
+        try { localStorage.setItem(PIN_KEY, v); } catch (e) {}
+        $('adminPinInput').value = '';
+        err.textContent = '시트에 적힌 비밀번호로 바꿨어요. 그 비밀번호를 입력하세요.';
+      }).catch(function () {
+        err.textContent = '시트를 읽지 못했어요. 인터넷과 구글 로그인을 확인해 주세요. (시트에 "관리자" 탭이 없으면 앱에서 비밀번호를 다시 정해야 해요)';
+      });
+    });
+
+    // 처음 열었을 때: 알바생이 있고 아직 비밀번호가 없으면 한 번 안내 (나중에 → 설정에서)
+    setTimeout(maybeAskPin, 800);
+    // 저장소를 지운 새 기기에서 구글을 다시 연결하면 시트의 비밀번호로 복구
+    setTimeout(adoptSheetPin, 5000);
 
     applyLockUi();
     renderPunch();
