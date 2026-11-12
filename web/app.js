@@ -189,6 +189,7 @@
     tabs.forEach(function (btn) {
       btn.addEventListener('click', function () {
         var target = btn.getAttribute('data-tab');
+        if (target !== 'punch' && isLocked()) return;   // 잠겨 있으면 출퇴근 화면만
         tabs.forEach(function (b) {
           var active = b === btn;
           b.classList.toggle('active', active);
@@ -985,6 +986,7 @@
     $('rosterTotal').textContent = E.formatWon(sum.totalNet) + '원';
     $('rosterMonthLabel').textContent = pm.slice(0, 4) + '년 ' + Number(pm.slice(5)) + '월';
     renderChips();
+    renderPunch();
 
     $('rosterCards').innerHTML = results.map(function (r, idx) {
       var w = state.workers[idx];
@@ -1935,7 +1937,7 @@
       getTables: cloudTables,
       applyData: cloudApply,
       confirm: function (m) { return window.confirm(m); },
-      onStatus: renderCloudUi
+      onStatus: function (st) { renderCloudUi(st); if (st && st.kind === 'saved') flushPunchQueue(); }
     });
 
     function openModal() { renderCloudUi(C.getStatus()); $('cloudModal').hidden = false; }
@@ -1976,6 +1978,267 @@
     renderCloudUi(C.getStatus());
   }
 
+
+  /* ==========================================================
+     출퇴근 (매장 기기에서 알바생이 이름 → 비밀번호) + 관리자 잠금
+     ========================================================== */
+  var PIN_KEY = 'alba.adminPin';          // 이 기기에만 저장 (구글 저장·백업에는 넣지 않음)
+  var QUEUE_KEY = 'alba.punchQueue';      // 구글 시트 '출퇴근기록' 탭에 아직 못 올린 기록
+  var IDLE_LOCK_MS = 10 * 60 * 1000;
+  var RESULT_MS = 5000;
+  var punchState = { unlocked: false, target: null, fails: 0, lockUntil: 0, resultTimer: null, idleTimer: null };
+
+  function getPin() { try { return localStorage.getItem(PIN_KEY) || ''; } catch (e) { return ''; } }
+  function isLocked() { return !!getPin() && !punchState.unlocked; }
+
+  function openTab(name) {
+    var b = document.querySelector('.tabs .tab[data-tab="' + name + '"]');
+    if (b) b.click();
+  }
+
+  function applyLockUi() {
+    var pin = getPin();
+    var locked = isLocked();
+    document.body.classList.toggle('locked', locked);
+    $('lockBtn').hidden = !pin;
+    $('lockBtn').textContent = locked ? '🔒 관리자' : '🔓 잠그기';
+    $('pinState').textContent = pin ? '· 설정됨' : '· 아직 없음';
+    if (locked) openTab('punch');
+  }
+
+  function lockNow() {
+    if (!getPin()) return;
+    punchState.unlocked = false;
+    if (punchState.idleTimer) { clearTimeout(punchState.idleTimer); punchState.idleTimer = null; }
+    document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open', 'modal-open');
+    $('sheetBackdrop').hidden = true;
+    $('dayModal').hidden = true;
+    $('cloudModal').hidden = true;
+    applyLockUi();
+  }
+
+  function bumpIdle() {
+    if (punchState.idleTimer) clearTimeout(punchState.idleTimer);
+    punchState.idleTimer = (getPin() && punchState.unlocked) ? setTimeout(lockNow, IDLE_LOCK_MS) : null;
+  }
+
+  function fmtHM(h) {
+    var m = Math.round((Number(h) || 0) * 60);
+    var hh = Math.floor(m / 60), mm = m % 60;
+    return hh + '시간' + (mm ? ' ' + mm + '분' : '');
+  }
+  function tsOf(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  }
+  function hmText(t) { var a = String(t).split(':'); return Number(a[0]) + '시 ' + a[1] + '분'; }
+
+  /* ---------- 시트 '출퇴근기록' 탭에 한 줄씩 덧붙임 (연동 중일 때) ---------- */
+  var queueBusy = false;
+  function loadQueue() { var q = loadJson(QUEUE_KEY, []); return Array.isArray(q) ? q : []; }
+  function enqueuePunch(row) {
+    var q = loadQueue();
+    q.push(row);
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q.slice(-500))); } catch (e) {}
+    flushPunchQueue();
+  }
+  function flushPunchQueue() {
+    var C = window.AlbaCloud;
+    if (queueBusy || !C || !C.isConnected() || !C.appendPunch) return;
+    var q = loadQueue();
+    if (!q.length) return;
+    queueBusy = true;
+    C.appendPunch(q).then(function () {
+      var rest = loadQueue().slice(q.length);
+      try { localStorage.setItem(QUEUE_KEY, JSON.stringify(rest)); } catch (e) {}
+    }).catch(function () { /* 다음 저장 때 다시 시도 */ }).then(function () { queueBusy = false; });
+  }
+
+  /* ---------- 출퇴근 화면 ---------- */
+  function renderPunch() {
+    var box = $('punchList');
+    if (!box) return;
+    var now = new Date();
+    if (!state.workers.length) {
+      box.innerHTML = '<p class="punch-empty">등록된 알바생이 없습니다.<br>사장님께 알려 주세요.</p>';
+      return;
+    }
+    box.innerHTML = state.workers.map(function (w) {
+      var working = E.punchNext(w, now) === 'out';
+      var chip = working
+        ? '<span class="punch-chip on">근무 중 · ' + escHtml(w.punch.time) + ' 출근</span>'
+        : '<span class="punch-chip">퇴근 상태</span>';
+      return '<button type="button" class="punch-row' + (working ? ' on' : '') + '" data-punch="' + escHtml(w.id) + '">' +
+        '<span class="punch-name">' + escHtml(w.name) + '</span>' + chip + '</button>';
+    }).join('');
+  }
+
+  function tickClock() {
+    var d = new Date();
+    var el = $('punchTime');
+    if (!el) return;
+    el.textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    var wd = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+    $('punchDate').textContent = d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + wd + ')';
+  }
+
+  function openPunchPw(w) {
+    punchState.target = w;
+    var next = E.punchNext(w, new Date());
+    $('punchPwName').textContent = w.name;
+    $('punchPwState').textContent = next === 'out'
+      ? ('지금 ' + hmText(w.punch.time) + '에 출근해 있어요. 비밀번호를 입력하면 퇴근이 찍혀요.')
+      : '비밀번호를 입력하면 출근이 찍혀요.';
+    $('punchPwOk').textContent = next === 'out' ? '퇴근 찍기' : '출근 찍기';
+    var inp = $('punchPwInput');
+    inp.value = '';
+    inp.setAttribute('inputmode', /^\d+$/.test(w.password || '') ? 'numeric' : 'text');
+    $('punchPwErr').textContent = '';
+    $('punchPw').hidden = false;
+    setTimeout(function () { inp.focus(); }, 50);
+  }
+  function closePunchPw() { $('punchPw').hidden = true; punchState.target = null; $('punchPwInput').value = ''; }
+
+  function punchSubmit() {
+    var w = punchState.target;
+    if (!w) return;
+    var now = new Date();
+    if (punchState.lockUntil > now.getTime()) {
+      $('punchPwErr').textContent = '잠시 후에 다시 해 주세요. (' + Math.ceil((punchState.lockUntil - now.getTime()) / 1000) + '초)';
+      return;
+    }
+    var typed = $('punchPwInput').value.trim();
+    if (!typed || typed !== w.password) {
+      punchState.fails++;
+      enqueuePunch([tsOf(now), w.code, w.name, '', '이름+비밀번호', '비밀번호 오류', punchState.fails + '번째 연속 실패']);
+      if (punchState.fails >= 5) {
+        punchState.lockUntil = now.getTime() + 30000;
+        punchState.fails = 0;
+        $('punchPwErr').textContent = '여러 번 틀렸어요. 30초 뒤에 다시 해 주세요.';
+      } else {
+        $('punchPwErr').textContent = '비밀번호가 맞지 않아요.';
+      }
+      $('punchPwInput').value = '';
+      $('punchPwInput').focus();
+      return;
+    }
+    punchState.fails = 0;
+    var r = E.applyPunch(w, now);
+    closePunchPw();
+    if (r.kind === 'too_soon') { showToast('방금 찍었어요. 잠시 뒤에 다시 눌러 주세요.'); return; }
+    saveWorkers();
+    // 열려 있던 급여 화면과 명단도 새 기록으로 맞춤
+    if (w.id === state.selId) { loadSelected(); recalcPayroll(); }
+    renderRoster();
+    enqueuePunch([tsOf(now), w.code, w.name, r.kind === 'in' ? '출근' : '퇴근', '이름+비밀번호', r.note ? '정상(참고)' : '정상', r.note]);
+    showPunchResult(w, r, now);
+  }
+
+  function showPunchResult(w, r, now) {
+    var pm = r.date.slice(0, 7);
+    var sum = E.monthSummary(w, pm);
+    var isIn = r.kind === 'in';
+    $('punchResIcon').textContent = isIn ? '☀️' : '🌙';
+    $('punchResTitle').textContent = isIn ? '출근했어요' : '퇴근했어요. 수고하셨어요!';
+    $('punchResWho').textContent = w.name + '님 · ' + hmText(isIn ? r.start : r.end);
+    var lines = [];
+    if (!isIn) {
+      var sh = E.workerShifts(w, pm)[Number(r.date.slice(8)) - 1];
+      if (sh && !sh.off) lines.push('<div>오늘 <b>' + fmtHM(E.calcShiftHours(sh.start, sh.end, sh.breakMinutes)) + '</b> 일했어요 (' + sh.start + '~' + sh.end + ')</div>');
+    }
+    lines.push('<div>이번 달 <b>' + sum.workDays + '일</b> · 누적 <b>' + fmtHM(sum.totalHours) + '</b></div>');
+    if (isIn) lines.push('<small>오늘 근무는 퇴근을 찍으면 더해져요</small>');
+    if (r.note) lines.push('<small>' + escHtml(r.note) + '</small>');
+    $('punchResStats').innerHTML = lines.join('');
+    var bar = $('punchTimerBar');
+    bar.style.animation = 'none'; void bar.offsetWidth;
+    bar.style.animation = 'punchTimer ' + (RESULT_MS / 1000) + 's linear forwards';
+    $('punchResult').hidden = false;
+    if (punchState.resultTimer) clearTimeout(punchState.resultTimer);
+    punchState.resultTimer = setTimeout(closePunchResult, RESULT_MS);
+  }
+  function closePunchResult() {
+    if (punchState.resultTimer) { clearTimeout(punchState.resultTimer); punchState.resultTimer = null; }
+    $('punchResult').hidden = true;
+  }
+
+  /* ---------- 관리자 비밀번호 ---------- */
+  function openAdminPin() {
+    $('adminPinInput').value = '';
+    $('adminPinErr').textContent = '';
+    $('adminPin').hidden = false;
+    setTimeout(function () { $('adminPinInput').focus(); }, 50);
+  }
+  function closeAdminPin() { $('adminPin').hidden = true; $('adminPinInput').value = ''; }
+
+  function initPunch() {
+    tickClock();
+    setInterval(function () { tickClock(); renderPunch(); }, 15000);
+
+    $('punchList').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-punch]');
+      if (!b) return;
+      var w = state.workers.filter(function (x) { return x.id === b.getAttribute('data-punch'); })[0];
+      if (!w) return;
+      if (!w.password) { showToast(w.name + '님은 아직 출퇴근 비밀번호가 없어요. 사장님께 정해 달라고 하세요.'); return; }
+      openPunchPw(w);
+    });
+    $('punchPwForm').addEventListener('submit', function (ev) { ev.preventDefault(); punchSubmit(); });
+    $('punchPw').addEventListener('click', function (ev) { if (ev.target.closest('[data-punch-close]')) closePunchPw(); });
+    $('punchResult').addEventListener('click', function (ev) { if (ev.target.closest('[data-punch-result-close]')) closePunchResult(); });
+
+    $('lockBtn').addEventListener('click', function () {
+      if (isLocked()) openAdminPin(); else lockNow();
+    });
+    $('adminPin').addEventListener('click', function (ev) { if (ev.target.closest('[data-admin-close]')) closeAdminPin(); });
+    $('adminPinForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      if ($('adminPinInput').value === getPin()) {
+        punchState.unlocked = true;
+        closeAdminPin();
+        applyLockUi();
+        openTab('payroll');
+        bumpIdle();
+      } else {
+        $('adminPinErr').textContent = '비밀번호가 맞지 않아요.';
+        $('adminPinInput').value = '';
+        $('adminPinInput').focus();
+      }
+    });
+    ['pointerdown', 'keydown'].forEach(function (t) { document.addEventListener(t, bumpIdle, true); });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Escape') return;
+      if (!$('punchPw').hidden) closePunchPw();
+      if (!$('punchResult').hidden) closePunchResult();
+      if (!$('adminPin').hidden) closeAdminPin();
+    });
+
+    $('btnPinSave').addEventListener('click', function () {
+      var v = $('sAdminPin').value.trim();
+      if (v.length < 4) { showToast('관리자 비밀번호는 4자 이상으로 정해 주세요.'); return; }
+      var msg = getPin()
+        ? '관리자 비밀번호를 바꿉니다. 계속할까요?'
+        : '정하면 지금 바로 잠기고, 출퇴근 화면만 보이게 됩니다.\n다시 열 때는 위의 [🔒 관리자]를 눌러 이 비밀번호를 입력하세요.\n\n계속할까요?';
+      if (!window.confirm(msg)) return;
+      var wasSet = !!getPin();
+      try { localStorage.setItem(PIN_KEY, v); } catch (e) { showToast('이 기기에 저장하지 못했습니다.'); return; }
+      $('sAdminPin').value = '';
+      if (wasSet) { applyLockUi(); bumpIdle(); showToast('관리자 비밀번호를 바꿨어요.'); }
+      else { lockNow(); showToast('관리자 비밀번호를 정했어요. 지금부터 잠깁니다.'); }
+    });
+    $('btnPinClear').addEventListener('click', function () {
+      if (!getPin()) { showToast('정해 둔 관리자 비밀번호가 없어요.'); return; }
+      if (!window.confirm('관리자 비밀번호를 없앨까요?\n없애면 누구나 급여 화면을 볼 수 있어요.')) return;
+      try { localStorage.removeItem(PIN_KEY); } catch (e) {}
+      applyLockUi();
+      bumpIdle();
+      showToast('관리자 비밀번호를 없앴어요.');
+    });
+
+    applyLockUi();
+    renderPunch();
+    setTimeout(flushPunchQueue, 4000);
+  }
+
   syncThemeBtn();
   syncFontBtn();
   initTabs();
@@ -1990,5 +2253,6 @@
   renderArchive();
   checkServerHealth();
   initCloud();
+  initPunch();
   if (window.AlbaCloud) window.AlbaCloud.resume();
 })();

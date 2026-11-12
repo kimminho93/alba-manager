@@ -445,6 +445,15 @@
     schedule();
   }
 
+  /* 출퇴근 기록 한 줄씩 '출퇴근기록' 탭 맨 아래에 덧붙임 (연동 중일 때만). 실패하면 거절 → 호출한 쪽이 보관했다가 다시 시도 */
+  function appendPunch(rows) {
+    if (!meta.connected || !meta.sheetId) return Promise.reject(new Error('not connected'));
+    if (!rows || !rows.length) return Promise.resolve();
+    var url = SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(SHEET_PUNCH + '!A:G') +
+      ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+    return api('POST', url, { values: rows }, 'silent');
+  }
+
   function saveNow() {
     if (saveTimer) { clearT(saveTimer); saveTimer = null; }
     return doSave('user');
@@ -484,6 +493,7 @@
     resume: resume,
     markDirty: markDirty,
     saveNow: saveNow,
+    appendPunch: appendPunch,
     loadFromSheet: loadFromSheet,
     disconnect: disconnect,
     isConnected: function () { return !!meta.connected; },

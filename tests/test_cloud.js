@@ -75,6 +75,13 @@ function makeGoogle() {
         });
         return res(200, {});
       }
+      const am = /^\/values\/(.+)!A:G:append$/.exec(decodeURIComponent(rest.split('?')[0]));
+      if (am) {
+        const t = tab(am[1]);
+        if (!t) return res(400, {});
+        JSON.parse(opt.body).values.forEach(row => t.rows.push(row));
+        return res(200, {});
+      }
       const hm = /^\/values\/(.+)!A1:Z1$/.exec(rest);
       if (hm) { const t = tab(hm[1]); return res(200, t && t.rows[0] ? { values: [t.rows[0]] } : {}); }
       const vm = /^\/values\/(.+)!A1:A300$/.exec(rest);
@@ -254,6 +261,24 @@ function makeDevice(google, opts) {
     // 순서: 알바생 바로 뒤
     const names = g.tabNames('sheet1');
     assert.strictEqual(names[names.indexOf('알바생') + 1], '출퇴근기록');
+  });
+
+  await test('출퇴근 기록은 출퇴근기록 탭 맨 아래에 한 줄씩 덧붙고, 연동 전에는 거절됨', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', { '2026-11': { net: 2 } })];
+    await assert.rejects(() => a.cloud.appendPunch([['x']]));
+    await a.cloud.connect();
+    await a.cloud.appendPunch([['2026-11-12 09:01:10', 'ABCD2345', '철수', '출근', '이름+비밀번호', '정상', '']]);
+    await a.cloud.appendPunch([['2026-11-12 18:00:02', 'ABCD2345', '철수', '퇴근', '이름+비밀번호', '정상', '']]);
+    const rows = g.rows('sheet1', '출퇴근기록');
+    assert.strictEqual(rows.length, 3);
+    assert.strictEqual(rows[2][3], '퇴근');
+    // 이후 일반 저장이 덧붙인 줄을 지우지 않음
+    a.data.workers[0].months['2026-11'].net = 9;
+    a.cloud.markDirty();
+    await a.cloud.saveNow();
+    assert.strictEqual(g.rows('sheet1', '출퇴근기록').length, 3);
   });
 
   await test('예전에 만든 시트(출퇴근기록 탭 없음)도 다음 저장 때 탭이 생김', async () => {

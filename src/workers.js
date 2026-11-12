@@ -155,9 +155,92 @@
       if (pw) item.password = pw;
       var dflt = cleanDefaults(raw.defaults);
       if (dflt) item.defaults = dflt;
+      var pn = cleanPunch(raw.punch);
+      if (pn) item.punch = pn;
       out.push(item);
     });
     return out;
+  }
+
+  /* ---------- 출퇴근 찍기 (매장 기기에서 알바생이 이름 → 비밀번호) ---------- */
+  var PUNCH_MAX_MIN = 16 * 60;   // 출근 후 이 시간 안에 찍으면 '퇴근', 넘으면 퇴근을 안 찍은 것으로 보고 새 '출근'
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function ymdOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function hmOf(d) { return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+  function toMin(t) { var a = String(t).split(':'); return Number(a[0]) * 60 + Number(a[1]); }
+
+  /* 출근 중인 기록 { date:'YYYY-MM-DD', time:'HH:MM' } 검사 */
+  function cleanPunch(raw) {
+    if (!isObj(raw)) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(raw.date)) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(raw.time))) return null;
+    return { date: raw.date, time: raw.time };
+  }
+
+  function punchIsOpen(worker) { return !!(worker && cleanPunch(worker.punch)); }
+
+  /**
+   * 알바생이 비밀번호를 맞게 입력한 뒤 부르는 함수.
+   *  - 출근 중이 아니면 → 출근 (지금 시각 기록)
+   *  - 출근 중이고 16시간 안이면 → 퇴근 (그 날 달력 칸에 출근~퇴근 시각을 그대로 넣음)
+   *  - 출근한 지 16시간이 넘었으면 → 퇴근 누락으로 보고 이전 기록은 버리고 새 출근
+   * 같은 날 두 번 일하면 한 칸에 합치고 사이 시간은 휴게시간으로 뺀다.
+   * 반환: { kind:'in'|'out'|'too_soon', date, start, end, note }
+   */
+  function applyPunch(worker, now) {
+    var open = cleanPunch(worker.punch);
+    var today = ymdOf(now), time = hmOf(now);
+    var note = '';
+    if (open) {
+      var inMs = new Date(open.date + 'T' + open.time + ':00').getTime();
+      var elapsed = (now.getTime() - inMs) / 60000;
+      if (elapsed >= 0 && elapsed <= PUNCH_MAX_MIN) {
+        if (elapsed < 1) return { kind: 'too_soon', date: open.date, start: open.time, end: time, note: '' };
+        return clockOut(worker, open, time);
+      }
+      note = '이전 출근(' + open.date + ' ' + open.time + ')은 퇴근 기록이 없어 무시하고 새로 출근 처리';
+    }
+    worker.punch = { date: today, time: time };
+    return { kind: 'in', date: today, start: time, end: '', note: note };
+  }
+
+  function clockOut(worker, open, end) {
+    var pm = open.date.slice(0, 7);
+    var idx = Number(open.date.slice(8)) - 1;
+    var shifts = workerShifts(worker, pm);
+    var cur = shifts[idx];
+    var start = open.time, breakMin = 0, merged = false;
+    if (cur && !cur.off && toMin(cur.end) > toMin(cur.start) && toMin(end) > toMin(start) && toMin(start) >= toMin(cur.end)) {
+      // 같은 날 앞선 근무가 있으면 한 칸으로 합치고 사이 시간은 휴게로
+      breakMin = (cur.breakMinutes || 0) + (toMin(start) - toMin(cur.end));
+      start = cur.start;
+      merged = true;
+    }
+    if (idx >= 0 && idx < shifts.length) {
+      shifts[idx] = { off: false, start: start, end: end, breakMinutes: breakMin };
+      var s = workerSettings(worker, pm);
+      setRecord(worker, pm, {
+        wage: s.wage, contractDays: s.contractDays, includeWeekly: s.includeWeekly, includeMeal: s.includeMeal,
+        mealMinHours: s.mealMinHours, mealAmount: s.mealAmount, tax: s.tax,
+        dailyShifts: shifts, weekExcuse: workerExcuse(worker, pm)
+      });
+    }
+    delete worker.punch;
+    return { kind: 'out', date: open.date, start: start, end: end, note: merged ? '같은 날 앞선 근무와 합쳐 사이 시간을 휴게로 처리' : '' };
+  }
+
+  /** 지금 찍으면 어떤 처리가 되는지: 'in'(출근) | 'out'(퇴근) */
+  function punchNext(worker, now) {
+    var open = cleanPunch(worker && worker.punch);
+    if (!open) return 'in';
+    var elapsed = (now.getTime() - new Date(open.date + 'T' + open.time + ':00').getTime()) / 60000;
+    return elapsed >= 0 && elapsed <= PUNCH_MAX_MIN ? 'out' : 'in';
+  }
+
+  /** 이번 달(payMonth) 일한 일수·누적 근무시간 (퇴근까지 끝난 날만) */
+  function monthSummary(worker, payMonth) {
+    var r = P.calculatePayroll(workerPayrollInput(worker, payMonth));
+    return { workDays: r.workDays || 0, totalHours: r.totalHours || 0 };
   }
 
   /** 예전 정산 명단(이름+달 한 줄씩) → 알바생별 월 기록 */
@@ -300,6 +383,10 @@
     createWorker: createWorker,
     newWorkerCode: newCode,
     cleanPassword: cleanPassword,
+    punchIsOpen: punchIsOpen,
+    applyPunch: applyPunch,
+    punchNext: punchNext,
+    monthSummary: monthSummary,
     normalizeWorkers: normalizeWorkers,
     migrateRoster: migrateRoster,
     workerSettings: workerSettings,

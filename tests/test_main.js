@@ -565,4 +565,66 @@ test('정산 명단 엑셀: 월별 탭(정산/근무기록/주휴판정) + 전�
   assert.strictEqual(E.rosterFileName(list), '알바_정산명단_2026-10~2026-11_5명.xlsx');
 });
 
+test('출퇴근: 출근 → 퇴근이면 그 날 달력 칸에 시각이 그대로 들어가고 일수·누적시간이 계산됨', () => {
+  const w = E.createWorker('홍길동', 5, 10320);
+  const d = (h, m) => new Date(2026, 10, 12, h, m, 0);   // 2026-11-12
+  const a = E.applyPunch(w, d(9, 3));
+  assert.strictEqual(a.kind, 'in');
+  assert.strictEqual(E.punchIsOpen(w), true);
+  assert.deepStrictEqual(E.monthSummary(w, '2026-11'), { workDays: 0, totalHours: 0 });
+  const b = E.applyPunch(w, d(18, 33));
+  assert.strictEqual(b.kind, 'out');
+  assert.strictEqual(E.punchIsOpen(w), false);
+  const sh = E.workerShifts(w, '2026-11')[11];
+  assert.strictEqual(sh.off, false);
+  assert.strictEqual(sh.start, '09:03');
+  assert.strictEqual(sh.end, '18:33');
+  const sum = E.monthSummary(w, '2026-11');
+  assert.strictEqual(sum.workDays, 1);
+  assert.ok(Math.abs(sum.totalHours - 9.5) < 0.01);
+});
+
+test('출퇴근: 1분 안에 다시 찍으면 무시, 출근 후 16시간이 넘으면 퇴근 누락으로 보고 새 출근', () => {
+  const w = E.createWorker('김철수', 5, 10320);
+  E.applyPunch(w, new Date(2026, 10, 12, 9, 0, 0));
+  assert.strictEqual(E.applyPunch(w, new Date(2026, 10, 12, 9, 0, 30)).kind, 'too_soon');
+  assert.strictEqual(E.punchIsOpen(w), true);
+  const r = E.applyPunch(w, new Date(2026, 10, 13, 10, 0, 0));   // 25시간 뒤
+  assert.strictEqual(r.kind, 'in');
+  assert.ok(r.note.indexOf('무시') >= 0);
+  assert.deepStrictEqual(w.punch, { date: '2026-11-13', time: '10:00' });
+  assert.strictEqual(E.workerShifts(w, '2026-11')[11].off, true);   // 전날은 기록되지 않음
+});
+
+test('출퇴근: 밤을 넘겨 퇴근하면 출근한 날 칸에 야간 근무로 기록', () => {
+  const w = E.createWorker('이영희', 5, 10320);
+  E.applyPunch(w, new Date(2026, 10, 12, 18, 0, 0));
+  const r = E.applyPunch(w, new Date(2026, 10, 13, 2, 0, 0));
+  assert.strictEqual(r.kind, 'out');
+  const sh = E.workerShifts(w, '2026-11')[11];
+  assert.strictEqual(sh.start, '18:00');
+  assert.strictEqual(sh.end, '02:00');
+  assert.ok(Math.abs(E.monthSummary(w, '2026-11').totalHours - 8) < 0.01);
+});
+
+test('출퇴근: 같은 날 두 번 일하면 한 칸으로 합치고 사이 시간은 휴게로 뺌', () => {
+  const w = E.createWorker('박민수', 5, 10320);
+  E.applyPunch(w, new Date(2026, 10, 12, 9, 0, 0)); E.applyPunch(w, new Date(2026, 10, 12, 12, 0, 0));
+  E.applyPunch(w, new Date(2026, 10, 12, 14, 0, 0)); E.applyPunch(w, new Date(2026, 10, 12, 18, 0, 0));
+  const sh = E.workerShifts(w, '2026-11')[11];
+  assert.strictEqual(sh.start, '09:00');
+  assert.strictEqual(sh.end, '18:00');
+  assert.strictEqual(sh.breakMinutes, 120);
+  assert.ok(Math.abs(E.monthSummary(w, '2026-11').totalHours - 7) < 0.01);
+});
+
+test('출퇴근: 출근 중 상태(punch)는 저장·불러오기 정리에서도 유지, 깨진 값은 버림', () => {
+  const w = E.createWorker('최하나', 5, 10320);
+  E.applyPunch(w, new Date(2026, 10, 12, 9, 0, 0));
+  const [back] = E.normalizeWorkers(JSON.parse(JSON.stringify([w])));
+  assert.deepStrictEqual(back.punch, { date: '2026-11-12', time: '09:00' });
+  const [bad] = E.normalizeWorkers([Object.assign({}, w, { punch: { date: 'x', time: '99:99' } })]);
+  assert.strictEqual(bad.punch, undefined);
+});
+
 console.log('\n총 ' + passed + '개 단위 테스트 통과!\n');

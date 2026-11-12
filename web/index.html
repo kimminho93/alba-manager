@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611122212">
+  <link rel="stylesheet" href="./style.css?v=202611122303">
 </head>
 <body>
   <header class="app-header">
@@ -32,6 +32,7 @@
       </div>
     </div>
     <div class="header-actions">
+      <button id="lockBtn" class="cloud-btn lock-btn" type="button" hidden>🔒 관리자</button>
       <button id="cloudBtn" class="cloud-btn" type="button" aria-label="구글 시트에 저장 설정">☁️ 구글 저장</button>
       <button id="fontToggle" class="icon-btn font-btn" type="button" aria-label="글자 크게 보기 켜기/끄기" aria-pressed="false">가+</button>
       <button id="themeToggle" class="icon-btn" type="button" aria-label="다크/라이트 모드 전환">🌙</button>
@@ -39,6 +40,7 @@
   </header>
 
   <nav class="tabs" role="tablist">
+    <button class="tab" type="button" role="tab" data-tab="punch" aria-selected="false">⏱️ 출퇴근</button>
     <button class="tab active" type="button" role="tab" data-tab="payroll" aria-selected="true">💰 급여 계산</button>
     <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false">🧼 위생 점검</button>
     <button class="tab" type="button" role="tab" data-tab="settings" aria-selected="false">⚙️ 설정</button>
@@ -46,6 +48,18 @@
   </nav>
 
   <main class="container">
+    <!-- ======================= 출퇴근 (알바생이 이름 → 비밀번호) ======================= -->
+    <section id="tab-punch" class="tab-panel" role="tabpanel">
+      <div class="punch-wrap">
+        <div class="punch-clock">
+          <div id="punchTime" class="punch-time">--:--</div>
+          <div id="punchDate" class="punch-date"></div>
+        </div>
+        <h2 class="punch-title">내 이름을 누르고 비밀번호를 입력하세요</h2>
+        <div id="punchList" class="punch-list"></div>
+      </div>
+    </section>
+
     <!-- ======================= 탭 1: 급여 ======================= -->
     <section id="tab-payroll" class="tab-panel active" role="tabpanel">
       <!-- 폰 전용: 맨 위 알바생 칩 (PC에서는 숨김) -->
@@ -380,6 +394,14 @@
         <h2 class="guide-title">⚙️ 설정</h2>
         <p class="guide-lead">세금·보험료 비율은 해마다 바뀔 수 있습니다. 바뀌면 여기서 고치세요. <b>고치는 즉시 계산에 반영</b>됩니다.</p>
 
+        <h3 class="set-title">관리자 비밀번호 <small id="pinState" class="pin-state"></small></h3>
+        <div class="set-note">정하면 <b>비밀번호를 입력해야 급여 계산·위생 점검·설정·사용 방법</b>을 볼 수 있고, 평소에는 <b>출퇴근 화면만</b> 보입니다. 매장 공용 기기에 두고 알바생이 출퇴근을 찍게 할 때 정해 두세요. 10분 동안 아무것도 안 하면 자동으로 다시 잠깁니다.<br>비밀번호를 잊으면 열 방법이 없으니 <b>구글 저장이나 백업 파일</b>을 꼭 해 두세요.</div>
+        <div class="pin-row">
+          <input id="sAdminPin" type="password" inputmode="text" maxlength="20" autocomplete="new-password" placeholder="새 관리자 비밀번호 (4자 이상)" aria-label="새 관리자 비밀번호">
+          <button id="btnPinSave" type="button" class="btn btn-primary">정하기</button>
+          <button id="btnPinClear" type="button" class="btn btn-ghost">없애기</button>
+        </div>
+
         <h3 class="set-title">최저시급</h3>
         <label class="field set-field"><span>올해 최저시급 (원) <em class="hint">새 알바생을 추가할 때 기본 시급으로 들어갑니다</em></span>
           <input id="sMinWage" type="number" inputmode="numeric" min="0" step="10">
@@ -433,7 +455,7 @@
                 </ul>
               </li>
             </ol>
-            <p class="guide-tip">💡 입력한 내용은 이 기기에 저장됩니다. 구글 시트에 저장하는 방법은 <b>6번</b>을 보세요.</p>
+            <p class="guide-tip">💡 입력한 내용은 이 기기에 저장됩니다. 구글 시트에 저장하는 방법은 <b>6번</b>, 알바생이 직접 출퇴근을 찍게 하는 방법은 <b>9번</b>을 보세요.</p>
           </div>
         </details>
 
@@ -581,6 +603,38 @@
             <p>결과는 참고용입니다. 실제 신고·납부는 세무 전문가나 관할 기관의 기준을 확인하세요.</p>
           </div>
         </details>
+
+        <details class="guide-item">
+          <summary><span class="guide-no">9</span>알바생 출퇴근 찍기 · 관리자 비밀번호</summary>
+          <div class="guide-body">
+            <p>매장에 두는 <b>공용 기기(사장님 폰·태블릿)</b>에서 알바생이 직접 출근·퇴근을 찍게 하는 기능입니다. 찍은 시각은 그대로 달력과 구글 시트에 들어갑니다.</p>
+            <p class="guide-step-title">① 준비 (사장님이 한 번만)</p>
+            <ol>
+              <li>알바생마다 <b>[정산 설정]</b>(컴퓨터는 왼쪽 입력칸)의 <b>"출퇴근 비밀번호"</b>를 정해 줍니다. 비밀번호가 없는 알바생은 출퇴근을 찍을 수 없습니다.</li>
+              <li><b>⚙️ 설정 → 관리자 비밀번호</b>를 정합니다. 그러면 평소에는 <b>⏱️ 출퇴근 화면만</b> 보이고, 급여·위생·설정은 <b>[🔒 관리자]</b>를 눌러 비밀번호를 입력해야 열립니다. 아무것도 안 하면 10분 뒤 자동으로 다시 잠깁니다.</li>
+              <li>비밀번호를 잊으면 열 방법이 없으니 <b>구글 저장이나 백업 파일</b>을 꼭 해 두세요.</li>
+            </ol>
+            <p class="guide-step-title">② 알바생이 찍는 방법</p>
+            <ol>
+              <li>출퇴근 화면에서 <b>내 이름</b>을 누릅니다.</li>
+              <li><b>비밀번호</b>를 입력하고 <b>[출근 찍기]</b>(출근 중이면 <b>[퇴근 찍기]</b>)를 누릅니다.</li>
+              <li>결과 창에 <b>이번 달 일한 일수와 누적 근무시간</b>이 나오고, <b>5초 뒤 자동으로 닫힙니다</b>. 바로 닫으려면 [닫기]를 누르세요.</li>
+            </ol>
+            <figure class="guide-fig"><img src="./img/guide-punch-list.webp" alt="출퇴근 화면 (초록색이 근무 중)" loading="lazy" decoding="async"><figcaption>출퇴근 화면 (초록색이 근무 중)</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-punch-pw.webp" alt="비밀번호 입력" loading="lazy" decoding="async"><figcaption>비밀번호 입력</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-punch-out.webp" alt="퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)" loading="lazy" decoding="async"><figcaption>퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)</figcaption></figure>
+            <p class="guide-step-title">③ 어떻게 기록되나요</p>
+            <ul>
+              <li>출근 중이 아니면 <b>출근</b>, 출근 중이면 <b>퇴근</b>이 찍힙니다. 찍힌 시각이 달력의 그 날 칸에 <b>그대로</b> 들어갑니다. (급여 계산에 바로 반영, 휴게시간은 따로 넣지 않으면 0분)</li>
+              <li>밤을 넘겨 퇴근해도(예: 18:00 출근, 새벽 02:00 퇴근) 출근한 날 칸에 들어갑니다.</li>
+              <li>퇴근을 안 찍고 <b>16시간이 지나면</b> 그 출근은 무시되고, 다음에 찍으면 새 출근이 됩니다. 이런 날은 달력에서 사장님이 직접 고치세요.</li>
+              <li>같은 날 두 번 일하면(점심 후 다시 출근) 한 칸으로 합쳐지고 사이 시간은 휴게로 빠집니다.</li>
+              <li>잘못 찍었거나 안 찍었다면 <b>달력에서 그 날을 눌러 고치면</b> 됩니다.</li>
+              <li>구글 저장을 켜 두었다면 시트의 <b>"출퇴근기록" 탭</b>에 찍은 시각·이름·출근/퇴근·처리결과가 한 줄씩 쌓입니다. 비밀번호를 틀린 기록도 남고, 5번 연속 틀리면 30초 동안 막힙니다.</li>
+            </ul>
+            <p class="guide-tip">💡 알바생 비밀번호는 시트의 "알바생" 탭에도 그대로 보입니다. 다른 곳에서 쓰는 중요한 비밀번호는 쓰지 말고 <b>4자리 숫자</b>처럼 간단한 것으로 정하세요.</p>
+          </div>
+        </details>
       </div>
     </section>
   </main>
@@ -588,6 +642,49 @@
   <footer class="app-footer">
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
   </footer>
+
+  <!-- 출퇴근: 비밀번호 입력 -->
+  <div id="punchPw" class="punch-modal" hidden>
+    <div class="punch-modal-backdrop" data-punch-close></div>
+    <form id="punchPwForm" class="punch-card" autocomplete="off" onsubmit="return false">
+      <div id="punchPwName" class="punch-card-name">-</div>
+      <p id="punchPwState" class="punch-card-state">-</p>
+      <input id="punchPwInput" type="password" maxlength="20" autocomplete="new-password" placeholder="비밀번호" aria-label="비밀번호">
+      <p id="punchPwErr" class="punch-err" role="alert"></p>
+      <div class="punch-btns">
+        <button type="button" class="btn" data-punch-close>취소</button>
+        <button type="submit" id="punchPwOk" class="btn btn-primary">확인</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 출퇴근: 결과 (5초 뒤 자동으로 닫힘) -->
+  <div id="punchResult" class="punch-modal" hidden>
+    <div class="punch-modal-backdrop" data-punch-result-close></div>
+    <div class="punch-card punch-result" role="status">
+      <div id="punchResIcon" class="punch-res-icon" aria-hidden="true">✓</div>
+      <div id="punchResTitle" class="punch-res-title">-</div>
+      <div id="punchResWho" class="punch-res-who">-</div>
+      <div id="punchResStats" class="punch-res-stats"></div>
+      <button type="button" class="btn btn-primary btn-big" data-punch-result-close>닫기</button>
+      <div class="punch-timer"><span id="punchTimerBar"></span></div>
+    </div>
+  </div>
+
+  <!-- 관리자 비밀번호 입력 -->
+  <div id="adminPin" class="punch-modal" hidden>
+    <div class="punch-modal-backdrop" data-admin-close></div>
+    <form id="adminPinForm" class="punch-card" autocomplete="off" onsubmit="return false">
+      <div class="punch-card-name">관리자 비밀번호</div>
+      <p class="punch-card-state">급여 계산·위생 점검·설정을 열려면 입력하세요</p>
+      <input id="adminPinInput" type="password" maxlength="20" autocomplete="new-password" placeholder="비밀번호" aria-label="관리자 비밀번호">
+      <p id="adminPinErr" class="punch-err" role="alert"></p>
+      <div class="punch-btns">
+        <button type="button" class="btn" data-admin-close>취소</button>
+        <button type="submit" class="btn btn-primary">열기</button>
+      </div>
+    </form>
+  </div>
 
   <div id="sheetBackdrop" class="sheet-backdrop" hidden></div>
   <!-- 엑셀로 받을 알바생 고르기 -->
@@ -750,8 +847,8 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611122212"></script>
-  <script src="./gsync.js?v=202611122212"></script>
-  <script src="./app.js?v=202611122212"></script>
+  <script src="./engine.js?v=202611122303"></script>
+  <script src="./gsync.js?v=202611122303"></script>
+  <script src="./app.js?v=202611122303"></script>
 </body>
 </html>
