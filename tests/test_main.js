@@ -239,33 +239,49 @@ test('4대보험 공제 10원 미만 절사 검증', () => {
   assert.strictEqual(r.net, 905960);
 });
 
-console.log('=== [3] 위생·소방 9대 체크리스트 & .xlsx 생성 테스트 ===');
+console.log('=== [3] 위생 점검 41개 항목 체크리스트 & .xlsx 생성 테스트 ===');
 
-test('법정 9대 점검 항목 적합/점검필요 판정', () => {
+test('위생 점검 41개 항목 적합/점검필요 판정', () => {
+  const all = Array.from({ length: 41 }, (_, i) => i + 1);
   const c1 = E.buildChecklist({
-    store: '행복분식',
-    date: '2026-11-11',
-    inspector: '김사장',
-    fridgeTemp: 3.0,
-    freezerTemp: -18.5,
-    check1: true,
-    check2: true,
-    check3: true
+    store: '행복분식', date: '2026-11-11', inspector: '김사장',
+    fridgeTemp: 3.0, freezerTemp: -18.5, checks: all
   });
-  assert.strictEqual(c1.total, 9);
-  assert.strictEqual(c1.passCount, 9);
+  assert.strictEqual(c1.total, 41);
+  assert.strictEqual(c1.passCount, 41);
   assert.strictEqual(c1.allPass, true);
+  assert.strictEqual(c1.items[0].no, 1);
+  assert.strictEqual(c1.items[40].no, 41);
+  assert.ok(c1.items[0].text.indexOf('소비기한') >= 0);
+  assert.ok(c1.items[40].text.indexOf('산가페이퍼') >= 0);
 
-  const c2 = E.buildChecklist({
-    store: '행복분식',
-    fridgeTemp: 8.0,
-    freezerTemp: -18.5,
-    check1: true,
-    check2: true,
-    check3: false
-  });
+  // 3개 항목만 체크 → 나머지는 점검필요
+  const c2 = E.buildChecklist({ checks: [1, 2, 3] });
+  assert.strictEqual(c2.passCount, 3);
+  assert.strictEqual(c2.failCount, 38);
   assert.strictEqual(c2.allPass, false);
-  assert.strictEqual(c2.failCount, 4);
+
+  // 20번(냉장·냉동 온도)은 체크해도 온도가 기준을 벗어나면 점검필요
+  const c3 = E.buildChecklist({ fridgeTemp: 8.0, freezerTemp: -18.5, checks: all });
+  assert.strictEqual(c3.failCount, 1);
+  assert.strictEqual(c3.items[19].ok, false);
+  const c4 = E.buildChecklist({ fridgeTemp: 3, freezerTemp: -10, checks: all });
+  assert.strictEqual(c4.items[19].ok, false);
+
+  // 범위 밖/중복 번호는 무시
+  const c5 = E.buildChecklist({ checks: [1, 1, 0, 42, 'x', 5] });
+  assert.deepStrictEqual(c5.input.checks, [1, 5]);
+});
+
+test('위생 점검 엑셀: 41개 항목 전부 시트에 포함', () => {
+  const c = E.buildChecklist({ store: '행복분식', checks: [1, 2] });
+  const sh = E.checklistSheet(c);
+  const text = JSON.stringify(sh.rows);
+  assert.ok(text.indexOf('산가페이퍼') >= 0);
+  assert.ok(text.indexOf('소방') < 0 && text.indexOf('소화기') < 0);
+  assert.ok(E.checklistFileName(c).indexOf('위생점검표_') === 0);
+  const bytes = E.checklistXlsx(c);
+  assert.strictEqual(bytes[0], 0x50);
 });
 
 test('순수 JS OpenXML .xlsx ZIP 시그니처(PK\\x03\\x04) 검증', () => {

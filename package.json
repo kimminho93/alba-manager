@@ -1,7 +1,7 @@
 {
   "name": "alba-manager",
   "version": "1.0.0",
-  "description": "1초 알바 급여 & 표준 급여명세서 + 위생·소방 법정 체크리스트 (서버 없이 100% 브라우저 동작)",
+  "description": "1초 알바 급여 & 표준 급여명세서 + 매장 위생 점검표 (서버 없이 100% 브라우저 동작)",
   "private": true,
   "scripts": {
     "build": "node tools/build.js",

@@ -4,7 +4,7 @@
  *   - 다크/라이트 모드 전환 (localStorage 저장)
  *   - 탭 1: 1초 알바 급여 & 표준 급여명세서
  *           (월별 실제 주차/달력 자동 반영 + 출퇴근 시각 슬라이더/클릭 선택기 + 주휴수당 + 식대 자동지급)
- *   - 탭 2: 위생 점검 / 소방 안전 법정 체크리스트 + 일별 보관함 + PDF/엑셀 출력
+ *   - 탭 2: 매장 위생 점검 41개 항목 + 일별 보관함 + PDF/엑셀 출력
  */
 (function () {
   'use strict';
@@ -990,7 +990,7 @@
   }
 
   /* ==========================================================
-     탭 2: 위생 점검 / 소방 안전 법정 체크리스트
+     탭 2: 매장 위생 점검 (41개 항목)
      ========================================================== */
   function readChecklistForm() {
     return {
@@ -1000,10 +1000,31 @@
       fridgeTemp: $('cFridge').value === '' ? null : E.toNumber($('cFridge').value, null),
       freezerTemp: $('cFreezer').value === '' ? null : E.toNumber($('cFreezer').value, null),
       memo: $('cMemo').value,
-      check1: $('cCheck1').checked,
-      check2: $('cCheck2').checked,
-      check3: $('cCheck3').checked
+      checks: Array.prototype.map.call(
+        document.querySelectorAll('#chkFormList input[type=checkbox]:checked'),
+        function (el) { return Number(el.value); })
     };
+  }
+
+  /* 점검 항목 체크 목록(왼쪽 입력 폼)을 한 번만 그린다 */
+  function buildChecklistForm() {
+    var html = '';
+    E.CHECKLIST_GROUPS.forEach(function (g) {
+      html += '<section class="chk-form-group"><h4 class="chk-form-title">' + escHtml(g.title) + '</h4>';
+      g.items.forEach(function (it) {
+        html += '<label class="check-item chk-form-item"><input type="checkbox" value="' + it.no + '">' +
+          '<span><b>' + it.no + '.</b> ' + escHtml(it.text) +
+          (it.standard ? '<small class="item-std">' + escHtml(it.standard) + '</small>' : '') +
+          '</span></label>';
+      });
+      html += '</section>';
+    });
+    $('chkFormList').innerHTML = html;
+  }
+
+  function setAllChecks(on) {
+    Array.prototype.forEach.call(document.querySelectorAll('#chkFormList input[type=checkbox]'), function (el) { el.checked = on; });
+    recalcChecklist();
   }
 
   function renderChecklist(c) {
@@ -1020,9 +1041,10 @@
     var banner = $('chkBanner');
     banner.className = 'banner chk-banner ' + (c.allPass ? 'ok' : 'bad');
     $('chkBannerText').textContent = c.allPass
-      ? '✅ 법정 9대 점검 항목 모두 적합합니다.'
-      : '⚠️ 점검필요 항목이 ' + c.failCount + '건 있습니다. 좌측 체크박스 및 온도를 확인하세요.';
+      ? '✅ 위생 점검 ' + c.total + '개 항목 모두 적합합니다.'
+      : '⚠️ 점검필요 항목이 ' + c.failCount + '건 있습니다. 체크하지 않은 항목과 온도를 확인하세요.';
     $('chkScore').textContent = '적합 ' + c.passCount + '/' + c.total;
+    $('chkProgress').textContent = c.input.checks.length + ' / ' + c.total + ' 체크';
 
     $('chkStore').textContent = c.store;
     $('chkDate').textContent = c.date || '-';
@@ -1042,7 +1064,7 @@
         }
         rowsHtml +=
           '<td class="no">' + it.no + '</td>' +
-          '<td>' + escHtml(it.text) + '<span class="item-std">기준: ' + escHtml(it.standard) + '</span></td>' +
+          '<td>' + escHtml(it.text) + (it.standard ? '<span class="item-std">기준: ' + escHtml(it.standard) + '</span>' : '') + '</td>' +
           '<td><span class="result ' + (it.ok ? 'ok' : 'bad') + '">' + escHtml(it.status) + '</span></td>' +
           '<td class="note">' + escHtml(it.note) + '</td>' +
           '</tr>';
@@ -1059,7 +1081,7 @@
           '<span class="chk-item-no">' + it.no + '</span>' +
           '<div class="chk-item-body">' +
             '<div class="chk-item-text">' + escHtml(it.text) + '</div>' +
-            '<div class="chk-item-std">기준: ' + escHtml(it.standard) + (it.note ? ' · ' + escHtml(it.note) : '') + '</div>' +
+            '<div class="chk-item-std">' + (it.standard ? '기준: ' + escHtml(it.standard) + ' · ' : '') + escHtml(it.note) + '</div>' +
           '</div>' +
           '<span class="result ' + (it.ok ? 'ok' : 'bad') + '">' + escHtml(it.status) + '</span>' +
           '</div>';
@@ -1140,9 +1162,6 @@
     }
     if (!$('cStore').value) $('cStore').value = '행복분식 강남점';
     if (!$('cInspector').value) $('cInspector').value = '김사장';
-    $('cCheck1').checked = true;
-    $('cCheck2').checked = true;
-    $('cCheck3').checked = true;
   }
 
   function bindEvents() {
@@ -1447,9 +1466,9 @@
     ['cStore', 'cDate', 'cInspector', 'cFridge', 'cFreezer', 'cMemo'].forEach(function (id) {
       $(id).addEventListener('input', recalcChecklist);
     });
-    ['cCheck1', 'cCheck2', 'cCheck3'].forEach(function (id) {
-      $(id).addEventListener('change', recalcChecklist);
-    });
+    $('chkFormList').addEventListener('change', recalcChecklist);
+    $('btnCheckAll').addEventListener('click', function () { setAllChecks(true); });
+    $('btnCheckNone').addEventListener('click', function () { setAllChecks(false); });
 
     $('btnPrintChk').addEventListener('click', function () { window.print(); });
     $('btnXlsxChk').addEventListener('click', function () {
@@ -1498,6 +1517,7 @@
   syncFontBtn();
   initTabs();
   initTimePickerChips();
+  buildChecklistForm();
   initDefaults();
   bindEvents();
   recalcPayroll();

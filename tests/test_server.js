@@ -66,13 +66,13 @@ function request(port, method, path, body) {
 
     // 4. /api/checklist & /api/checklist/excel
     const ck = await request(port, 'POST', '/api/checklist', {
-      input: { store: '테스트점', check1: true, check2: true, check3: true }
+      input: { store: '테스트점', checks: Array.from({ length: 41 }, (_, i) => i + 1) }
     });
     assert.strictEqual(ck.status, 200);
     assert.strictEqual(JSON.parse(ck.body.toString()).allPass, true);
 
     const cx = await request(port, 'POST', '/api/checklist/excel', {
-      input: { store: '테스트점', check1: true, check2: true, check3: true }
+      input: { store: '테스트점', checks: Array.from({ length: 41 }, (_, i) => i + 1) }
     });
     assert.strictEqual(cx.status, 200);
     assert.strictEqual(cx.body[0], 0x50);

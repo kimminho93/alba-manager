@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="1초 알바 급여·주휴수당·식대 정산 & 표준 급여명세서, 위생·소방 법정 체크리스트 (서버 없이 동작)">
+  <meta name="description" content="1초 알바 급여·주휴수당·식대 정산 & 표준 급여명세서, 위생 점검표 (서버 없이 동작)">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
   <script>
@@ -24,7 +24,7 @@
       <span class="brand-logo">🧾</span>
       <div>
         <h1>사장님 도우미</h1>
-        <p>알바 급여 정산 · 위생/소방 법정 점검</p>
+        <p>알바 급여 정산 · 매장 위생 점검</p>
       </div>
     </div>
     <div class="header-actions">
@@ -36,7 +36,7 @@
 
   <nav class="tabs" role="tablist">
     <button class="tab active" type="button" role="tab" data-tab="payroll" aria-selected="true">💰 급여 계산</button>
-    <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false">🛡️ 위생·소방 점검</button>
+    <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false">🧼 위생 점검</button>
   </nav>
 
   <main class="container">
@@ -396,7 +396,7 @@
       </div>
     </section>
 
-    <!-- ======================= 탭 2: 위생·소방 ======================= -->
+    <!-- ======================= 탭 2: 위생 점검 ======================= -->
     <section id="tab-checklist" class="tab-panel" role="tabpanel">
       <div class="grid">
         <form id="chkForm" class="card input-card" autocomplete="off" onsubmit="return false">
@@ -419,27 +419,29 @@
             </label>
           </div>
 
-          <div class="check-list">
-            <label class="check-item"><input id="cCheck1" type="checkbox"><span><b>①</b> 냉장·냉동 온도 정상 &amp; 소비기한 경과 식재료 없음</span></label>
-            <label class="check-item"><input id="cCheck2" type="checkbox"><span><b>②</b> 개인위생(보건증·위생모) &amp; 조리장·칼·도마 소독 완료</span></label>
-            <label class="check-item"><input id="cCheck3" type="checkbox"><span><b>③</b> 소화기·비상구 확보 &amp; 가스밸브·누전차단기 이상 없음</span></label>
+          <div class="chk-tools">
+            <button id="btnCheckAll" type="button" class="btn">✅ 전체 적합으로 체크</button>
+            <button id="btnCheckNone" type="button" class="btn btn-ghost">전체 해제</button>
+            <span id="chkProgress" class="chk-progress">0 / 41 체크</span>
           </div>
+          <p class="hint-line">문제 없는 항목만 눌러서 체크하세요. 체크하지 않은 항목은 "점검필요"로 표시됩니다.</p>
+          <div id="chkFormList" class="chk-form-list"></div>
 
           <label class="field"><span>특이사항 메모</span>
-            <textarea id="cMemo" rows="3" maxlength="500" placeholder="예) 냉동고 성에 제거 필요, 소화기 교체 예정"></textarea>
+            <textarea id="cMemo" rows="3" maxlength="500" placeholder="예) 냉동고 성에 제거 필요, 손 소독제 교체 예정"></textarea>
           </label>
         </form>
 
         <div class="card preview-card">
           <div id="chkBanner" class="banner chk-banner">
             <p id="chkBannerText">계산 중…</p>
-            <span id="chkScore" class="score">0/9</span>
+            <span id="chkScore" class="score">0/41</span>
           </div>
 
           <div class="doc" id="chkDoc">
             <div class="doc-head">
-              <h3>위생 점검 / 소방 안전 체크리스트</h3>
-              <span class="doc-law">법정 9대 점검 항목</span>
+              <h3>매장 위생 점검표</h3>
+              <span class="doc-law">위생 점검 41개 항목</span>
             </div>
             <table class="doc-info">
               <tr><th>매장명</th><td id="chkStore">-</td><th>점검일자</th><td id="chkDate">-</td></tr>
@@ -468,7 +470,7 @@
 
       <div class="card archive">
         <div class="archive-head">
-          <h2 class="card-title">🗂️ 일별 위생·소방 점검 보관함 <span id="archiveCount" class="count">0일</span></h2>
+          <h2 class="card-title">🗂️ 일별 위생 점검 보관함 <span id="archiveCount" class="count">0일</span></h2>
           <div class="archive-actions">
             <button id="btnArchiveXlsx" type="button" class="btn">📊 보관함 일괄 엑셀(.xlsx) 다운로드</button>
             <button id="btnArchiveClear" type="button" class="btn btn-ghost">비우기</button>

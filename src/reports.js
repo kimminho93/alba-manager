@@ -429,12 +429,12 @@
     return '알바_정산명단' + pm + '_' + results.length + '명.xlsx';
   }
 
-  /* ---------------- 위생·소방 점검 ---------------- */
+  /* ---------------- 위생 점검 ---------------- */
 
   function checklistSheet(c, name) {
     var rows = [];
-    rows.push([TITLE('위생 점검 / 소방 안전 법정 체크리스트')]);
-    rows.push([P('식품위생법 · 화재예방법 · 액화석유가스법 기준 자율 점검표')]);
+    rows.push([TITLE('매장 위생 점검표 (41개 항목)')]);
+    rows.push([P('문제 없는 항목은 적합(O), 그 외는 점검필요(X)로 표시됩니다')]);
     rows.push([]);
     rows.push([H('매장명(상호)'), T(c.store), T(''), H('점검일자'), T(c.date || '-'), T('')]);
     rows.push([H('점검자'), T(c.inspector), T(''), H('종합 결과'), { v: '적합 ' + c.passCount + '/' + c.total + ' · ' + c.verdict, s: c.allPass ? 'ok' : 'bad' }, { v: '', s: c.allPass ? 'ok' : 'bad' }]);
@@ -461,7 +461,7 @@
   function checklistArchiveSheet(results) {
     var s = M.summarizeChecklists(results);
     var rows = [];
-    rows.push([TITLE('일별 위생·소방 점검 보관함')]);
+    rows.push([TITLE('일별 위생 점검 보관함')]);
     rows.push([P('총 ' + s.count + '일 · 전 항목 적합 ' + s.allPassDays + '일 · 평균 적합률 ' + s.avgPassRate + '%')]);
     rows.push([]);
     rows.push([H('No'), H('점검일자'), H('매장명'), H('점검자'), H('냉장(°C)'), H('냉동(°C)'), H('적합 항목'), H('결과'), H('점검필요 항목'), H('특이사항')]);
@@ -490,11 +490,11 @@
   }
 
   function checklistFileName(c) {
-    return '위생소방점검표_' + safeFilePart(c.input && c.input.store ? c.input.store : '매장') + (c.date ? '_' + c.date : '') + '.xlsx';
+    return '위생점검표_' + safeFilePart(c.input && c.input.store ? c.input.store : '매장') + (c.date ? '_' + c.date : '') + '.xlsx';
   }
 
   function archiveFileName(results) {
-    return '위생소방_점검보관함_' + results.length + '일.xlsx';
+    return '위생_점검보관함_' + results.length + '일.xlsx';
   }
 
   return {

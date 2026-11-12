@@ -902,6 +902,22 @@ textarea {
   background: var(--ok-weak);
 }
 
+.chk-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+.chk-progress { margin-left: auto; font-weight: 800; font-size: 16px; }
+.hint-line { margin: 4px 0 10px; font-size: 14px; color: var(--muted); }
+.chk-form-list { display: flex; flex-direction: column; gap: 14px; margin: 0 0 14px; }
+.chk-form-group { display: flex; flex-direction: column; gap: 6px; }
+.chk-form-title { margin: 0; font-size: 16px; font-weight: 800; padding: 2px 2px 0; }
+.chk-form-item { font-size: 16px; line-height: 1.45; word-break: keep-all; }
+.chk-form-item input { width: 24px; height: 24px; flex: none; margin-top: 1px; }
+.chk-form-item .item-std { display: block; margin-top: 3px; font-size: 14px; color: var(--muted); }
+
 .temp-hint {
   font-size: 14px;
   font-weight: 600;
