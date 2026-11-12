@@ -248,7 +248,20 @@
     return t.getFullYear() + '-' + (t.getMonth() + 1 < 10 ? '0' : '') + (t.getMonth() + 1);
   }
 
+  /** 설정(세율·보험료율·최저시급) 검사: 이상한 값은 기본값으로 */
+  var DEFAULT_MIN_WAGE = 10320;
+  function sanitizeSettings(raw) {
+    raw = isObj(raw) ? raw : {};
+    var mw = Math.round(Number(raw.minWage));
+    return {
+      minWage: isFinite(mw) && mw > 0 && mw < 1000000 ? mw : DEFAULT_MIN_WAGE,
+      rates: P.sanitizeRates(raw.rates)
+    };
+  }
+
   return {
+    DEFAULT_MIN_WAGE: DEFAULT_MIN_WAGE,
+    sanitizeSettings: sanitizeSettings,
     DEFAULT_SETTINGS: DEFAULT_SETTINGS,
     RETAIN_MONTHS: RETAIN_MONTHS,
     emptyShifts: emptyShifts,

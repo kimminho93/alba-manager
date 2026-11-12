@@ -1925,3 +1925,11 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .75; }
   .add-worker .btn { grid-column: 1 / -1; }
   .add-worker .field:first-child { grid-column: 1 / -1; }
 }
+
+/* ---------- 설정 탭 ---------- */
+.settings { max-width: 760px; margin: 0 auto; }
+.set-title { margin: 22px 0 8px; font-size: 1.1em; }
+.set-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.set-field input { width: 100%; font-size: 18px; min-height: 48px; }
+.set-note { margin: 18px 0 12px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2, rgba(120,140,200,.08)); font-size: 14.5px; line-height: 1.6; }
+@media (max-width: 560px) { .set-grid { grid-template-columns: 1fr; } }

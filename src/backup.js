@@ -32,7 +32,8 @@
         workers: Array.isArray(data.workers) ? data.workers : [],
         archive: Array.isArray(data.archive) ? data.archive : [],
         presets: Array.isArray(data.presets) ? data.presets : [],
-        store: isObj(data.store) ? data.store : {}
+        store: isObj(data.store) ? data.store : {},
+        settings: W.sanitizeSettings(data.settings)
       }
     }, null, 2);
   }
@@ -77,7 +78,7 @@
 
     return {
       ok: true,
-      data: { workers: okRoster, archive: okArchive, presets: okPresets, store: okStore },
+      data: { workers: okRoster, archive: okArchive, presets: okPresets, store: okStore, settings: W.sanitizeSettings(d.settings) },
       counts: { workers: okRoster.length, archive: okArchive.length, skipped: (legacy ? 0 : rawList.length - okRoster.length) + (archive.length - okArchive.length) },
       exportedAt: typeof obj.exportedAt === 'string' ? obj.exportedAt : ''
     };

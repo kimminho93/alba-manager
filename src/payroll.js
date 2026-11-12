@@ -39,6 +39,28 @@
     'none': '미적용 (0%)'
   };
 
+  /* 세율·보험료율 (%) — 해마다 바뀔 수 있어 앱의 [설정] 탭에서 고칠 수 있다 */
+  var DEFAULT_RATES = { incomeTax: 3, localTax: 10, pension: 4.5, health: 3.545, care: 12.95, employment: 0.9 };
+  var RATES = Object.assign({}, DEFAULT_RATES);
+
+  /** 입력값을 검사해 정상 범위(0~100%, 소수 3자리)의 숫자만 남긴 세율 객체를 돌려준다 */
+  function sanitizeRates(raw) {
+    var out = Object.assign({}, DEFAULT_RATES);
+    if (raw && typeof raw === 'object') {
+      Object.keys(DEFAULT_RATES).forEach(function (k) {
+        var v = raw[k];
+        if (v === '' || v === null || v === undefined) return;
+        v = Number(v);
+        if (isFinite(v) && v >= 0 && v <= 100) out[k] = Math.round(v * 1000) / 1000;
+      });
+    }
+    return out;
+  }
+  function setRates(raw) { RATES = sanitizeRates(raw); return Object.assign({}, RATES); }
+  function getRates() { return Object.assign({}, RATES); }
+  function pct(v) { return String(Math.round(v * 1000) / 1000); }
+  function bp(v) { return Math.round(v * 1000); }   // % → rateTrunc10 단위(1% = 1000)
+
   var won = M.formatWon;
   function fmtH(h) { return M.formatNum(h, 2); }
 
@@ -225,25 +247,27 @@
 
   function calcTax(type, gross) {
     var lines = [];
+    var R = RATES;
     if (type === '3.3') {
-      var income = M.rateTrunc10(gross, 3000);
-      var local = M.rateTrunc10(income, 10000);
-      lines.push({ key: 'incomeTax', label: '소득세 (3%)', amount: income, formula: won(gross) + '원 × 3% → 10원 미만 절사' });
-      lines.push({ key: 'localTax', label: '지방소득세 (소득세의 10%)', amount: local, formula: won(income) + '원 × 10% → 10원 미만 절사' });
+      var income = M.rateTrunc10(gross, bp(R.incomeTax));
+      var local = M.rateTrunc10(income, bp(R.localTax));
+      lines.push({ key: 'incomeTax', label: '소득세 (' + pct(R.incomeTax) + '%)', amount: income, formula: won(gross) + '원 × ' + pct(R.incomeTax) + '% → 10원 미만 절사' });
+      lines.push({ key: 'localTax', label: '지방소득세 (소득세의 ' + pct(R.localTax) + '%)', amount: local, formula: won(income) + '원 × ' + pct(R.localTax) + '% → 10원 미만 절사' });
     } else if (type === '4ins') {
-      var pension = M.rateTrunc10(gross, 4500);
-      var health = M.rateTrunc10(gross, 3545);
-      var care = M.rateTrunc10(health, 12950);
-      var employ = M.rateTrunc10(gross, 900);
-      lines.push({ key: 'pension', label: '국민연금 (4.5%)', amount: pension, formula: won(gross) + '원 × 4.5% → 10원 미만 절사' });
-      lines.push({ key: 'health', label: '건강보험 (3.545%)', amount: health, formula: won(gross) + '원 × 3.545% → 10원 미만 절사' });
-      lines.push({ key: 'care', label: '장기요양보험 (건보의 12.95%)', amount: care, formula: won(health) + '원 × 12.95% → 10원 미만 절사' });
-      lines.push({ key: 'employment', label: '고용보험 (0.9%)', amount: employ, formula: won(gross) + '원 × 0.9% → 10원 미만 절사' });
+      var pension = M.rateTrunc10(gross, bp(R.pension));
+      var health = M.rateTrunc10(gross, bp(R.health));
+      var care = M.rateTrunc10(health, bp(R.care));
+      var employ = M.rateTrunc10(gross, bp(R.employment));
+      lines.push({ key: 'pension', label: '국민연금 (' + pct(R.pension) + '%)', amount: pension, formula: won(gross) + '원 × ' + pct(R.pension) + '% → 10원 미만 절사' });
+      lines.push({ key: 'health', label: '건강보험 (' + pct(R.health) + '%)', amount: health, formula: won(gross) + '원 × ' + pct(R.health) + '% → 10원 미만 절사' });
+      lines.push({ key: 'care', label: '장기요양보험 (건보의 ' + pct(R.care) + '%)', amount: care, formula: won(health) + '원 × ' + pct(R.care) + '% → 10원 미만 절사' });
+      lines.push({ key: 'employment', label: '고용보험 (' + pct(R.employment) + '%)', amount: employ, formula: won(gross) + '원 × ' + pct(R.employment) + '% → 10원 미만 절사' });
     } else {
       lines.push({ key: 'none', label: '세금 공제', amount: 0, formula: '세금 미적용 (0%) → 0원' });
     }
     var total = lines.reduce(function (s, l) { return s + l.amount; }, 0);
-    return { type: type, label: TAX_TYPES[type], lines: lines, total: total };
+    var label = type === '3.3' ? pct(Math.round(R.incomeTax * (1 + R.localTax / 100) * 1000) / 1000) + '% (사업소득세)' : TAX_TYPES[type];
+    return { type: type, label: label, lines: lines, total: total };
   }
 
   function payMonthLabel(pm) {
@@ -535,6 +559,10 @@
     weeklyAllowanceFor: weeklyAllowanceFor,
     lateDeductionFor: lateDeductionFor,
     calcTax: calcTax,
+    DEFAULT_RATES: DEFAULT_RATES,
+    sanitizeRates: sanitizeRates,
+    setRates: setRates,
+    getRates: getRates,
     calculatePayroll: calculatePayroll
   };
 });

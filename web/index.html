@@ -41,6 +41,7 @@
   <nav class="tabs" role="tablist">
     <button class="tab active" type="button" role="tab" data-tab="payroll" aria-selected="true">💰 급여 계산</button>
     <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false">🧼 위생 점검</button>
+    <button class="tab" type="button" role="tab" data-tab="settings" aria-selected="false">⚙️ 설정</button>
     <button class="tab" type="button" role="tab" data-tab="guide" aria-selected="false">📖 사용 방법</button>
   </nav>
 
@@ -75,7 +76,7 @@
             </div>
           </div>
 
-          <label class="field"><span>시급 (원) <em class="hint">2026 최저시급 10,320원</em></span>
+          <label class="field"><span>시급 (원) <em class="hint" id="minWageHint">2026 최저시급 10,320원</em></span>
             <input id="pWage" type="number" inputmode="numeric" min="0" step="10" value="10320">
           </label>
 
@@ -460,6 +461,36 @@
       </div>
     </section>
 
+    <!-- ======================= 설정 ======================= -->
+    <section id="tab-settings" class="tab-panel" role="tabpanel">
+      <div class="card settings">
+        <h2 class="guide-title">⚙️ 설정</h2>
+        <p class="guide-lead">세금·보험료 비율은 해마다 바뀔 수 있습니다. 바뀌면 여기서 고치세요. <b>고치는 즉시 계산에 반영</b>됩니다.</p>
+
+        <h3 class="set-title">최저시급</h3>
+        <label class="field set-field"><span>올해 최저시급 (원) <em class="hint">새 알바생을 추가할 때 기본 시급으로 들어갑니다</em></span>
+          <input id="sMinWage" type="number" inputmode="numeric" min="0" step="10">
+        </label>
+
+        <h3 class="set-title">3.3% 공제 (사업소득세)</h3>
+        <div class="set-grid">
+          <label class="field set-field"><span>소득세 (%)</span><input id="sRate_incomeTax" type="number" inputmode="decimal" min="0" max="100" step="0.001"></label>
+          <label class="field set-field"><span>지방소득세 (소득세의 %)</span><input id="sRate_localTax" type="number" inputmode="decimal" min="0" max="100" step="0.001"></label>
+        </div>
+
+        <h3 class="set-title">4대보험 (근로자 부담분)</h3>
+        <div class="set-grid">
+          <label class="field set-field"><span>국민연금 (%)</span><input id="sRate_pension" type="number" inputmode="decimal" min="0" max="100" step="0.001"></label>
+          <label class="field set-field"><span>건강보험 (%)</span><input id="sRate_health" type="number" inputmode="decimal" min="0" max="100" step="0.001"></label>
+          <label class="field set-field"><span>장기요양보험 (건강보험료의 %)</span><input id="sRate_care" type="number" inputmode="decimal" min="0" max="100" step="0.001"></label>
+          <label class="field set-field"><span>고용보험 (%)</span><input id="sRate_employment" type="number" inputmode="decimal" min="0" max="100" step="0.001"></label>
+        </div>
+
+        <p class="set-note">처음 들어 있는 값은 이 앱을 만들 때 기준이며 <b>매년 달라질 수 있습니다</b>. 정확한 비율은 국세청·국민연금공단·건강보험공단 안내를 확인해 주세요. 주휴수당 기준(주 15시간, 최대 40시간)은 법으로 정해진 값이라 바꾸지 않습니다.</p>
+        <button id="btnSettingsReset" type="button" class="btn btn-ghost">처음 값으로 되돌리기</button>
+      </div>
+    </section>
+
     <!-- ======================= 탭 3: 사용 방법 ======================= -->
     <section id="tab-guide" class="tab-panel" role="tabpanel">
       <div class="card guide">
@@ -605,6 +636,8 @@
         <details class="guide-item">
           <summary><span class="guide-no">8</span>자주 묻는 질문</summary>
           <div class="guide-body">
+            <p class="guide-q">세금이나 4대보험 비율이 바뀌었어요.</p>
+            <p>위쪽 <b>⚙️ 설정</b> 탭에서 소득세·국민연금·건강보험 등의 비율과 최저시급을 고치면 바로 계산에 반영됩니다. 처음 값으로 되돌릴 수도 있습니다.</p>
             <p class="guide-q">기록이 사라졌어요.</p>
             <p>기록은 사용 중인 브라우저에 저장됩니다. 브라우저의 "인터넷 사용 기록/사이트 데이터 삭제"를 하면 같이 지워집니다. 구글 연동이나 백업 파일이 있다면 [☁️ 구글 저장] 창에서 불러오세요.</p>
             <p class="guide-q">가게 공용 컴퓨터에서 써도 되나요?</p>

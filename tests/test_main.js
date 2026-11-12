@@ -390,6 +390,36 @@ test('백업 파일: 내려받기 → 불러오기로 기록이 그대로 복원
   assert.deepStrictEqual(rb.data.store, { store: '', inspector: '' });
 });
 
+test('설정: 세율·보험료율을 바꾸면 공제 계산이 바뀌고, 이상한 값은 기본값으로, 백업에도 포함', () => {
+  try {
+    assert.strictEqual(E.calcTax('3.3', 1000000).total, 33000);
+    E.setRates({ incomeTax: 2, localTax: 10 });
+    const t = E.calcTax('3.3', 1000000);
+    assert.strictEqual(t.total, 22000);
+    assert.ok(t.label.indexOf('2.2%') === 0);
+    assert.ok(t.lines[0].label.indexOf('2%') > 0);
+    E.setRates({ pension: 5, health: 4, care: 10, employment: 1 });
+    const i = E.calcTax('4ins', 1000000);
+    assert.strictEqual(i.total, 50000 + 40000 + 4000 + 10000);
+    // 이상한 값은 기본값 유지
+    const r = E.sanitizeRates({ pension: 'abc', health: -3, care: 500, employment: '' , incomeTax: '2.5'});
+    assert.strictEqual(r.pension, 4.5); assert.strictEqual(r.health, 3.545); assert.strictEqual(r.care, 12.95);
+    assert.strictEqual(r.incomeTax, 2.5);
+    // 설정 + 백업
+    const st = E.sanitizeSettings({ minWage: '11000', rates: { pension: 5 } });
+    assert.strictEqual(st.minWage, 11000); assert.strictEqual(st.rates.pension, 5);
+    assert.strictEqual(E.sanitizeSettings({ minWage: -1 }).minWage, 10320);
+    const back = E.parseBackup(E.buildBackup({ workers: [], archive: [], presets: [], store: {}, settings: st }));
+    assert.strictEqual(back.data.settings.minWage, 11000);
+    assert.strictEqual(back.data.settings.rates.pension, 5);
+    // 설정이 없는 예전 백업은 기본값
+    const old = E.parseBackup(JSON.stringify({ app: 'alba-manager', version: 1, data: { roster: [] } }));
+    assert.strictEqual(old.data.settings.rates.pension, 4.5);
+  } finally {
+    E.setRates({});   // 다른 테스트에 영향 없도록 처음 값으로
+  }
+});
+
 test('순수 JS OpenXML .xlsx ZIP 시그니처(PK\\x03\\x04) 검증', () => {
   const r = E.calculatePayroll({ name: '철수', hourlyWage: 10000, totalHours: 60, includeMeal: true, mealDays: 15, mealAmount: 8000 });
   const bytes = E.payrollSlipXlsx(r);

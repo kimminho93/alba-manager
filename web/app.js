@@ -20,13 +20,20 @@
     bigFont: 'alba.bigFont',
     roster: 'alba.roster.v1',        // 예전 형식(정산 명단) — 새 형식으로 옮기기 위해서만 읽음
     workers: 'alba.workers.v2',
+    settings: 'alba.settings.v1',
     archive: 'alba.archive.v1',
     store: 'alba.store.v1',
     presets: 'alba.timePresets.v1'
   };
 
   var SYNC_KEYS = {};
-  SYNC_KEYS[KEYS.workers] = SYNC_KEYS[KEYS.archive] = SYNC_KEYS[KEYS.store] = SYNC_KEYS[KEYS.presets] = true;
+  SYNC_KEYS[KEYS.settings] = SYNC_KEYS[KEYS.workers] = SYNC_KEYS[KEYS.archive] = SYNC_KEYS[KEYS.store] = SYNC_KEYS[KEYS.presets] = true;
+
+  function loadSettings() {
+    var st = E.sanitizeSettings(loadJson(KEYS.settings, {}));
+    E.setRates(st.rates);   // 계산에 쓰이는 세율을 먼저 맞춘다
+    return st;
+  }
 
   function loadWorkers() {
     var list = loadJson(KEYS.workers, null);
@@ -44,6 +51,7 @@
     serverAvailable: false,
     payroll: null,
     checklist: null,
+    settings: loadSettings(),
     workers: loadWorkers(),
     selId: '',          // 지금 달력에 불러온 알바생
     archive: loadJson(KEYS.archive, []),
@@ -817,6 +825,46 @@
     renderPayroll(r);
   }
 
+  /* ---------- 설정 (세율·보험료율·최저시급) ---------- */
+  var RATE_KEYS = ['incomeTax', 'localTax', 'pension', 'health', 'care', 'employment'];
+
+  function fillSettingsForm() {
+    $('sMinWage').value = state.settings.minWage;
+    RATE_KEYS.forEach(function (k) { $('sRate_' + k).value = state.settings.rates[k]; });
+  }
+
+  /* 설정을 계산·화면에 반영 */
+  function applySettings() {
+    E.setRates(state.settings.rates);
+    var mw = state.settings.minWage;
+    $('minWageHint').textContent = '최저시급 ' + E.formatWon(mw) + '원';
+    $('awWage').value = mw;
+    var r = state.settings.rates;
+    var eff = Math.round(r.incomeTax * (1 + r.localTax / 100) * 1000) / 1000;
+    var lab = document.querySelector('input[name="pTax"][value="3.3"] + span');
+    if (lab) lab.textContent = eff + '%';
+    fillSettingsForm();
+    recalcPayroll();
+    renderRoster();
+  }
+
+  function onSettingsInput() {
+    var raw = { minWage: $('sMinWage').value, rates: {} };
+    RATE_KEYS.forEach(function (k) { raw.rates[k] = $('sRate_' + k).value; });
+    state.settings = E.sanitizeSettings(raw);
+    saveJson(KEYS.settings, state.settings);
+    E.setRates(state.settings.rates);
+    // 입력 중인 칸은 그대로 두고 계산 결과만 갱신
+    var r = state.settings.rates;
+    var eff = Math.round(r.incomeTax * (1 + r.localTax / 100) * 1000) / 1000;
+    var lab = document.querySelector('input[name="pTax"][value="3.3"] + span');
+    if (lab) lab.textContent = eff + '%';
+    $('minWageHint').textContent = '최저시급 ' + E.formatWon(state.settings.minWage) + '원';
+    $('awWage').value = state.settings.minWage;
+    recalcPayroll();
+    renderRoster();
+  }
+
   /* ---------- 알바생 중심 기록: 선택 / 불러오기 / 자동 저장 ---------- */
   function selWorker() {
     for (var i = 0; i < state.workers.length; i++) if (state.workers[i].id === state.selId) return state.workers[i];
@@ -835,6 +883,7 @@
     var w = selWorker();
     var pm = $('pMonth').value;
     var s = E.workerSettings(w, pm);
+    if (!w) s.wage = state.settings.minWage;
     $('pName').value = w ? w.name : '';
     $('pName').disabled = !w;
     $('noWorkerNote').hidden = !!w;
@@ -1382,6 +1431,19 @@
       var r = state.payroll || E.calculatePayroll(readPayrollForm());
       downloadXlsx('./api/payroll/excel', { input: r.input }, function () { return E.payrollSlipXlsx(r); }, E.payrollFileName(r));
     });
+    // 설정 탭
+    ['sMinWage'].concat(RATE_KEYS.map(function (k) { return 'sRate_' + k; })).forEach(function (id) {
+      $(id).addEventListener('input', onSettingsInput);
+      $(id).addEventListener('blur', fillSettingsForm);   // 비우거나 잘못 넣었으면 적용된 값으로 되돌려 보여줌
+    });
+    $('btnSettingsReset').addEventListener('click', function () {
+      if (!window.confirm('세금·보험료 비율과 최저시급을 처음 값으로 되돌릴까요?')) return;
+      state.settings = E.sanitizeSettings({});
+      saveJson(KEYS.settings, state.settings);
+      applySettings();
+      showToast('처음 값으로 되돌렸습니다.');
+    });
+
     // 알바생 추가: 이름 + 계약서상 주 몇 일 + 시급 → 명단에 한 줄 생기고 바로 선택됨
     $('addWorkerForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
@@ -1524,7 +1586,8 @@
       workers: state.workers,
       archive: state.archive,
       presets: presetState.list,
-      store: loadJson(KEYS.store, {})
+      store: loadJson(KEYS.store, {}),
+      settings: state.settings
     };
   }
 
@@ -1597,6 +1660,7 @@
         if (d.store.store) $('cStore').value = d.store.store;
         if (d.store.inspector) $('cInspector').value = d.store.inspector;
       }
+      if (d.settings) { state.settings = E.sanitizeSettings(d.settings); saveJson(KEYS.settings, state.settings); applySettings(); }
       if (!selWorker()) state.selId = state.workers.length ? state.workers[0].id : '';
       loadSelected();
       recalcPayroll();
@@ -1754,6 +1818,7 @@
   buildChecklistForm();
   initDefaults();
   bindEvents();
+  applySettings();
   recalcPayroll();
   recalcChecklist();
   renderRoster();
