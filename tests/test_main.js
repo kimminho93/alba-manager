@@ -144,6 +144,60 @@ test('월별 실제 달력 주차(buildMonthCalendar) & 출퇴근 시각(calcShi
   assert.strictEqual(r.weeks.length, 6);
 });
 
+test('주 5일 약속인데 4일만 출근한 주는 주휴수당 없음 (일별 모드)', () => {
+  // 4주 모두 월~목 5시간(4일 = 20시간, 15h 이상이지만 약속한 5일 미충족) -> 주휴 0원
+  const dailyHours = [];
+  for (let w = 0; w < 4; w++) dailyHours.push(5, 5, 5, 5, 0, 0, 0);
+  const base = { name: '현수', hourlyWage: 10000, mode: 'daily', dailyHours, includeWeekly: true, tax: 'none' };
+  const absent = E.calculatePayroll(Object.assign({ contractDays: 5 }, base));
+  assert.strictEqual(absent.weeklyAllowance, 0);
+  assert.ok(absent.weeks.every((w) => w.absent && !w.eligible && w.hoursOk && w.workDays === 4));
+  // 약속일수를 4일로 하면 개근이므로 주휴 지급
+  const ok = E.calculatePayroll(Object.assign({ contractDays: 4 }, base));
+  assert.ok(ok.weeklyAllowance > 0);
+  assert.ok(ok.weeks.every((w) => w.eligible && !w.absent));
+  // 기본값(5일)은 contractDays 생략과 동일
+  assert.strictEqual(E.calculatePayroll(base).weeklyAllowance, 0);
+});
+
+test('결근이 있어도 그 주만 "주휴 지급"으로 예외 처리 가능 (공휴일·사장님 사정)', () => {
+  const dailyHours = [];
+  for (let w = 0; w < 4; w++) dailyHours.push(5, 5, 5, 5, 0, 0, 0);
+  const r = E.calculatePayroll({
+    name: '현수', hourlyWage: 10000, mode: 'daily', dailyHours, includeWeekly: true, tax: 'none',
+    contractDays: 5, weekExcuse: [false, true, false, false]
+  });
+  assert.strictEqual(r.weeks[1].excused, true);
+  assert.strictEqual(r.weeks[1].eligible, true);
+  assert.ok(r.weeks[1].allowance > 0);
+  assert.strictEqual(r.weeks[0].allowance, 0);
+  assert.strictEqual(r.weeklyAllowance, r.weeks[1].allowance);
+});
+
+test('주차별 모드: 주별 "결근 있음" 체크한 주는 주휴 제외, 15h 미만 사유와 구분', () => {
+  const r = E.calculatePayroll({
+    name: '민아', hourlyWage: 10000, mode: 'weekly', weekHours: [20, 20, 10, 20], includeWeekly: true, tax: 'none',
+    weekAbsent: [false, true, false, false]
+  });
+  assert.strictEqual(r.weeks[0].eligible, true);
+  assert.strictEqual(r.weeks[1].eligible, false);
+  assert.strictEqual(r.weeks[1].hoursOk, true);   // 시간은 충족, 결근 때문에 제외
+  assert.strictEqual(r.weeks[2].hoursOk, false);  // 15h 미만
+  assert.ok(/결근 제외/.test(r.rows.find((x) => x.label === '주휴수당').detail));
+});
+
+test('월 경계의 7일 미만 주는 결근 판정에서 제외 (15시간 조건만 적용)', () => {
+  const r = E.calculatePayroll({
+    name: '월경계', hourlyWage: 10000, mode: 'daily', includeWeekly: true, tax: 'none', contractDays: 5,
+    payMonth: '2026-11',
+    dailyShifts: Array.from({ length: 30 }, () => ({ off: false, start: '09:00', end: '14:00', breakMinutes: 0 }))
+  });
+  // 2026-11: 1주차(11/1 일요일 1일), 6주차(11/30 월요일 1일)는 7일 미만
+  assert.strictEqual(r.weeks[0].partial, true);
+  assert.strictEqual(r.weeks[0].absent, false);
+  assert.strictEqual(r.weeks[r.weeks.length - 1].partial, true);
+});
+
 test('주휴수당 포함 체크 해제 시 주휴수당 0원', () => {
   const r = E.calculatePayroll({
     name: '영희',

@@ -30,6 +30,7 @@
   var WEEKLY_CAP_HOURS = 40;
   var WEEKLY_PAID_HOURS = 8;
   var DEFAULT_MEAL_MIN_HOURS = 4;
+  var DEFAULT_CONTRACT_DAYS = 5; // 주 소정근로일 기본값 (주휴수당 개근 판정용)
   var DEFAULT_MEAL_AMOUNT = 8000;
 
   var TAX_TYPES = {
@@ -171,6 +172,16 @@
 
     var mode = raw.mode === 'daily' ? 'daily' : (raw.mode === 'weekly' ? 'weekly' : 'total');
 
+    // 주휴수당 개근 조건: 주 소정근로일(약속한 출근 일수). 이보다 적게 출근한 주는 주휴수당 없음
+    var contractDays = Math.min(7, Math.max(1, Math.round(M.toNumber(raw.contractDays, DEFAULT_CONTRACT_DAYS))));
+    // weekAbsent: (주차별/월합계 모드) 주별 "결근 있음" 수동 체크 / weekExcuse: 결근이 있어도 그 주는 주휴 지급(공휴일·사장님 사정 등)
+    var weekAbsent = [];
+    var weekExcuse = [];
+    for (var wb = 0; wb < 6; wb++) {
+      weekAbsent.push(Array.isArray(raw.weekAbsent) ? toBool(raw.weekAbsent[wb], false) : false);
+      weekExcuse.push(Array.isArray(raw.weekExcuse) ? toBool(raw.weekExcuse[wb], false) : false);
+    }
+
     var mealMinHours = raw.mealMinHours === undefined || raw.mealMinHours === null || raw.mealMinHours === ''
       ? DEFAULT_MEAL_MIN_HOURS
       : Math.max(0, M.toNumber(raw.mealMinHours, DEFAULT_MEAL_MIN_HOURS));
@@ -186,6 +197,9 @@
       payMonth: payMonth,
       hourlyWage: Math.max(0, Math.round(M.toNumber(raw.hourlyWage, 0))),
       mode: mode,
+      contractDays: contractDays,
+      weekAbsent: weekAbsent,
+      weekExcuse: weekExcuse,
       totalHours: Math.max(0, M.toNumber(raw.totalHours, 0)),
       weekHours: weekHours,
       dailyHours: dailyHours,
@@ -251,15 +265,17 @@
       var elig = r.weeks.filter(function (w) { return w.eligible; });
       weeklyDetail = elig.length
         ? r.weeks.map(function (w) {
-            return w.week + '주 ' + fmtH(w.hours) + 'h' + (w.eligible ? ' → ' + won(w.allowance) + '원' : ' (15h 미만 제외)');
+            return w.week + '주 ' + fmtH(w.hours) + 'h' + (w.eligible
+              ? ' → ' + won(w.allowance) + '원' + (w.excused ? ' (결근 있으나 지급)' : '')
+              : (!w.hoursOk ? ' (15h 미만 제외)' : ' (결근 제외' + (w.workDays !== null ? ': ' + w.workDays + '/' + w.contractDays + '일 출근' : '') + ')'));
           }).join(' / ')
-        : '주 15시간 이상 근무한 주가 없어 0원';
+        : '주 15시간 이상 개근한 주가 없어 0원';
     }
     rows.push({
       kind: 'pay', section: '지급', label: '주휴수당', amount: r.weeklyAllowance, sign: 1,
       badge: r.includeWeekly ? '포함' : '미포함',
       formula: r.includeWeekly
-        ? '주 15h 이상인 주: (min(주시간, 40) ÷ 40) × 8시간 × ' + won(r.hourlyWage) + '원'
+        ? '주 15h 이상 + 약속한 출근일 개근한 주: (min(주시간, 40) ÷ 40) × 8시간 × ' + won(r.hourlyWage) + '원'
         : '주휴수당 미포함으로 정산 → 0원',
       detail: weeklyDetail
     });
@@ -338,18 +354,26 @@
     var daysDetail = [];
     var workDays = 0;
     var dailyMealDays = 0;
+    var weekWorkDays = [];  // 주차별 실제 출근일 수 (일별 모드)
+    var weekCalDays = [];   // 주차별로 해당 월에 포함된 날짜 수 (7일 미만이면 월 경계 주)
 
     if (inp.dailyShifts && inp.dailyShifts.length > 0) {
       // 실제 월별 달력(28~31일, 4~6주차) + 출퇴근 시각(start~end) 기반 계산
       for (var w = 0; w < cal.weekCount; w++) {
         weekHours.push(0);
         weekMealDays.push(0);
+        weekWorkDays.push(0);
+        weekCalDays.push(0);
       }
       cal.days.forEach(function (cd, idx) {
         var sh = inp.dailyShifts[idx] || { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
         var h = sh.off ? 0 : calcShiftHours(sh.start, sh.end, sh.breakMinutes);
         var mealEligible = h > 0 && h >= minMealH;
-        if (h > 0) workDays++;
+        if (h > 0) {
+          workDays++;
+          weekWorkDays[cd.weekIndex] += 1;
+        }
+        weekCalDays[cd.weekIndex] += 1;
         if (mealEligible) {
           dailyMealDays++;
           weekMealDays[cd.weekIndex] += 1;
@@ -377,11 +401,12 @@
       for (var w2 = 0; w2 < WEEKS; w2++) {
         var wSum = 0;
         var wMeals = 0;
+        var wDays2 = 0;
         for (var d2 = 0; d2 < DAYS_PER_WEEK; d2++) {
           var idx2 = w2 * DAYS_PER_WEEK + d2;
           var h2 = inp.dailyHours[idx2] || 0;
           var mealElig2 = h2 > 0 && h2 >= minMealH;
-          if (h2 > 0) workDays++;
+          if (h2 > 0) { workDays++; wDays2++; }
           if (mealElig2) {
             dailyMealDays++;
             wMeals++;
@@ -405,6 +430,8 @@
         }
         weekHours.push(M.round2(wSum));
         weekMealDays.push(wMeals);
+        weekWorkDays.push(wDays2);
+        weekCalDays.push(DAYS_PER_WEEK);
       }
     }
 
@@ -421,11 +448,27 @@
     var basePay = Math.round(totalHours * wage);
 
     var weeks = activeWeekHours.map(function (h, i) {
-      var eligible = h >= WEEKLY_MIN_HOURS;
+      var hoursOk = h >= WEEKLY_MIN_HOURS;
+      var partial = inp.mode === 'daily' && (weekCalDays[i] || DAYS_PER_WEEK) < DAYS_PER_WEEK;
+      var absent;
+      if (inp.mode === 'daily') {
+        // 월 경계의 7일 미만 주는 소정근로일 판단이 어려워 결근 판정에서 제외 (15시간 조건만 적용)
+        absent = !partial && (weekWorkDays[i] || 0) < inp.contractDays;
+      } else {
+        absent = !!inp.weekAbsent[i];
+      }
+      var excused = absent && !!inp.weekExcuse[i];
+      var eligible = hoursOk && (!absent || excused);
       return {
         week: i + 1,
         hours: M.round2(h),
         eligible: eligible,
+        hoursOk: hoursOk,
+        absent: absent,
+        excused: excused,
+        partial: partial,
+        workDays: inp.mode === 'daily' ? (weekWorkDays[i] || 0) : null,
+        contractDays: inp.contractDays,
         allowance: inp.includeWeekly && eligible ? weeklyAllowanceFor(h, wage) : 0,
         mealDays: weekMealDays[i] || 0
       };
@@ -458,6 +501,7 @@
       mode: inp.mode,
       totalHours: M.round2(totalHours),
       workDays: workDays,
+      contractDays: inp.contractDays,
       days: daysDetail,
       weeks: weeks,
       basePay: basePay,

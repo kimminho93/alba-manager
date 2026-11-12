@@ -62,7 +62,7 @@
     rows.push([]);
     rows.push([H('주차'), H('근무시간(h)'), H('주휴 대상 (15h↑) / 식대 일수'), H('주휴수당(원)')]);
     r.weeks.forEach(function (w) {
-      var subText = (w.eligible ? '주휴 대상' : '주휴 미대상') +
+      var subText = (w.eligible ? (w.excused ? '주휴 지급(결근 있으나 인정)' : '주휴 대상') : (w.hoursOk === false ? '주휴 미대상(15h 미만)' : '주휴 미대상(결근' + (w.workDays !== null && w.workDays !== undefined ? ' ' + w.workDays + '/' + w.contractDays + '일' : '') + ')')) +
         (r.includeMeal ? ' · 식대 ' + (w.mealDays || 0) + '일' : '');
       rows.push([T(w.week + '주차'), N(w.hours), T(subText), W(w.allowance)]);
     });
