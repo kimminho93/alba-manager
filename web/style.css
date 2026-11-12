@@ -1763,3 +1763,67 @@ html[data-fs="large"] .pay-banner .money { font-size: 48px; }
 
 /* 입력칸 예시(placeholder) 글씨도 또렷하게 */
 input::placeholder, textarea::placeholder { color: var(--muted); opacity: .75; }
+
+
+/* ---------- 구글 연동 (헤더 버튼 + 안내 창) ---------- */
+.cloud-btn {
+  border: 1.5px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 0 14px;
+  height: 44px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cloud-btn.ok { border-color: var(--ok); color: var(--ok); }
+.cloud-btn.bad { border-color: var(--bad); color: var(--bad); }
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal[hidden] { display: none; }
+.modal-card {
+  position: relative;
+  background: var(--card);
+  color: var(--text);
+  border-radius: 18px;
+  padding: 24px 22px 22px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+.modal-title { margin: 0 32px 12px 0; font-size: 21px; }
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+.cloud-lead { font-size: 17px; line-height: 1.55; margin: 0 0 12px; word-break: keep-all; }
+.cloud-points { margin: 0 0 16px; padding-left: 20px; font-size: 16px; line-height: 1.6; color: var(--muted); word-break: keep-all; }
+.cloud-big { width: 100%; font-size: 19px; padding: 16px 12px; }
+.cloud-state { font-size: 18px; font-weight: 800; margin: 0 0 6px; }
+.cloud-state.ok { color: var(--ok); }
+.cloud-state.bad { color: var(--bad); }
+.cloud-sub { margin: 0 0 14px; color: var(--muted); font-size: 15px; word-break: keep-all; }
+.cloud-actions { display: flex; flex-direction: column; gap: 8px; }
+.cloud-actions .btn { width: 100%; justify-content: center; padding: 14px 12px; font-size: 16px; }
+.cloud-warn { margin: 10px 0 0; font-size: 14px; color: var(--bad); word-break: keep-all; }
+@media print { .cloud-btn, .modal { display: none !important; } }

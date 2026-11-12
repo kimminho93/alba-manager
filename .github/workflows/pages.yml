@@ -33,6 +33,7 @@ jobs:
         run: |
           node tools/build.js
           node tests/test_main.js
+          node tests/test_cloud.js
           node tests/test_server.js
 
       - name: Setup Pages

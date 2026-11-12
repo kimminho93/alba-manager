@@ -28,6 +28,7 @@
       </div>
     </div>
     <div class="header-actions">
+      <button id="cloudBtn" class="cloud-btn" type="button" aria-label="구글 시트에 저장 설정">☁️ 구글 저장</button>
       <button id="fontToggle" class="icon-btn font-btn" type="button" aria-label="글자 크게 보기 켜기/끄기" aria-pressed="false">가+</button>
       <button id="themeToggle" class="icon-btn" type="button" aria-label="다크/라이트 모드 전환">🌙</button>
     </div>
@@ -435,7 +436,17 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <!-- 구글 연동 창 -->
+  <div id="cloudModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="cloudTitle">
+    <div class="modal-card">
+      <button id="cloudClose" class="modal-close" type="button" aria-label="닫기">✕</button>
+      <h2 id="cloudTitle" class="modal-title">☁️ 구글 시트에 자동 저장</h2>
+      <div id="cloudBody"></div>
+    </div>
+  </div>
+
   <script src="./engine.js"></script>
+  <script src="./gsync.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

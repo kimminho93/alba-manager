@@ -24,6 +24,9 @@
     presets: 'alba.timePresets.v1'
   };
 
+  var SYNC_KEYS = {};
+  SYNC_KEYS[KEYS.roster] = SYNC_KEYS[KEYS.archive] = SYNC_KEYS[KEYS.store] = SYNC_KEYS[KEYS.presets] = true;
+
   var MINUTE_STEPS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
   var state = {
@@ -70,8 +73,10 @@
     }
   }
 
+  var syncSuspended = false; // 구글 시트에서 받은 내용을 반영하는 중에는 다시 저장하지 않음
   function saveJson(key, val) {
     try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+    if (!syncSuspended && SYNC_KEYS[key] && window.AlbaCloud) window.AlbaCloud.markDirty();
   }
 
   var toastTimer = null;
@@ -1367,6 +1372,157 @@
     });
   }
 
+
+  /* ==========================================================
+     구글 시트 연동 (내 구글 드라이브에 자동 저장 / 다른 기기에서 불러오기)
+     ========================================================== */
+  function fmtClock(ms) {
+    if (!ms) return '';
+    var d = new Date(ms);
+    return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
+  function cloudData() {
+    return {
+      roster: state.roster,
+      archive: state.archive,
+      presets: presetState.list,
+      store: loadJson(KEYS.store, {})
+    };
+  }
+
+  function cloudTables() {
+    var roster = [['이름', '지급월', '총 근무시간(h)', '시급(원)', '주휴수당(원)', '식대(원)', '세전 합계(원)', '공제(원)', '실수령액(원)']];
+    state.roster.forEach(function (inp) {
+      var r = E.calculatePayroll(inp);
+      roster.push([r.name, r.payMonthLabel, r.totalHours, r.hourlyWage, r.weeklyAllowance, r.mealAllowance, r.gross, r.tax.total, r.net]);
+    });
+    var archive = [['점검일자', '매장명', '점검자', '냉장(°C)', '냉동(°C)', '적합 항목', '결과', '점검필요 항목', '특이사항']];
+    state.archive.forEach(function (inp) {
+      var c = E.buildChecklist(inp);
+      var fails = c.items.filter(function (it) { return !it.ok; }).map(function (it) { return it.no + '. ' + it.text; }).join('\n');
+      archive.push([c.date || '-', c.store, c.inspector, c.fridgeTemp === null ? '' : c.fridgeTemp, c.freezerTemp === null ? '' : c.freezerTemp,
+        c.passCount + ' / ' + c.total, c.verdict, fails || '-', c.memo || '-']);
+    });
+    return { roster: roster.length > 1 ? roster : [], archive: archive.length > 1 ? archive : [] };
+  }
+
+  function cloudApply(d) {
+    d = d || {};
+    syncSuspended = true;
+    try {
+      state.roster = Array.isArray(d.roster) ? d.roster : [];
+      state.archive = Array.isArray(d.archive) ? d.archive : [];
+      saveJson(KEYS.roster, state.roster);
+      saveJson(KEYS.archive, state.archive);
+      if (Array.isArray(d.presets) && d.presets.length) {
+        saveJson(KEYS.presets, d.presets);
+        loadPresets();
+        renderPresets();
+      }
+      if (d.store && typeof d.store === 'object') {
+        saveJson(KEYS.store, d.store);
+        if (d.store.store) $('cStore').value = d.store.store;
+        if (d.store.inspector) $('cInspector').value = d.store.inspector;
+      }
+      renderRoster();
+      renderArchive();
+      recalcChecklist();
+    } finally {
+      syncSuspended = false;
+    }
+  }
+
+  function renderCloudUi(st) {
+    var btn = $('cloudBtn');
+    var body = $('cloudBody');
+    if (!btn || !body) return;
+    var connected = !!(st && st.connected);
+    var kind = st ? st.kind : 'off';
+    var clock = fmtClock(st && st.lastSaved);
+
+    if (!connected && kind !== 'saving') { btn.textContent = '☁️ 구글 저장'; btn.className = 'cloud-btn'; }
+    else if (kind === 'saving') { btn.textContent = '☁️ 저장 중…'; btn.className = 'cloud-btn'; }
+    else if (kind === 'needLogin' || kind === 'error') { btn.textContent = '⚠️ 다시 연결'; btn.className = 'cloud-btn bad'; }
+    else { btn.textContent = '☁️ 저장됨' + (clock ? ' ' + clock : ''); btn.className = 'cloud-btn ok'; }
+
+    var html;
+    if (!connected) {
+      html =
+        '<p class="cloud-lead">알바 명단과 점검 기록을 <b>내 구글 드라이브</b>에 자동으로 저장합니다. 휴대폰을 바꾸거나 다른 컴퓨터에서 열어도 같은 기록을 볼 수 있어요.</p>' +
+        '<ul class="cloud-points">' +
+        '<li>내 구글 드라이브에 <b>"사장님 도우미 데이터"</b> 파일이 만들어집니다</li>' +
+        '<li>이 앱이 만든 파일 외에는 볼 수 없습니다</li>' +
+        '<li>저장된 내용은 개발자도 볼 수 없습니다</li>' +
+        '<li>언제든 연동을 끊을 수 있습니다</li>' +
+        '</ul>' +
+        '<button type="button" class="btn btn-primary cloud-big" data-cloud="connect"' + (kind === 'saving' ? ' disabled' : '') + '>구글 계정으로 연동하기</button>' +
+        (kind === 'error' && st.text ? '<p class="cloud-warn">' + escHtml(st.text) + '</p>' : '');
+    } else {
+      var head, cls = 'ok';
+      if (kind === 'saving') { head = '⏳ ' + escHtml(st.text || '저장 중…'); cls = ''; }
+      else if (kind === 'needLogin') { head = '⚠️ 구글 연결을 다시 해 주세요'; cls = 'bad'; }
+      else if (kind === 'error') { head = '⚠️ 저장하지 못했습니다'; cls = 'bad'; }
+      else { head = '✅ 구글 시트에 자동 저장 중'; }
+      html =
+        '<p class="cloud-state ' + cls + '">' + head + '</p>' +
+        '<p class="cloud-sub">' + (clock ? '마지막 저장 ' + clock + ' · ' : '') + '내용을 바꾸면 몇 초 뒤 자동으로 저장됩니다.</p>' +
+        ((kind === 'needLogin' || kind === 'error') && st.text ? '<p class="cloud-warn">' + escHtml(st.text) + '</p>' : '') +
+        '<div class="cloud-actions">' +
+        ((kind === 'needLogin' || kind === 'error')
+          ? '<button type="button" class="btn btn-primary" data-cloud="save">다시 연결하고 저장하기</button>'
+          : '<button type="button" class="btn btn-primary" data-cloud="save">지금 저장</button>') +
+        '<button type="button" class="btn" data-cloud="open">📄 구글 시트 열어보기</button>' +
+        '<button type="button" class="btn" data-cloud="load">⬇️ 시트에서 다시 불러오기</button>' +
+        '<button type="button" class="btn btn-ghost" data-cloud="off">연동 끊기</button>' +
+        '</div>';
+    }
+    body.innerHTML = html;
+  }
+
+  function initCloud() {
+    var C = window.AlbaCloud;
+    if (!C) { var b = $('cloudBtn'); if (b) b.hidden = true; return; }
+    C.init({
+      getData: cloudData,
+      getTables: cloudTables,
+      applyData: cloudApply,
+      confirm: function (m) { return window.confirm(m); },
+      onStatus: renderCloudUi
+    });
+
+    function openModal() { renderCloudUi(C.getStatus()); $('cloudModal').hidden = false; }
+    function closeModal() { $('cloudModal').hidden = true; }
+    $('cloudBtn').addEventListener('click', openModal);
+    $('cloudClose').addEventListener('click', closeModal);
+    $('cloudModal').addEventListener('click', function (ev) { if (ev.target === $('cloudModal')) closeModal(); });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeModal(); });
+
+    $('cloudBody').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-cloud]');
+      if (!b) return;
+      var act = b.getAttribute('data-cloud');
+      if (act === 'connect') {
+        C.connect().then(function (ok) { if (ok) showToast('☁️ 구글 시트 연동 완료'); });
+      } else if (act === 'save') {
+        C.saveNow().then(function (ok) { if (ok) showToast('☁️ 구글 시트에 저장했습니다'); });
+      } else if (act === 'open') {
+        var u = C.sheetUrl();
+        if (u) window.open(u, '_blank', 'noopener');
+      } else if (act === 'load') {
+        if (!window.confirm('구글 시트에 저장된 내용으로 이 화면의 기록을 바꿉니다.\n계속할까요?')) return;
+        C.loadFromSheet().then(function (r) {
+          showToast(r === 'ok' ? '⬇️ 구글 시트에서 불러왔습니다' : (r === 'empty' ? '시트에 저장된 기록이 없습니다' : '불러오지 못했습니다'));
+        });
+      } else if (act === 'off') {
+        if (!window.confirm('구글 연동을 끊을까요?\n이 기기의 기록과 구글 드라이브의 파일은 그대로 남습니다.')) return;
+        C.disconnect();
+        showToast('구글 연동을 끊었습니다');
+      }
+    });
+    renderCloudUi(C.getStatus());
+  }
+
   syncThemeBtn();
   syncFontBtn();
   initTabs();
@@ -1379,4 +1535,6 @@
   renderRoster();
   renderArchive();
   checkServerHealth();
+  initCloud();
+  if (window.AlbaCloud) window.AlbaCloud.resume();
 })();
