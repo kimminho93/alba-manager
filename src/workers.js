@@ -243,9 +243,10 @@
 
 
   /**
-   * 자정까지 퇴근을 안 찍은 사람은 모두 그 날 24:00(=00:00)에 퇴근한 것으로 처리.
+   * 자정까지 퇴근을 안 찍은 사람은 그 출근을 무효로 하고 그 날은 휴무(근무 없음)로 둔다.
+   * (달력 칸은 퇴근을 찍어야 채워지므로, 출근 중 표시만 지우면 된다. 그 날 앞서 끝난 근무가 있으면 그대로 남는다.)
    * 앱을 켜 둔 동안은 자정이 지나면, 꺼져 있었다면 다음에 열 때 처리한다.
-   * 반환: 자동 퇴근 처리된 사람 목록 [{worker, date, start, end, ts(자정 시각)}]
+   * 반환: 무효 처리된 사람 목록 [{worker, date, start, ts(자정 시각)}]
    */
   function autoCloseOpen(workers, now) {
     var today = ymdOf(now), out = [];
@@ -253,8 +254,8 @@
       var open = cleanPunch(w.punch);
       if (!open || open.date >= today) return;
       var y = Number(open.date.slice(0, 4)), m = Number(open.date.slice(5, 7)), d = Number(open.date.slice(8, 10));
-      var r = clockOut(w, open, '00:00');
-      out.push({ worker: w, date: r.date, start: r.start, end: '00:00', ts: new Date(y, m - 1, d + 1, 0, 0, 0) });
+      delete w.punch;
+      out.push({ worker: w, date: open.date, start: open.time, ts: new Date(y, m - 1, d + 1, 0, 0, 0) });
     });
     return out;
   }
@@ -276,10 +277,9 @@
       var ts = parseLogTs(row[0]);
       if (!ts || ts.getTime() <= afterMs) return;
       var kind = String(row[3] || '').trim();
-      if (kind !== '출근' && kind !== '퇴근') return;
       if (String(row[5] || '').indexOf('정상') !== 0) return;
-      var auto = String(row[4] || '').indexOf('자동') === 0;
-      if (auto) { n += autoCloseOpen(workers, ts).length ? 1 : 0; return; }
+      if (String(row[4] || '').indexOf('자동') === 0) { n += autoCloseOpen(workers, ts).length ? 1 : 0; return; }
+      if (kind !== '출근' && kind !== '퇴근') return;
       var code = String(row[1] || '').trim();
       var w = (workers || []).filter(function (x) { return x.code === code; })[0];
       if (!w) return;

@@ -2076,16 +2076,16 @@
     }
   }
 
-  /* 자정까지 퇴근을 안 찍은 사람은 00:00 퇴근으로 처리 */
+  /* 자정까지 퇴근을 안 찍은 사람은 그날 출근을 무효(휴무)로 처리 */
   function runAutoClose() {
     var done = E.autoCloseOpen(state.workers, new Date());
     if (!done.length) return;
     saveWorkers();
     loadSelected(); recalcPayroll(); renderRoster();
     done.forEach(function (d) {
-      enqueuePunch([tsOf(d.ts), d.worker.code, d.worker.name, '퇴근', '자동(자정)', '정상(자동)', '자정까지 퇴근을 찍지 않아 00:00 퇴근으로 처리 (출근 ' + d.date + ' ' + d.start + ')']);
+      enqueuePunch([tsOf(d.ts), d.worker.code, d.worker.name, '퇴근누락(무효)', '자동(자정)', '정상(자동)', '자정까지 퇴근을 찍지 않아 그날 출근(' + d.date + ' ' + d.start + ')을 무효·휴무로 처리']);
     });
-    showToast('🌙 자정이 지나 ' + done.map(function (d) { return d.worker.name; }).join(', ') + '님을 자동 퇴근 처리했습니다');
+    showToast('🌙 퇴근을 안 찍어 ' + done.map(function (d) { return d.worker.name; }).join(', ') + '님의 어제 출근은 무효(휴무) 처리했습니다');
   }
 
   /* ---------- 출퇴근 화면 ---------- */
