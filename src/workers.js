@@ -206,7 +206,11 @@
       var elapsed = (now.getTime() - inMs) / 60000;
       if (elapsed >= 0 && elapsed <= PUNCH_MAX_MIN) {
         if (elapsed < 1) return { kind: 'too_soon', date: open.date, start: open.time, end: time, note: '' };
-        if (today === open.date && toMin(time) < toMin(open.time)) return { kind: 'too_soon', date: open.date, start: open.time, end: time, note: '출근 시각(' + open.time + ')이 아직 되지 않았어요' };
+        if (today === open.date && toMin(time) < toMin(open.time)) {
+          // 올림한 출근 시각(예: 09:30)보다 일찍 퇴근 → 근무 시간 0, 기록은 남기지 않고 출근만 취소
+          delete worker.punch;
+          return { kind: 'out', date: open.date, start: open.time, end: open.time, note: '출근 시각(' + open.time + ') 전에 퇴근해서 근무 시간은 0시간이에요', empty: true };
+        }
         return clockOut(worker, open, time);
       }
       note = '이전 출근(' + open.date + ' ' + open.time + ')은 퇴근 기록이 없어 무시하고 새로 출근 처리';
@@ -293,7 +297,7 @@
   function punchNext(worker, now) {
     var open = cleanPunch(worker && worker.punch);
     if (!open) return 'in';
-    var elapsed = (now.getTime() - new Date(open.date + 'T' + open.time + ':00').getTime()) / 60000;
+    var elapsed = (now.getTime() - new Date(open.date + 'T' + (open.at || open.time) + ':00').getTime()) / 60000;   // 올림 전(실제 찍은) 시각 기준
     return elapsed >= 0 && elapsed <= PUNCH_MAX_MIN ? 'out' : 'in';
   }
 

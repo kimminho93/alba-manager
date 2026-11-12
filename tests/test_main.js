@@ -595,7 +595,9 @@ test('출근 30분 올림: 정각 유지, 1분이라도 지나면 다음 30분, 
   assert.strictEqual(t(23, 50), '23:59');
   const w = E.createWorker('나', 5, 10320);
   E.applyPunch(w, at(9, 5));                                   // 09:30로 기록
-  assert.strictEqual(E.applyPunch(w, at(9, 20)).kind, 'too_soon');   // 아직 출근 시각 전
+  assert.strictEqual(E.punchNext(w, at(9, 6)), 'out');          // 방금 출근 → 근무 중으로 보임 (올림한 09:30 전이어도)
+  assert.strictEqual(E.punchNext(w, at(9, 25)), 'out');
+  assert.strictEqual(E.applyPunch(w, at(9, 5)).kind, 'too_soon');   // 1분 안에 또 누름
   assert.strictEqual(E.punchIsOpen(w), true);
   assert.strictEqual(E.applyPunch(w, at(13, 0)).kind, 'out');
 });
@@ -691,4 +693,23 @@ test('출퇴근기록 장부 재생: 저장 이후에 찍은 출근·퇴근·자
   const v = E.createWorker('나', 5, 10320);
   E.replayPunchLog([v], [['2026-11-12 18:00:00', v.code, '나', '출근', '이름+비밀번호', '정상', '']], saved);
   assert.strictEqual(E.punchIsOpen(v), true);
+});
+
+test('출근 올림 시각 전에 퇴근하면 근무 0시간으로 출근 취소, 그 뒤 다시 출근 가능', () => {
+  const at = (h, m) => new Date(2026, 10, 12, h, m, 0);
+  const w = E.createWorker('가', 5, 10320);
+  assert.strictEqual(E.applyPunch(w, at(9, 5)).kind, 'in');     // 09:30 출근으로 기록
+  const r = E.applyPunch(w, at(9, 20));                          // 15분 뒤 퇴근
+  assert.strictEqual(r.kind, 'out');
+  assert.strictEqual(E.punchIsOpen(w), false);
+  assert.strictEqual(E.monthSummary(w, '2026-11').workDays, 0);
+  assert.strictEqual(E.applyPunch(w, at(9, 40)).kind, 'in');    // 다시 출근 가능
+});
+
+test('자정 직후 출근(00:06→00:30 올림)도 근무 중으로 표시', () => {
+  const w = E.createWorker('가', 5, 10320);
+  const r = E.applyPunch(w, new Date(2026, 10, 13, 0, 6, 0));
+  assert.strictEqual(r.start, '00:30');
+  assert.strictEqual(E.punchNext(w, new Date(2026, 10, 13, 0, 7, 0)), 'out');
+  assert.strictEqual(E.autoCloseOpen([w], new Date(2026, 10, 13, 0, 8, 0)).length, 0);   // 오늘 출근은 무효 처리 안 됨
 });

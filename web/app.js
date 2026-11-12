@@ -2299,7 +2299,7 @@
     $('punchResWho').textContent = w.name + '님 · ' + hmText(isIn ? r.start : r.end);
     var lines = [];
     if (!isIn) {
-      var sh = E.workerShifts(w, pm)[Number(r.date.slice(8)) - 1];
+      var sh = r.empty ? null : E.workerShifts(w, pm)[Number(r.date.slice(8)) - 1];
       if (sh && !sh.off) lines.push('<div>오늘 <b>' + fmtHM(E.calcShiftHours(sh.start, sh.end, sh.breakMinutes)) + '</b> 일했어요 (' + sh.start + '~' + sh.end + ')</div>');
     }
     lines.push('<div>이번 달 <b>' + sum.workDays + '일</b> · 누적 <b>' + fmtHM(sum.totalHours) + '</b></div>');
