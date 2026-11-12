@@ -264,4 +264,33 @@ test('순수 JS OpenXML .xlsx ZIP 시그니처(PK\\x03\\x04) 검증', () => {
   assert.ok(bytes.length > 1500);
 });
 
+test('급여 엑셀: 요약/급여명세서/출퇴근 기록/주차별 요약 탭 구성과 출퇴근·약속일수·식대 내용', () => {
+  const shifts = [];
+  for (let d = 1; d <= 30; d++) {
+    const dow = new Date(2026, 10, d).getDay();
+    const work = dow >= 1 && dow <= 5 && d !== 10; // 11/10(화) 결근
+    shifts.push({ off: !work, start: '09:00', end: '14:00', breakMinutes: 0 });
+  }
+  const r = E.calculatePayroll({
+    name: '철수', hourlyWage: 10320, mode: 'daily', payMonth: '2026-11', dailyShifts: shifts,
+    includeWeekly: true, includeMeal: true, mealMinHours: 4, mealAmount: 8000, tax: '3.3', contractDays: 5
+  });
+  const sheets = E.payrollSheets(r);
+  assert.deepStrictEqual(sheets.map((x) => x.name), ['요약', '급여명세서', '출퇴근 기록', '주차별 요약']);
+  const text = (sh) => sh.rows.map((row) => row.map((c) => (c && typeof c === 'object' ? c.v : c)).join('|')).join('\n');
+  assert.ok(/주 5일 근무 약속/.test(text(sheets[0])));
+  assert.ok(/09:00\|14:00/.test(text(sheets[2])));          // 출근·퇴근 시각
+  assert.ok(/11\/10\|화\|3주차\|-\|-/.test(text(sheets[2]))); // 휴무일 표시
+  assert.ok(/지급/.test(text(sheets[2])));                   // 식대 지급 여부
+  assert.ok(/제외 \(결근\)/.test(text(sheets[3])));          // 4/5일 출근한 주
+  assert.ok(/대상 \(개근\)/.test(text(sheets[3])));
+  // 날짜별 입력이 아니면 출퇴근 기록 탭은 생략
+  const r2 = E.calculatePayroll({ name: '영희', hourlyWage: 10000, mode: 'weekly', weekHours: [20, 20, 20, 20] });
+  assert.deepStrictEqual(E.payrollSheets(r2).map((x) => x.name), ['요약', '급여명세서', '주차별 요약']);
+  // 정산 명단 통합 파일: 명단 탭 + 사람별 탭
+  const bytes = E.payrollRosterXlsx([r, r2]);
+  assert.strictEqual(bytes[0], 0x50);
+  assert.ok(bytes.length > 3000);
+});
+
 console.log('\n총 ' + passed + '개 단위 테스트 통과!\n');
