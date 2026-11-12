@@ -652,6 +652,41 @@
     }
 
     $('monthCalBody').innerHTML = rowsHtml;
+    renderMonthCards(r, cal, grid);
+  }
+
+  // 휴대폰용 주 단위 카드: 요일을 세로로 한 줄씩 보여줌 (CSS가 화면 폭에 따라 표/카드 중 하나만 표시)
+  function renderMonthCards(r, cal, grid) {
+    var box = $('monthCalCards');
+    if (!box) return;
+    var DOW = ['월', '화', '수', '목', '금', '토', '일'];
+    var html = '';
+    for (var wi = 0; wi < cal.weekCount; wi++) {
+      var wk = r.weeks[wi] || { hours: 0, eligible: false, allowance: 0, mealDays: 0 };
+      var wkSub = r.includeWeekly
+        ? (wk.eligible ? ('주휴 +' + E.formatWon(wk.allowance) + '원') : '주휴 없음 (15시간 미만)')
+        : '주휴 미포함';
+      var mealSub = r.includeMeal ? (' · 🍚 식대 ' + wk.mealDays + '일') : '';
+      html += '<section class="wk-card">' +
+        '<div class="wk-card-head"><b>' + (wi + 1) + '주차</b>' +
+        '<span class="wk-card-sum' + (wk.eligible && r.includeWeekly ? ' eligible' : '') + '">' + E.formatNum(wk.hours, 1) + '시간</span></div>';
+      for (var di = 0; di < 7; di++) {
+        var day = grid[wi][di];
+        if (!day) continue;
+        var isSel = day.index === state.selectedDayIdx;
+        var isMeal = r.includeMeal && day.mealEligible;
+        var off = day.off || day.hours <= 0;
+        html += '<button type="button" class="wk-day' + (isSel ? ' selected' : '') + (isMeal ? ' meal-ok' : '') + (off ? ' off-day' : '') +
+          '" data-day-idx="' + day.index + '">' +
+          '<span class="wk-day-date' + (di === 5 ? ' sat' : (di === 6 ? ' sun' : '')) + '">' +
+            cal.month + '/' + day.date + ' (' + DOW[di] + ')</span>' +
+          '<span class="wk-day-main">' + (off ? '휴무' : escHtml(day.start + '~' + day.end)) + '</span>' +
+          '<span class="wk-day-hours">' + (off ? '' : E.formatNum(day.hours, 1) + '시간') + (isMeal ? ' 🍚' : '') + '</span>' +
+          '</button>';
+      }
+      html += '<div class="wk-card-foot">' + wkSub + mealSub + '</div></section>';
+    }
+    box.innerHTML = html;
   }
 
   /* ==========================================================
@@ -1060,13 +1095,15 @@
     });
 
     // 달력 날짜 클릭 -> 해당 날짜 선택
-    $('monthCalBody').addEventListener('click', function (ev) {
+    function onCalDayClick(ev) {
       var cell = ev.target.closest('[data-day-idx]');
       if (!cell) return;
       var idx = Number(cell.getAttribute('data-day-idx'));
       loadDayIntoEditor(idx);
       recalcPayroll();
-    });
+    }
+    $('monthCalBody').addEventListener('click', onCalDayClick);
+    $('monthCalCards').addEventListener('click', onCalDayClick);
 
     // 드롭다운 스크롤 피커 열기/닫기 및 옵션 선택
     [

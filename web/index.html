@@ -313,7 +313,7 @@
                 <h4 id="calBoardTitle">2026년 11월 출퇴근 달력 (총 5개 주차)</h4>
                 <span class="muted small">날짜 칸을 클릭하면 위 시간 선택기로 바로 수정됩니다 · 초록 배지(🍚) = 식대 지급일</span>
               </div>
-              <div class="table-wrap">
+              <div class="table-wrap cal-table-view">
                 <table class="month-cal-table" aria-label="월별 출퇴근 달력">
                   <thead>
                     <tr>
@@ -326,6 +326,8 @@
                   <tbody id="monthCalBody"></tbody>
                 </table>
               </div>
+              <!-- 휴대폰용: 주 단위 카드 목록 (화면 폭 640px 이하에서만 표시) -->
+              <div id="monthCalCards" class="cal-cards-view" aria-label="주별 출퇴근 목록"></div>
             </div>
           </div>
 

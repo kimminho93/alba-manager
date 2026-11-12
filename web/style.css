@@ -1518,6 +1518,41 @@ html[data-fs="large"] .pay-banner .money { font-size: 48px; }
   html[data-fs="large"] body { zoom: 1.1; }
 }
 
+/* ---------- 달력: 화면 폭에 따라 표(PC) ↔ 주 단위 카드(휴대폰) 전환 ---------- */
+.cal-cards-view { display: none; }
+
+@media (max-width: 640px) {
+  .cal-table-view { display: none; }
+  .cal-cards-view { display: flex; flex-direction: column; gap: 12px; }
+
+  .wk-card {
+    border: 1px solid var(--line); border-radius: 14px; background: var(--card-2);
+    padding: 10px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .wk-card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 2px 4px 6px; font-size: 18px;
+  }
+  .wk-card-sum { font-size: 20px; font-weight: 800; color: var(--muted); }
+  .wk-card-sum.eligible { color: var(--ok); }
+  .wk-day {
+    display: grid; grid-template-columns: 5.6em 1fr auto; align-items: center; gap: 8px;
+    width: 100%; min-height: 56px; padding: 8px 12px; text-align: left;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+    font-size: 17px; cursor: pointer;
+  }
+  .wk-day.meal-ok { background: var(--ok-weak); }
+  .wk-day.off-day { opacity: .7; }
+  .wk-day.selected { box-shadow: 0 0 0 3px var(--primary) inset; background: var(--primary-weak); }
+  .wk-day-date { font-weight: 700; white-space: nowrap; }
+  .wk-day-date.sat { color: var(--primary); }
+  .wk-day-date.sun { color: var(--bad); }
+  .wk-day-main { font-weight: 700; font-size: 18px; }
+  .wk-day-hours { font-weight: 800; color: var(--primary); white-space: nowrap; }
+  .wk-day.off-day .wk-day-main { color: var(--muted); font-weight: 600; }
+  .wk-card-foot { padding: 4px 6px 0; font-size: 15px; color: var(--muted); }
+}
+
 @media print {
   @page {
     size: A4 portrait;
