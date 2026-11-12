@@ -59,8 +59,18 @@
             <input id="pMonth" type="hidden">
             <div class="month-stepper" role="group" aria-label="지급월 선택">
               <button type="button" id="pMonthPrev" class="month-step" aria-label="이전 달">◀</button>
-              <output id="pMonthLabel" class="month-label" aria-live="polite">----년 --월</output>
+              <button type="button" id="pMonthLabel" class="month-label month-label-btn" aria-haspopup="true" aria-expanded="false" aria-label="달 직접 고르기">----년 --월</button>
               <button type="button" id="pMonthNext" class="month-step" aria-label="다음 달">▶</button>
+            </div>
+            <div id="monthPicker" class="month-picker" hidden>
+              <div class="month-picker-year">
+                <button type="button" id="mpYearPrev" class="month-step" aria-label="이전 해">◀</button>
+                <b id="mpYearLabel">2026년</b>
+                <button type="button" id="mpYearNext" class="month-step" aria-label="다음 해">▶</button>
+              </div>
+              <div id="mpGrid" class="month-picker-grid"></div>
+              <button type="button" id="mpThisMonth" class="btn btn-sm month-picker-now">이번 달로 이동</button>
+              <p class="month-picker-hint">● 표시는 정산 명단에 저장된 달입니다</p>
             </div>
           </div>
 
@@ -464,7 +474,7 @@
             <p class="guide-step-title">① 기본 정보 입력 <small>(💰 급여 계산 탭)</small></p>
             <ol>
               <li><b>알바생 이름</b>을 적습니다.</li>
-              <li><b>지급월</b>은 ◀ ▶ 버튼으로 맞춥니다. 그 달의 달력이 자동으로 나옵니다.</li>
+              <li><b>지급월</b>은 ◀ ▶ 버튼으로 한 달씩 넘기거나, <b>가운데 "2026년 11월"을 눌러</b> 원하는 달을 바로 고릅니다. 그 달의 달력이 자동으로 나옵니다.</li>
               <li><b>시급</b>을 적습니다. (2026년 최저시급은 10,320원)</li>
               <li><b>주 근무 약속일수</b>는 일주일에 며칠 나오기로 했는지 − ＋ 로 맞춥니다.</li>
             </ol>

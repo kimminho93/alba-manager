@@ -1240,6 +1240,55 @@
     $('pMonthNext').addEventListener('click', function () { shiftPayMonth(1); });
     syncPayMonthLabel();
 
+    // 지급월 라벨을 누르면 1~12월 선택 창 (해 단위 이동 가능)
+    var mpYear = new Date().getFullYear();
+    function curPayMonth() {
+      var m = /^(\d{4})-(\d{2})$/.exec($('pMonth').value || '');
+      return m ? { y: Number(m[1]), m: Number(m[2]) } : { y: new Date().getFullYear(), m: new Date().getMonth() + 1 };
+    }
+    function renderMonthPicker() {
+      var cur = curPayMonth();
+      var has = {};
+      state.roster.forEach(function (x) { if (x && /^\d{4}-\d{2}$/.test(x.payMonth || '')) has[x.payMonth] = true; });
+      $('mpYearLabel').textContent = mpYear + '년';
+      var html = '';
+      for (var mo = 1; mo <= 12; mo++) {
+        var key = mpYear + '-' + pad2(mo);
+        html += '<button type="button" class="mp-month' + (cur.y === mpYear && cur.m === mo ? ' current' : '') + (has[key] ? ' has' : '') +
+          '" data-mp="' + key + '">' + mo + '월</button>';
+      }
+      $('mpGrid').innerHTML = html;
+    }
+    function setMonthPicker(open) {
+      $('monthPicker').hidden = !open;
+      $('pMonthLabel').setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) { mpYear = curPayMonth().y; renderMonthPicker(); }
+    }
+    function pickMonth(key) {
+      if (key !== $('pMonth').value) {
+        $('pMonth').value = key;
+        $('pMonth').dispatchEvent(new Event('change'));
+      }
+      setMonthPicker(false);
+    }
+    $('pMonthLabel').addEventListener('click', function () { setMonthPicker($('monthPicker').hidden); });
+    $('mpYearPrev').addEventListener('click', function () { mpYear--; renderMonthPicker(); });
+    $('mpYearNext').addEventListener('click', function () { mpYear++; renderMonthPicker(); });
+    $('mpGrid').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-mp]');
+      if (b) pickMonth(b.getAttribute('data-mp'));
+    });
+    $('mpThisMonth').addEventListener('click', function () {
+      var n = new Date();
+      pickMonth(n.getFullYear() + '-' + pad2(n.getMonth() + 1));
+    });
+    document.addEventListener('click', function (ev) {
+      if (!$('monthPicker').hidden && !ev.target.closest('.month-field')) setMonthPicker(false);
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && !$('monthPicker').hidden) setMonthPicker(false);
+    });
+
     // 지급월 변경 시 해당 월의 실제 달력/주차 재구성
     $('pMonth').addEventListener('change', function () {
       syncPayMonthLabel();

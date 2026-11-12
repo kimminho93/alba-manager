@@ -1874,3 +1874,25 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .75; }
 .guide-q { font-weight: 800; margin: 14px 0 2px !important; }
 .guide-tip { background: var(--card-2); border-radius: 10px; padding: 10px 12px; font-size: 16px; }
 @media print { #tab-guide { display: none !important; } }
+
+/* ---------- 지급월 직접 고르기(달 선택 창) ---------- */
+.month-label-btn { cursor: pointer; color: var(--text); font-family: inherit; }
+.month-label-btn::after { content: '▾'; margin-left: 8px; color: var(--primary); font-size: 16px; }
+.month-label-btn:hover, .month-label-btn[aria-expanded="true"] { border-color: var(--primary); }
+.month-picker {
+  margin-top: 8px; padding: 12px; border: 1.5px solid var(--primary); border-radius: 12px;
+  background: var(--card); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.month-picker[hidden] { display: none; }
+.month-picker-year { display: grid; grid-template-columns: 52px 1fr 52px; gap: 6px; align-items: center; text-align: center; font-size: 19px; margin-bottom: 10px; }
+.month-picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.mp-month {
+  min-height: 52px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--card-2);
+  font-size: 18px; font-weight: 700; cursor: pointer; color: var(--text); position: relative;
+}
+.mp-month:hover { border-color: var(--primary); }
+.mp-month.current { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+.mp-month.has::after { content: '●'; position: absolute; top: 3px; right: 6px; font-size: 10px; color: var(--ok); }
+.mp-month.current.has::after { color: #fff; }
+.month-picker-now { width: 100%; margin-top: 10px; justify-content: center; min-height: 46px; font-size: 16px; }
+.month-picker-hint { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
