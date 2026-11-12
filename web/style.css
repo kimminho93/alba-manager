@@ -1604,6 +1604,19 @@ html[data-fs="large"] .pay-banner .money { font-size: 48px; }
   background: var(--card-2); font-size: 19px; font-weight: 800; white-space: nowrap;
 }
 
+/* ---------- 주휴수당 개근 판정 표시 ---------- */
+.cal-sum-cell.absent { background: var(--bad-weak); }
+.cal-sum-cell.absent .cal-sum-sub { color: var(--bad); font-weight: 700; }
+.wk-excuse-btn { margin-top: 4px; white-space: normal; }
+.week-absent-box { display: flex; flex-wrap: wrap; gap: 6px; }
+.week-absent-chip.on { border-color: var(--bad); background: var(--bad-weak); color: var(--bad); font-weight: 700; }
+
+@container (max-width: 680px) {
+  .wk-card-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+  .wk-card-foot.bad { color: var(--bad); font-weight: 700; }
+  .wk-card-foot.ok { color: var(--ok); }
+}
+
 @media print {
   @page {
     size: A4 portrait;

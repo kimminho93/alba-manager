@@ -81,6 +81,14 @@
             <input id="pWage" type="number" inputmode="numeric" min="0" step="10" value="10320">
           </label>
 
+          <div class="field"><span>주 근무 약속일수 <em class="hint">이보다 적게 출근한 주는 주휴수당 없음</em></span>
+            <div class="month-stepper" role="group" aria-label="주 근무 약속일수">
+              <button type="button" id="pContractMinus" class="month-step" aria-label="하루 줄이기">−</button>
+              <output id="pContractLabel" class="month-label" aria-live="polite">주 5일</output>
+              <button type="button" id="pContractPlus" class="month-step" aria-label="하루 늘리기">+</button>
+            </div>
+          </div>
+
           <div class="field">
             <span>근무시간 입력 방식</span>
             <div class="segmented" role="radiogroup" aria-label="근무시간 입력 방식">
@@ -121,7 +129,10 @@
               <label id="pW5Wrap" class="field" hidden><span>5주</span><input id="pW5" type="number" min="0" step="0.5" value="0"></label>
               <label id="pW6Wrap" class="field" hidden><span>6주</span><input id="pW6" type="number" min="0" step="0.5" value="0"></label>
             </div>
-            <p class="muted small">합계 <b id="weeksSum">60</b>시간 · 주 15시간 이상인 주만 주휴수당 대상</p>
+            <p class="muted small">합계 <b id="weeksSum">60</b>시간 · 주 15시간 이상 + 개근한 주만 주휴수당 대상</p>
+            <div class="field"><span>결근한 주가 있으면 눌러 주세요 <em class="hint">누른 주는 주휴수당 없음</em></span>
+              <div id="weekAbsentBox" class="week-absent-box"></div>
+            </div>
           </div>
 
           <div class="field"><span>세금 공제</span>

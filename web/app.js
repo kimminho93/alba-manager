@@ -36,6 +36,9 @@
     calendar: null,
     dailyShifts: [],
     selectedDayIdx: 0,
+    contractDays: 5,    // 주 근무 약속일수 (주휴수당 개근 판정)
+    weekExcuse: [],     // 결근 있어도 해당 주는 주휴 지급(예외)
+    weekAbsent: [],     // 주차별 모드: 결근한 주 수동 체크
     editor: {
       startHour: 9,
       startMin: 0,
@@ -588,6 +591,28 @@
     $('pMonthLabel').textContent = m ? (m[1] + '년 ' + Number(m[2]) + '월') : '월 선택';
   }
 
+  // 주별 주휴 상태 문구 + (결근 주일 때) 예외 지급 버튼
+  function weekStatus(w, r, idx) {
+    if (!r.includeWeekly) return { text: '주휴 미포함', btn: '', cls: '' };
+    var days = (w.workDays !== null && w.workDays !== undefined) ? (w.workDays + '/' + w.contractDays + '일 출근') : '';
+    if (w.eligible && !w.excused) {
+      return { text: '주휴 +' + E.formatWon(w.allowance) + '원' + (days ? ' · 개근 ' + days : ''), btn: '', cls: 'ok' };
+    }
+    if (w.excused) {
+      return {
+        text: '주휴 +' + E.formatWon(w.allowance) + '원 (결근 있으나 지급)',
+        btn: '<button type="button" class="btn btn-xs wk-excuse-btn" data-week-excuse="' + idx + '">다시 제외하기</button>',
+        cls: 'ok'
+      };
+    }
+    if (!w.hoursOk) return { text: '주휴 없음 (15시간 미만)', btn: '', cls: '' };
+    return {
+      text: '주휴 없음 · ' + (days || '결근') + (w.partial ? '' : ''),
+      btn: '<button type="button" class="btn btn-xs wk-excuse-btn" data-week-excuse="' + idx + '" title="공휴일·사장님 사정으로 쉰 주">이 주는 주휴 지급</button>',
+      cls: 'bad'
+    };
+  }
+
   function renderMonthCalendar(r) {
     var cal = r.calendar || state.calendar;
     if (!cal) return;
@@ -642,14 +667,13 @@
         rowsHtml += '</td>';
       }
 
-      var wkSub = r.includeWeekly
-        ? (wkObj.eligible ? ('주휴 +' + E.formatWon(wkObj.allowance) + '원') : '15h 미만 (주휴 0원)')
-        : '주휴 미포함';
+      var st = weekStatus(wkObj, r, wi);
       var mealSub = r.includeMeal ? ('🍚 식대 ' + wkObj.mealDays + '일') : '';
 
-      rowsHtml += '<td class="cal-sum-cell' + (wkObj.eligible && r.includeWeekly ? ' eligible' : '') + '">' +
+      rowsHtml += '<td class="cal-sum-cell' + (wkObj.eligible && r.includeWeekly ? ' eligible' : '') + (st.cls === 'bad' ? ' absent' : '') + '">' +
         '<b>' + E.formatNum(wkObj.hours, 1) + '시간</b>' +
-        '<span class="cal-sum-sub">' + wkSub + '</span>' +
+        '<span class="cal-sum-sub">' + st.text + '</span>' +
+        (st.btn ? '<span class="cal-sum-sub">' + st.btn + '</span>' : '') +
         (mealSub ? '<span class="cal-sum-sub">' + mealSub + '</span>' : '') +
         '</td>';
 
@@ -668,9 +692,7 @@
     var html = '';
     for (var wi = 0; wi < cal.weekCount; wi++) {
       var wk = r.weeks[wi] || { hours: 0, eligible: false, allowance: 0, mealDays: 0 };
-      var wkSub = r.includeWeekly
-        ? (wk.eligible ? ('주휴 +' + E.formatWon(wk.allowance) + '원') : '주휴 없음 (15시간 미만)')
-        : '주휴 미포함';
+      var st = weekStatus(wk, r, wi);
       var mealSub = r.includeMeal ? (' · 🍚 식대 ' + wk.mealDays + '일') : '';
       html += '<section class="wk-card">' +
         '<div class="wk-card-head"><b>' + (wi + 1) + '주차</b>' +
@@ -689,7 +711,7 @@
           '<span class="wk-day-hours">' + (off ? '' : E.formatNum(day.hours, 1) + '시간') + (isMeal ? ' 🍚' : '') + '</span>' +
           '</button>';
       }
-      html += '<div class="wk-card-foot">' + wkSub + mealSub + '</div></section>';
+      html += '<div class="wk-card-foot ' + st.cls + '"><span>' + st.text + mealSub + '</span>' + st.btn + '</div></section>';
     }
     box.innerHTML = html;
   }
@@ -743,6 +765,9 @@
       weekHours: w,
       dailyShifts: state.dailyShifts.map(function (s) { return Object.assign({}, s); }),
       lateMinutes: 0, // 지각·조퇴 입력은 UI에서 제거됨 (항상 0)
+      contractDays: state.contractDays,
+      weekExcuse: state.weekExcuse.slice(0, 6),
+      weekAbsent: state.weekAbsent.slice(0, 6),
       includeWeekly: $('pWeekly').checked,
       includeMeal: $('pMeal').checked,
       mealMinHours: E.toNumber($('pMealMinHours').value, 4),
@@ -853,9 +878,21 @@
     }
   }
 
+  function renderWeekAbsentChips(r) {
+    var box = $('weekAbsentBox');
+    if (!box) return;
+    box.innerHTML = r.weeks.map(function (w, i) {
+      var on = !!state.weekAbsent[i];
+      return '<button type="button" class="chip week-absent-chip' + (on ? ' on' : '') + '" data-week-absent="' + i + '" aria-pressed="' + on + '">' +
+        (i + 1) + '주 ' + (on ? '결근 있음' : '개근') + '</button>';
+    }).join('');
+  }
+
   function renderPayroll(r) {
     state.payroll = r;
+    $('pContractLabel').textContent = '주 ' + state.contractDays + '일';
     syncModeAndHighlights(r);
+    if (r.mode === 'weekly') renderWeekAbsentChips(r);
 
     $('bannerText').innerHTML =
       '<span class="pay-label"><b>' + escHtml(r.name) + '</b>님에게 줄 돈 (실수령액)</span>' +
@@ -895,7 +932,10 @@
       return '<div class="week-cell ' + (active ? 'yes' : 'no') + '">' +
         '<b>' + w.week + '주차 · ' + E.formatNum(w.hours, 2) + 'h' + mealSub + '</b>' +
         '<span class="w-amt">' + (r.includeWeekly
-          ? (w.eligible ? '주휴 +' + E.formatWon(w.allowance) + '원' : '15h 미만 (주휴 0원)')
+          ? (w.eligible
+              ? '주휴 +' + E.formatWon(w.allowance) + '원' + (w.excused ? ' (결근 있으나 지급)' : '')
+              : (!w.hoursOk ? '15h 미만 (주휴 0원)'
+                : '결근으로 주휴 없음' + (w.workDays !== null && w.workDays !== undefined ? ' (' + w.workDays + '/' + w.contractDays + '일)' : '')))
           : '주휴 미포함 (0원)') + '</span>' +
         '</div>';
     }).join('');
@@ -1118,6 +1158,34 @@
     });
 
     // 달력 날짜 클릭 -> 해당 날짜 선택
+    // 주 근무 약속일수 − / +
+    function shiftContractDays(delta) {
+      state.contractDays = Math.min(7, Math.max(1, state.contractDays + delta));
+      recalcPayroll();
+    }
+    $('pContractMinus').addEventListener('click', function () { shiftContractDays(-1); });
+    $('pContractPlus').addEventListener('click', function () { shiftContractDays(1); });
+
+    // 결근 주의 "주휴 지급" 예외 버튼(달력 표/카드) 및 주차별 모드 결근 칩
+    function onWeekToggleClick(ev) {
+      var ex = ev.target.closest('[data-week-excuse]');
+      if (ex) {
+        var wi = Number(ex.getAttribute('data-week-excuse'));
+        state.weekExcuse[wi] = !state.weekExcuse[wi];
+        recalcPayroll();
+        return;
+      }
+      var ab = ev.target.closest('[data-week-absent]');
+      if (ab) {
+        var ai = Number(ab.getAttribute('data-week-absent'));
+        state.weekAbsent[ai] = !state.weekAbsent[ai];
+        recalcPayroll();
+      }
+    }
+    $('monthCalBody').addEventListener('click', onWeekToggleClick);
+    $('monthCalCards').addEventListener('click', onWeekToggleClick);
+    $('weekAbsentBox').addEventListener('click', onWeekToggleClick);
+
     function onCalDayClick(ev) {
       var cell = ev.target.closest('[data-day-idx]');
       if (!cell) return;
@@ -1297,6 +1365,8 @@
     // 지급월 변경 시 해당 월의 실제 달력/주차 재구성
     $('pMonth').addEventListener('change', function () {
       syncPayMonthLabel();
+      state.weekExcuse = [];
+      state.weekAbsent = [];
       ensureCalendarAndShifts($('pMonth').value, false);
       recalcPayroll();
       showToast('📅 ' + state.calendar.year + '년 ' + state.calendar.month + '월 달력 (' + state.calendar.weekCount + '개 주차) 적용');
