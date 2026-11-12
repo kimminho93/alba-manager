@@ -1518,10 +1518,12 @@ html[data-fs="large"] .pay-banner .money { font-size: 48px; }
   html[data-fs="large"] body { zoom: 1.1; }
 }
 
-/* ---------- 달력: 화면 폭에 따라 표(PC) ↔ 주 단위 카드(휴대폰) 전환 ---------- */
+/* ---------- 달력: 달력 영역의 실제 폭에 따라 표 ↔ 주 단위 카드 전환 ----------
+   (화면 폭이 아니라 달력이 놓인 칸의 폭 기준: 휴대폰·태블릿 세로·좁은 2단 레이아웃 모두 대응) */
+.month-cal-wrap { container-type: inline-size; }
 .cal-cards-view { display: none; }
 
-@media (max-width: 640px) {
+@container (max-width: 680px) {
   .cal-table-view { display: none; }
   .cal-cards-view { display: flex; flex-direction: column; gap: 12px; }
 
