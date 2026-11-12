@@ -9,6 +9,7 @@
   <script>
     (function () {
       try {
+        if (localStorage.getItem('alba.bigFont') === '1') document.documentElement.setAttribute('data-fs', 'large');
         var t = localStorage.getItem('alba.theme');
         if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', t);
@@ -28,13 +29,14 @@
     </div>
     <div class="header-actions">
       <span id="modeBadge" class="badge badge-muted" title="실행 모드">⏳ 연결 확인 중…</span>
+      <button id="fontToggle" class="icon-btn font-btn" type="button" aria-label="글자 크게 보기 켜기/끄기" aria-pressed="false">가+</button>
       <button id="themeToggle" class="icon-btn" type="button" aria-label="다크/라이트 모드 전환">🌙</button>
     </div>
   </header>
 
   <nav class="tabs" role="tablist">
-    <button class="tab active" type="button" role="tab" data-tab="payroll" aria-selected="true">💰 1초 알바 급여 &amp; 명세서</button>
-    <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false">🛡️ 위생 점검 / 소방 안전 법정 체크리스트</button>
+    <button class="tab active" type="button" role="tab" data-tab="payroll" aria-selected="true">💰 급여 계산</button>
+    <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false">🛡️ 위생·소방 점검</button>
   </nav>
 
   <main class="container">

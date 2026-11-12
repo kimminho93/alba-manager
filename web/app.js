@@ -17,6 +17,7 @@
 
   var KEYS = {
     theme: 'alba.theme',
+    bigFont: 'alba.bigFont',
     roster: 'alba.roster.v1',
     archive: 'alba.archive.v1',
     store: 'alba.store.v1',
@@ -97,6 +98,23 @@
       btn.textContent = cur === 'dark' ? '☀️' : '🌙';
       btn.title = cur === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환';
     }
+  }
+
+  function syncFontBtn() {
+    var big = document.documentElement.getAttribute('data-fs') === 'large';
+    var btn = $('fontToggle');
+    if (!btn) return;
+    btn.textContent = big ? '가−' : '가+';
+    btn.setAttribute('aria-pressed', big ? 'true' : 'false');
+    btn.title = big ? '글자를 보통 크기로' : '글자를 크게';
+  }
+
+  function toggleFontSize() {
+    var big = document.documentElement.getAttribute('data-fs') === 'large';
+    if (big) document.documentElement.removeAttribute('data-fs');
+    else document.documentElement.setAttribute('data-fs', 'large');
+    try { localStorage.setItem(KEYS.bigFont, big ? '0' : '1'); } catch (e) {}
+    syncFontBtn();
   }
 
   function toggleTheme() {
@@ -285,6 +303,7 @@
       if (tool) {
         var ti = Number(tool.getAttribute('data-i'));
         if (tool.getAttribute('data-act') === 'del') {
+          if (!window.confirm('이 시간대를 삭제할까요?')) return;
           presetState.list.splice(ti, 1);
           savePresets();
           closePresetForm();
@@ -799,7 +818,8 @@
     syncModeAndHighlights(r);
 
     $('bannerText').innerHTML =
-      '<b>' + escHtml(r.name) + '</b>님 계좌로 <b class="money">' + E.formatWon(r.net) + '원</b> 입금하시면 됩니다.';
+      '<span class="pay-label"><b>' + escHtml(r.name) + '</b>님에게 줄 돈 (실수령액)</span>' +
+      '<b class="money">' + E.formatWon(r.net) + '<small>원</small></b>';
 
     $('slipName').textContent = r.name;
     $('slipMonth').textContent = r.payMonthLabel;
@@ -1029,6 +1049,7 @@
 
   function bindEvents() {
     $('themeToggle').addEventListener('click', toggleTheme);
+    $('fontToggle').addEventListener('click', toggleFontSize);
 
     // 우측 상단 뷰 전환 탭 (일별 출퇴근 시간표 크게 입력 <-> 표준 급여명세서 보기)
     $('btnViewSchedule').addEventListener('click', function () { setRightView('schedule'); });
@@ -1247,6 +1268,7 @@
       if (!btn) return;
       var idx = Number(btn.getAttribute('data-del-roster'));
       if (idx >= 0 && idx < state.roster.length) {
+        if (!window.confirm('"' + (state.roster[idx].name || '이 사람') + '"님을 정산 명단에서 삭제할까요?')) return;
         state.roster.splice(idx, 1);
         saveJson(KEYS.roster, state.roster);
         renderRoster();
@@ -1296,6 +1318,7 @@
       if (!btn) return;
       var idx = Number(btn.getAttribute('data-del-archive'));
       if (idx >= 0 && idx < state.archive.length) {
+        if (!window.confirm('이 점검 기록을 삭제할까요?')) return;
         state.archive.splice(idx, 1);
         saveJson(KEYS.archive, state.archive);
         renderArchive();
@@ -1321,6 +1344,7 @@
   }
 
   syncThemeBtn();
+  syncFontBtn();
   initTabs();
   initTimePickerChips();
   initDefaults();
