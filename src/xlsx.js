@@ -180,7 +180,11 @@
     ['moneyC', 0, 0, 2, 3, 'right', false],    // 금액 (연한 테두리)
     ['moneyCBold', 1, 3, 2, 3, 'right', false],
     ['okC', 1, 4, 2, 0, 'center', true],       // 초록 (대상/지급)
-    ['badC', 1, 5, 2, 0, 'center', true]       // 빨강 (제외)
+    ['badC', 1, 5, 2, 0, 'center', true],      // 빨강 (제외)
+    ['cTextZ', 0, 8, 2, 0, 'center', true],    // 얼룩무늬(날짜 구분용 연한 회색) 가운데 글자
+    ['valueZ', 0, 8, 2, 0, 'left', true],
+    ['hoursZ', 0, 8, 2, 164, 'center', false],
+    ['moneyCZ', 0, 8, 2, 3, 'right', false]
   ];
   var STYLE = { plain: 0 };
   XF_DEFS.forEach(function (d, i) { STYLE[d[0]] = i; });
@@ -272,6 +276,7 @@
       if (cells) x += '<row r="' + (r + 1) + '"' + (ht ? ' ht="' + ht + '" customHeight="1"' : '') + '>' + cells + '</row>';
     });
     x += '</sheetData>';
+    if (sheet.autoFilter) x += '<autoFilter ref="' + sheet.autoFilter + '"/>';
     if (sheet.merges && sheet.merges.length) {
       x += '<mergeCells count="' + sheet.merges.length + '">';
       sheet.merges.forEach(function (m) { x += '<mergeCell ref="' + m + '"/>'; });
@@ -299,7 +304,7 @@
 
   /**
    * sheets: [{ name, rows: [[cell, ...], ...], colWidths?: [number], merges?: ['A1:D1'],
-   *           tabColor?: 'FF3563F0', hideGrid?: bool, freezeRows?: n, freezeCols?: n, rowHeights?: {행번호(0부터): 높이}, landscape?: bool }]
+   *           tabColor?: 'FF3563F0', hideGrid?: bool, freezeRows?: n, freezeCols?: n, rowHeights?: {행번호(0부터): 높이}, landscape?: bool, autoFilter?: 'A4:K40' }]
    * cell  : 'text' | 123 | { v: any, s: 'header'|'money'|'moneyBold'|'title'|'text'|'textBold'|'num'|'ok'|'bad'|'plain' }
    * return: Uint8Array (.xlsx 바이너리)
    */

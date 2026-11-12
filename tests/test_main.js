@@ -293,4 +293,36 @@ test('급여 엑셀: 요약/급여명세서/출퇴근 기록/주차별 요약 �
   assert.ok(bytes.length > 3000);
 });
 
+test('정산 명단 엑셀: 월별 탭(정산/근무기록/주휴판정) + 전체 요약, 사람이 늘어도 탭 수 고정, 총 근무일수·시간 합계', () => {
+  const mk = (name, month, offDays, extra) => {
+    const n = new Date(2026, Number(month.slice(5)), 0).getDate();
+    const shifts = [];
+    for (let d = 1; d <= n; d++) {
+      const dow = new Date(2026, Number(month.slice(5)) - 1, d).getDay();
+      shifts.push({ off: !(dow >= 1 && dow <= 5) || offDays.includes(d), start: '09:00', end: '14:00', breakMinutes: 0 });
+    }
+    return E.calculatePayroll(Object.assign({ name, hourlyWage: 10000, mode: 'daily', payMonth: month, dailyShifts: shifts,
+      includeWeekly: true, includeMeal: true, mealAmount: 8000, tax: 'none' }, extra || {}));
+  };
+  const list = [mk('철수', '2026-10', []), mk('영희', '2026-10', [8]), mk('철수', '2026-11', [10]), mk('영희', '2026-11', []), mk('민수', '2026-11', [])];
+  const sheets = E.payrollRosterSheets(list);
+  assert.deepStrictEqual(sheets.map((x) => x.name),
+    ['전체 요약', '2026-10 정산', '2026-10 근무기록', '2026-10 주휴판정', '2026-11 정산', '2026-11 근무기록', '2026-11 주휴판정']);
+  const text = (sh) => sh.rows.map((row) => row.map((c) => (c && typeof c === 'object' ? c.v : c)).join('|')).join('\n');
+  // 11월 근무기록: 한 날짜(11/2)에 3명이 출근한 기록과 그날 인원/시간
+  const att = text(sheets[5]);
+  assert.ok(/11\/2\|월\|2주차\|민수\|09:00\|14:00/.test(att));
+  assert.ok(/3명\|15/.test(att));
+  assert.ok(/■ 사람별 합계/.test(att));
+  // 정산 탭의 합계: 근무일수 = 사람별 출근일수의 합
+  const days11 = list.filter((r) => r.payMonth === '2026-11').reduce((s, r) => s + r.workDays, 0);
+  assert.ok(new RegExp('합계\\|3명\\|\\|\\|' + days11 + '일').test(text(sheets[4])));
+  // 전체 요약: 월별 + 전체 합계 총 근무일수
+  const totalDays = list.reduce((s, r) => s + r.workDays, 0);
+  assert.ok(text(sheets[0]).indexOf('전체 합계||' + totalDays + '일') >= 0);
+  // 사람이 더 늘어도 탭 수는 그대로
+  assert.strictEqual(E.payrollRosterSheets(list.concat([mk('지수', '2026-11', [])])).length, 7);
+  assert.strictEqual(E.rosterFileName(list), '알바_정산명단_2026-10~2026-11_5명.xlsx');
+});
+
 console.log('\n총 ' + passed + '개 단위 테스트 통과!\n');

@@ -1399,10 +1399,19 @@
     });
     $('btnAddRoster').addEventListener('click', function () {
       var r = state.payroll || E.calculatePayroll(readPayrollForm());
-      state.roster.push(r.input);
+      // 같은 사람·같은 달이 이미 있으면 새로 쌓지 않고 최신 내용으로 덮어씀 (엑셀 월별 탭 중복 방지)
+      var dupIdx = -1;
+      state.roster.forEach(function (x, i) {
+        if (dupIdx < 0 && x.name === r.input.name && x.payMonth === r.input.payMonth) dupIdx = i;
+      });
+      if (dupIdx >= 0) {
+        state.roster[dupIdx] = r.input;
+      } else {
+        state.roster.push(r.input);
+      }
       saveJson(KEYS.roster, state.roster);
       renderRoster();
-      showToast('➕ 정산 명단에 ' + r.name + '님(' + E.formatWon(r.net) + '원) 추가');
+      showToast((dupIdx >= 0 ? '🔄 ' : '➕ ') + '정산 명단에 ' + r.name + '님(' + E.formatWon(r.net) + '원) ' + (dupIdx >= 0 ? '갱신' : '추가'));
     });
 
     $('rosterBody').addEventListener('click', function (ev) {
