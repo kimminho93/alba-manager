@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="1초 알바 급여·주휴수당·식대 정산 & 표준 급여명세서, 위생 점검표 (서버 없이 동작)">
+  <meta name="description" content="1초 알바 급여·주휴수당·식대 정산 & 표준 급여명세서, 위생 점검표 ">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
   <script>
@@ -67,7 +67,7 @@
             <input id="pName" type="text" value="철수" maxlength="20">
           </label>
 
-          <div class="field month-field"><span>지급월 <em class="hint">월별 주차 자동 반영</em></span>
+          <div class="field month-field"><span>지급월</span>
             <input id="pMonth" type="hidden">
             <div class="month-stepper" role="group" aria-label="지급월 선택">
               <button type="button" id="pMonthPrev" class="month-step" aria-label="이전 달">◀</button>
@@ -76,7 +76,7 @@
             </div>
           </div>
 
-          <label class="field"><span>시급 (원) <em class="hint">자유 입력 · 2026 최저 10,320원</em></span>
+          <label class="field"><span>시급 (원) <em class="hint">2026 최저시급 10,320원</em></span>
             <input id="pWage" type="number" inputmode="numeric" min="0" step="10" value="10320">
           </label>
 
@@ -113,7 +113,7 @@
 
           <!-- ② 월 총 근무시간 입력 모드 -->
           <div id="totalGroup" hidden>
-            <label class="field"><span>이번 달 총 근무시간 <em class="hint">4주 균등 분할 계산</em></span>
+            <label class="field"><span>이번 달 총 근무시간 </span>
               <div class="input-unit"><input id="pTotal" type="number" inputmode="decimal" min="0" step="0.5" value="60"><b>시간</b></div>
             </label>
           </div>
@@ -146,7 +146,7 @@
             <input id="pWeekly" type="checkbox" checked>
             <span class="weekly-text">
               <b>주휴수당 포함하여 정산하기</b>
-              <small>주 15시간 이상인 주 : (min(주시간,40) ÷ 40) × 8 × 시급</small>
+              <small>주 15시간 이상, 약속한 날수를 다 나온 주에 지급</small>
             </span>
           </label>
 
@@ -175,7 +175,7 @@
                 </div>
               </label>
               <label id="mealDaysManualField" class="field" hidden>
-                <span>식대 지급 일수 <em class="hint">월/주차 모드 수동 입력</em></span>
+                <span>식대 받은 날수</span>
                 <div class="input-unit">
                   <input id="pMealDays" type="number" min="0" max="31" step="1" value="16">
                   <b>일</b>
@@ -349,7 +349,7 @@
           <div class="doc" id="payDoc">
             <div class="doc-head">
               <h3>급여명세서</h3>
-              <span class="doc-law">근로기준법 제48조 제2항 기준</span>
+              
             </div>
             <table class="doc-info">
               <tr><th>성명</th><td id="slipName">-</td><th>지급월</th><td id="slipMonth">-</td></tr>
