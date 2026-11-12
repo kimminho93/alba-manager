@@ -62,7 +62,7 @@ function makeGoogle() {
         return res(200, { replies });
       }
       if (rest === '/values:batchClear') {
-        JSON.parse(opt.body).ranges.forEach(r => { const t = tab(r); if (!t) throw new Error('없는 탭 clear: ' + r); t.rows = []; });
+        JSON.parse(opt.body).ranges.forEach(r => { const pm = /^(.+)!A2:G5000$/.exec(r); if (pm) { const pt = tab(pm[1]); pt.rows = pt.rows.slice(0, 1); return; } const t = tab(r); if (!t) throw new Error('없는 탭 clear: ' + r); t.rows = []; });
         return res(200, {});
       }
       if (rest === '/values:batchUpdate') {
@@ -83,6 +83,8 @@ function makeGoogle() {
         const v = t.rows[0] && t.rows[0][1];
         return res(200, v === undefined || v === '' ? {} : { values: [[v]] });
       }
+      const um = /^\/values\/(.+)!A2$/.exec(rest.split('?')[0]);
+      if (um && (opt.method || 'GET') === 'PUT') { const t = tab(um[1]); JSON.parse(opt.body).values.forEach((row, k) => { t.rows[1 + k] = row; }); return res(200, {}); }
       const am = /^\/values\/(.+)!A:G:append$/.exec(decodeURIComponent(rest.split('?')[0]));
       if (am) {
         const t = tab(am[1]);
@@ -549,6 +551,38 @@ function makeDevice(google, opts) {
     assert.deepStrictEqual(a.data.workers[0].punch, { date: '2026-11-12', time: '09:30', at: '09:05' });
     const saved = JSON.parse(g.rows('sheet1', '데이터').slice(2).map(r => r[0]).join(''));
     assert.strictEqual(saved.workers[0].password, '1234');   // 시트에도 반영됨
+  });
+
+  await test('앱에서 알바생을 지우면 시트 출퇴근기록 장부에서도 그 사람 줄이 지워짐 (전체 삭제는 전부)', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', {})];
+    await a.cloud.connect();
+    await a.cloud.appendPunch([['2026-11-12 09:00:00', 'C1', '철수', '출근', '이름+비밀번호', '정상', ''], ['2026-11-12 10:00:00', 'C2', '영희', '출근', '이름+비밀번호', '정상', '']]);
+    assert.strictEqual(g.rows('sheet1', '출퇴근기록').length, 3);
+    assert.strictEqual(await a.cloud.purgePunchLog(['C1']), true);
+    const rows = g.rows('sheet1', '출퇴근기록');
+    assert.strictEqual(rows.length, 2);
+    assert.strictEqual(rows[1][1], 'C2');
+    assert.ok(rows[0][0].indexOf('기록시각') === 0);        // 머리글은 그대로
+    await a.cloud.purgePunchLog(null);
+    assert.strictEqual(g.rows('sheet1', '출퇴근기록').length, 1);
+  });
+
+  await test('구글 토큰은 새로고침해도 유효한 동안 재사용(다시 로그인 안 함), 연동을 끊으면 지움', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', {})];
+    await a.cloud.connect();
+    assert.ok(a.store['alba.cloud.tok']);
+    const b = makeDevice(g, { store: a.store });             // 같은 기기에서 새로고침
+    const before = b.tokens;
+    b.tokenFail = true;                                      // 새 토큰을 받으려 하면 실패하게 해 둠
+    await b.cloud.resume();
+    assert.strictEqual(b.lastStatus.kind, 'saved');           // 저장된 토큰으로 조용히 성공
+    assert.strictEqual(b.tokens, before);
+    a.cloud.disconnect();
+    assert.strictEqual(a.store['alba.cloud.tok'], undefined);
   });
 
   console.log('\n총 ' + passed + '개 구글 연동 테스트 통과!');

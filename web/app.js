@@ -1606,8 +1606,9 @@
         var idx = state.workers.findIndex(function (x) { return x.id === id; });
         if (idx < 0) return;
         if (!window.confirm('"' + state.workers[idx].name + '"님과 지금까지의 모든 월 기록을 삭제할까요?\n(삭제하면 되돌릴 수 없습니다)')) return;
-        state.workers.splice(idx, 1);
+        var gone = state.workers.splice(idx, 1)[0];
         saveWorkers();
+        purgePunchRows([gone.code]);
         if (state.selId === id) state.selId = state.workers.length ? state.workers[0].id : '';
         loadSelected();
         recalcPayroll();
@@ -1691,6 +1692,7 @@
       state.workers = [];
       state.selId = '';
       saveWorkers();
+      purgePunchRows(null);
       loadSelected();
       recalcPayroll();
       renderRoster();
@@ -1850,6 +1852,19 @@
   }
 
   var shownNotice = '';
+  /* 출퇴근 화면(잠금 상태 포함)에 구글 저장 연결 상태 표시 */
+  function renderPunchCloud(connected, kind, clock) {
+    var el = $('punchCloud');
+    if (!el) return;
+    var cls = 'punch-cloud', txt;
+    if (!connected) { cls += ' off'; txt = '☁️ 구글 저장 꺼짐 · 이 기기에만 저장 중'; }
+    else if (kind === 'needLogin' || kind === 'error') { cls += ' bad'; txt = '⚠️ 구글 로그인이 풀렸어요 · 사장님이 다시 연결해 주세요 (출퇴근은 이 기기에 저장돼요)'; }
+    else if (kind === 'saving') { txt = '⏳ 구글 시트에 저장 중…'; }
+    else { cls += ' ok'; txt = '✅ 구글 시트 연결됨' + (clock ? ' · 마지막 저장 ' + clock : ''); }
+    el.className = cls;
+    el.textContent = txt;
+  }
+
   function renderCloudUi(st) {
     if (st && st.notice && st.notice !== shownNotice) { shownNotice = st.notice; showToast('🗑️ ' + st.notice); }
     var btn = $('cloudBtn');
@@ -1858,6 +1873,7 @@
     var connected = !!(st && st.connected);
     var kind = st ? st.kind : 'off';
     var clock = fmtClock(st && st.lastSaved);
+    renderPunchCloud(connected, kind, clock);
 
     if (!connected && kind !== 'saving') { btn.textContent = '☁️ 구글 저장'; btn.className = 'cloud-btn'; }
     else if (kind === 'saving') { btn.textContent = '☁️ 저장 중…'; btn.className = 'cloud-btn'; }
@@ -2003,6 +2019,15 @@
 
   function getPin() { try { return localStorage.getItem(PIN_KEY) || ''; } catch (e) { return ''; } }
   function isLocked() { return !!getPin() && !punchState.unlocked; }
+  /* 새로고침해도 관리자 잠금 해제를 유지: 같은 탭에서 마지막 사용 후 10분 안이면 그대로 (탭을 닫으면 사라짐) */
+  var UNLOCK_KEY = 'alba.unlockAt';
+  function markUnlocked(on) { try { if (on) sessionStorage.setItem(UNLOCK_KEY, String(Date.now())); else sessionStorage.removeItem(UNLOCK_KEY); } catch (e) {} }
+  function restoreUnlock() {
+    try {
+      var t = Number(sessionStorage.getItem(UNLOCK_KEY) || 0);
+      if (getPin() && t && Date.now() - t < IDLE_LOCK_MS) punchState.unlocked = true;
+    } catch (e) {}
+  }
 
   function openTab(name) {
     var b = document.querySelector('.tabs .tab[data-tab="' + name + '"]');
@@ -2022,6 +2047,7 @@
   function lockNow() {
     if (!getPin()) return;
     punchState.unlocked = false;
+    markUnlocked(false);
     if (punchState.idleTimer) { clearTimeout(punchState.idleTimer); punchState.idleTimer = null; }
     document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open', 'modal-open');
     $('sheetBackdrop').hidden = true;
@@ -2031,6 +2057,7 @@
   }
 
   function bumpIdle() {
+    if (punchState.unlocked) markUnlocked(true);
     if (punchState.idleTimer) clearTimeout(punchState.idleTimer);
     punchState.idleTimer = (getPin() && punchState.unlocked) ? setTimeout(lockNow, IDLE_LOCK_MS) : null;
   }
@@ -2066,9 +2093,18 @@
     }).catch(function () { /* 다음 저장 때 다시 시도 */ }).then(function () { queueBusy = false; });
   }
 
+  /* 지운 알바생의 출퇴근 장부 줄도 지운다 (이 기기에 쌓인 대기분 + 구글 시트). codes가 null이면 전부 */
+  function purgePunchRows(codes) {
+    var q = loadQueue().filter(function (r) { return codes && codes.indexOf(String(r[1])) < 0; });
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch (e) {}
+    var C = window.AlbaCloud;
+    if (C && C.isConnected() && C.purgePunchLog) C.purgePunchLog(codes);
+  }
+
   /* 시트 '출퇴근기록' 장부로 출근/퇴근 상태 복구 (다시 로그인·불러오기 뒤) */
   function replayPunchLog(rows, afterMs) {
-    var n = E.replayPunchLog(state.workers, rows, afterMs);
+    // 너무 오래된 줄은 건너뜀: 지운 기록의 옛 장부가 되살아나는 것을 막는다 (최근 48시간만)
+    var n = E.replayPunchLog(state.workers, rows, Math.max(afterMs, Date.now() - 48 * 3600 * 1000));
     if (n) {
       saveWorkers();
       loadSelected(); recalcPayroll(); renderRoster();
@@ -2177,8 +2213,8 @@
   /* ---------- 출퇴근 알림음: 크기 · 소리 종류(출근/퇴근 따로) ---------- */
   var SND_KEY = 'alba.sound';
   var SOUNDS = {
-    up:    { label: '차임 (올라가는 음)', n: [[660, 0, .22], [880, .18, .3]] },
-    down:  { label: '차임 (내려가는 음)', n: [[880, 0, .22], [660, .18, .3]] },
+    up:    { label: '차임 (올라가는 음)', n: [[660, 0, .3], [880, .22, .3], [1320, .44, .5]] },
+    down:  { label: '차임 (내려가는 음)', n: [[1320, 0, .3], [880, .22, .3], [660, .44, .5]] },
     dingdong: { label: '딩동', n: [[784, 0, .35], [622, .32, .5]] },
     bell:  { label: '벨', n: [[1175, 0, .9, 'bell'], [1568, .12, .8, 'bell']] },
     beep:  { label: '삐빅 (또렷함)', n: [[1000, 0, .12, 'square'], [1000, .2, .12, 'square']] },
@@ -2189,7 +2225,7 @@
   };
   var SND_ORDER = ['up', 'down', 'dingdong', 'bell', 'beep', 'triple', 'fanfare', 'soft', 'none'];
   function loadSnd() {
-    var d = { vol: 90, inId: 'up', outId: 'down' };
+    var d = { vol: 100, inId: 'up', outId: 'down' };
     try {
       var o = JSON.parse(localStorage.getItem(SND_KEY) || '{}');
       if (typeof o.vol === 'number' && o.vol >= 0 && o.vol <= 100) d.vol = o.vol;
@@ -2210,13 +2246,15 @@
       if (!audioCtx) audioCtx = new AC();
       if (audioCtx.state === 'suspended') audioCtx.resume();
       var master = audioCtx.createGain();
-      master.gain.value = volPct / 100;
-      var comp = audioCtx.createDynamicsCompressor();   // 커져도 소리가 깨지지 않게
-      master.connect(comp); comp.connect(audioCtx.destination);
+      master.gain.value = (volPct / 100) * 6;           // 100%는 원래 소리의 6배(업장용)
+      var comp = audioCtx.createDynamicsCompressor();   // 크게 올려도 찢어지지 않게 제한기로 사용
+      comp.threshold.value = -3; comp.knee.value = 0; comp.ratio.value = 20; comp.attack.value = 0.001; comp.release.value = 0.15;
+      var post = audioCtx.createGain(); post.gain.value = 1.4;
+      master.connect(comp); comp.connect(post); post.connect(audioCtx.destination);
       var t0 = audioCtx.currentTime + 0.02;
       snd.n.forEach(function (nt) {
         var type = nt[3] || 'sine';
-        var peak = type === 'square' ? 0.45 : 0.95;
+        var peak = type === 'square' ? 0.8 : 1;
         var parts = type === 'bell' ? [[1, 1], [2.76, .35], [5.4, .15]] : [[1, 1]];
         parts.forEach(function (pt) {
           var o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -2424,7 +2462,9 @@
     // 저장소를 지운 새 기기에서 구글을 다시 연결하면 시트의 비밀번호로 복구
     setTimeout(adoptSheetPin, 5000);
 
+    restoreUnlock();
     applyLockUi();
+    bumpIdle();
     renderPunch();
     setTimeout(flushPunchQueue, 4000);
   }

@@ -126,13 +126,39 @@
   }
 
   /* ---------------- 토큰 ---------------- */
-  function getToken(mode) {
-    if (token && deps.now() < tokenExp - 60000) return Promise.resolve(token);
+  /* 구글 접속 토큰(약 1시간 유효)을 이 기기에 잠깐 보관: 새로고침해도 유효한 동안은 다시 로그인하지 않는다 */
+  var TOKEN_KEY = 'alba.cloud.tok';
+  var refreshTimer = null;
+  function loadStoredToken() {
+    try {
+      var t = JSON.parse(deps.storage.get(TOKEN_KEY) || 'null');
+      if (t && t.token && t.exp > deps.now() + 60000) { token = t.token; tokenExp = t.exp; }
+    } catch (e) {}
+  }
+  function storeToken() {
+    try { deps.storage.set(TOKEN_KEY, JSON.stringify({ token: token, exp: tokenExp })); } catch (e) {}
+  }
+  function scheduleRefresh() {
+    if (refreshTimer) { clearT(refreshTimer); refreshTimer = null; }
+    var wait = Math.max(30000, tokenExp - deps.now() - 5 * 60000);   // 만료 5분 전에 조용히 갱신 시도
+    refreshTimer = setT(function () {
+      refreshTimer = null;
+      if (!meta.connected) return;
+      fetchToken('silent').then(function () { setStatus('saved', ''); }).catch(function () { setStatus('needLogin', '구글 로그인이 필요합니다.'); });
+    }, wait);
+  }
+  function fetchToken(mode) {
     return deps.requestToken(mode).then(function (r) {
       token = r.token;
       tokenExp = deps.now() + r.expiresIn * 1000;
+      storeToken();
+      scheduleRefresh();
       return token;
     });
+  }
+  function getToken(mode) {
+    if (token && deps.now() < tokenExp - 60000) return Promise.resolve(token);
+    return fetchToken(mode);
   }
 
   function api(method, url, body, mode, retried) {
@@ -479,6 +505,21 @@
     return api('POST', url, { values: rows }, 'silent');
   }
 
+  /* 앱에서 알바생/기록을 지우면 시트 '출퇴근기록' 장부에서도 그 사람(codes) 줄을 지운다. codes가 비면 전부 지운다 */
+  function purgePunchLog(codes) {
+    if (!meta.connected || !meta.sheetId) return Promise.resolve(false);
+    var rng = SHEET_PUNCH + '!A2:G5000';
+    return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(rng), undefined, 'silent').then(function (res) {
+      var rows = (res && res.values) || [];
+      var keep = codes && codes.length ? rows.filter(function (r) { return codes.indexOf(String(r[1] || '').trim()) < 0; }) : [];
+      if (keep.length === rows.length) return true;
+      return api('POST', SHEETS + '/' + meta.sheetId + '/values:batchClear', { ranges: [rng] }, 'silent').then(function () {
+        if (!keep.length) return true;
+        return api('PUT', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(SHEET_PUNCH + '!A2') + '?valueInputOption=RAW', { values: keep }, 'silent').then(function () { return true; });
+      });
+    }).catch(function () { return false; });
+  }
+
   /* 관리자 비밀번호 복구: 시트 '관리자' 탭 B1 칸 읽기/쓰기 */
   function readAdminPin(mode) {
     if (!meta.connected || !meta.sheetId) return Promise.reject(new Error('not connected'));
@@ -518,6 +559,8 @@
     if (saveTimer) { clearT(saveTimer); saveTimer = null; }
     if (token) deps.revoke(token);
     token = null; tokenExp = 0;
+    if (refreshTimer) { clearT(refreshTimer); refreshTimer = null; }
+    deps.storage.remove(TOKEN_KEY);
     meta = { connected: false, sheetId: '', stamp: '', dirty: false, lastSaved: 0 };
     deps.storage.remove(META_KEY);
     lastJson = null;
@@ -528,12 +571,13 @@
   }
 
   return {
-    init: function (h) { host = h; },
+    init: function (h) { host = h; loadStoredToken(); },
     connect: connect,
     resume: resume,
     markDirty: markDirty,
     saveNow: saveNow,
     appendPunch: appendPunch,
+    purgePunchLog: purgePunchLog,
     readAdminPin: readAdminPin,
     setAdminPin: setAdminPin,
     loadFromSheet: loadFromSheet,

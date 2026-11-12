@@ -2346,3 +2346,8 @@ body.on-punch .app-footer, body.locked .app-footer { display: none; }
 .snd-row select { flex: 1; min-width: 0; min-height: 46px; font: inherit; font-size: 16px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
 .snd-row .btn { flex: none; min-height: 46px; }
 .snd-val { flex: none; width: 3.2em; text-align: right; }
+
+.punch-cloud { margin: 18px auto 0; max-width: 560px; padding: 12px 16px; border-radius: 14px; font-size: 15px; line-height: 1.45; text-align: center; background: var(--card); border: 1px solid var(--line); color: var(--muted); }
+.punch-cloud.ok { color: #0a7d4b; border-color: rgba(10,125,75,.35); background: rgba(10,125,75,.07); }
+.punch-cloud.bad { color: #b3261e; border-color: rgba(179,38,30,.45); background: rgba(179,38,30,.08); font-weight: 700; }
+@media print { .punch-cloud { display: none !important; } }
