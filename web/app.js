@@ -1194,7 +1194,6 @@
     $('btnViewSlip').addEventListener('click', function () { setRightView('slip'); });
     $('btnOpenScheduleView').addEventListener('click', function () {
       setRightView('schedule');
-      $('scheduleBoard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
 
     // 달력 날짜 클릭 -> 해당 날짜 선택
@@ -1531,7 +1530,6 @@
       selectWorker(wid);
       var w = selWorker();
       if (w) showToast('👤 ' + w.name + '님 ' + state.calendar.month + '월 ' + (w.months[$('pMonth').value] ? '기록을 불러왔습니다' : '— 아직 기록이 없어 비어 있습니다'));
-      $('payForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
     function allRecordInputs() {
