@@ -195,6 +195,7 @@
           b.classList.toggle('active', active);
           b.setAttribute('aria-selected', active ? 'true' : 'false');
         });
+        document.body.classList.toggle('on-punch', target === 'punch');
         document.querySelectorAll('.tab-panel').forEach(function (panel) {
           panel.classList.toggle('active', panel.id === 'tab-' + target);
         });
@@ -1533,7 +1534,7 @@
       if (ev.key === 'Escape' && /set-open|add-open|slip-open|export-open/.test(document.body.className)) closeSheets();
     });
     // 폰에서는 '지급월'을 설정 창 밖(맨 위)에 두고, PC에서는 원래 자리(시급 위)에 둔다
-    var phoneMq = window.matchMedia('(max-width: 560px)');
+    var phoneMq = window.matchMedia('screen');
     function placeMonthField() {
       var mf = $('monthField'), sheet = $('setSheet');
       if (phoneMq.matches) sheet.parentNode.insertBefore(mf, sheet);
@@ -1632,13 +1633,19 @@
       return list;
     }
 
-    function downloadRosterXlsx(ids) {
+    function downloadRosterXlsx(ids, personal) {
       var inputs = allRecordInputs(ids);
       if (!inputs.length) {
         showToast('저장된 근무 기록이 없습니다. 알바생을 추가하고 근무 시간을 입력해 주세요.');
         return;
       }
       var results = inputs.map(function (inp) { return E.calculatePayroll(inp); });
+      if (personal) {
+        var fn = E.personalFileName(results);
+        triggerBlobDownload(E.payrollPersonalXlsx(results), fn);
+        showToast('📊 엑셀(.xlsx) 다운로드 완료: ' + fn);
+        return;
+      }
       var names = {};
       results.forEach(function (r) { names[r.name] = 1; });
       var nameList = Object.keys(names);
@@ -1652,7 +1659,6 @@
     function openExportPicker() {
       var withRec = state.workers.filter(function (w) { return Object.keys(w.months).length; });
       if (!withRec.length) { downloadRosterXlsx(null); return; }
-      if (state.workers.length === 1) { downloadRosterXlsx([state.workers[0].id]); return; }
       $('exportList').innerHTML = state.workers.map(function (w) {
         var n = Object.keys(w.months).length;
         return '<label class="export-row' + (n ? '' : ' off') + '"><input type="checkbox" value="' + escHtml(w.id) + '"' + (n ? ' checked' : ' disabled') + '>' +
@@ -1675,7 +1681,7 @@
       var ids = Array.prototype.map.call($('exportList').querySelectorAll('input:checked'), function (b) { return b.value; });
       if (!ids.length) { showToast('엑셀로 받을 알바생을 한 명 이상 체크해 주세요.'); return; }
       closeSheets();
-      downloadRosterXlsx(ids);
+      downloadRosterXlsx(ids, $('exportPersonal').checked);
     });
 
 
@@ -2139,7 +2145,30 @@
     showPunchResult(w, r, now);
   }
 
+  var audioCtx = null;
+  function playChime(isIn) {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      var notes = isIn ? [660, 880] : [880, 660];   // 출근: 올라가는 소리 / 퇴근: 내려가는 소리
+      var t0 = audioCtx.currentTime + 0.02;
+      notes.forEach(function (f, i) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        var t = t0 + i * 0.18;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t); o.stop(t + 0.36);
+      });
+    } catch (e) { /* 소리를 못 내도 출퇴근 처리는 그대로 */ }
+  }
+
   function showPunchResult(w, r, now) {
+    if (r.kind === 'in' || r.kind === 'out') playChime(r.kind === 'in');
     var pm = r.date.slice(0, 7);
     var sum = E.monthSummary(w, pm);
     var isIn = r.kind === 'in';

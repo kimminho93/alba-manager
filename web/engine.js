@@ -1458,7 +1458,17 @@
   function cleanPunch(raw) {
     if (!isObj(raw)) return null;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(raw.date)) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(raw.time))) return null;
-    return { date: raw.date, time: raw.time };
+    var o = { date: raw.date, time: raw.time };
+    if (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(raw.at))) o.at = raw.at;   // 실제로 찍은 시각(올림 전)
+    return o;
+  }
+
+  /** 출근 시각은 30분 단위로 올림: 09:00 → 09:00, 09:01 → 09:30, 09:31 → 10:00 (자정을 넘기면 23:59로 제한) */
+  function roundUp30(hm) {
+    var m = Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3));
+    var r = Math.ceil(m / 30) * 30;
+    if (r >= 1440) return '23:59';
+    return ('0' + Math.floor(r / 60)).slice(-2) + ':' + ('0' + (r % 60)).slice(-2);
   }
 
   function punchIsOpen(worker) { return !!(worker && cleanPunch(worker.punch)); }
@@ -1476,16 +1486,18 @@
     var today = ymdOf(now), time = hmOf(now);
     var note = '';
     if (open) {
-      var inMs = new Date(open.date + 'T' + open.time + ':00').getTime();
+      var inMs = new Date(open.date + 'T' + (open.at || open.time) + ':00').getTime();
       var elapsed = (now.getTime() - inMs) / 60000;
       if (elapsed >= 0 && elapsed <= PUNCH_MAX_MIN) {
         if (elapsed < 1) return { kind: 'too_soon', date: open.date, start: open.time, end: time, note: '' };
+        if (today === open.date && toMin(time) < toMin(open.time)) return { kind: 'too_soon', date: open.date, start: open.time, end: time, note: '출근 시각(' + open.time + ')이 아직 되지 않았어요' };
         return clockOut(worker, open, time);
       }
       note = '이전 출근(' + open.date + ' ' + open.time + ')은 퇴근 기록이 없어 무시하고 새로 출근 처리';
     }
-    worker.punch = { date: today, time: time };
-    return { kind: 'in', date: today, start: time, end: '', note: note };
+    var rounded = roundUp30(time);
+    worker.punch = { date: today, time: rounded, at: time };
+    return { kind: 'in', date: today, start: rounded, end: '', note: note };
   }
 
   function clockOut(worker, open, end) {
@@ -2579,6 +2591,52 @@
     return M.buildXlsx(payrollRosterSheets(results));
   }
 
+
+  /* 알바생 본인용: 근무시간 · 식대 · 출근일자만 (시급·급여·세금은 넣지 않음) */
+  function personalSheet(list, name) {
+    var COLS = 6, rows = [], merges = ['A1:F1', 'A2:F2'];
+    var who = list[0].name;
+    rows.push([S('band', '내 근무 기록  ·  ' + who)].concat(fill(COLS - 1, 'band')));
+    rows.push([S('sub', '출근한 날짜와 근무시간, 식대 지급 횟수입니다.')].concat(fill(COLS - 1, 'sub')));
+    var sorted = list.slice().sort(function (a, b) { return String(a.payMonth).localeCompare(String(b.payMonth)); });
+    sorted.forEach(function (r) {
+      rows.push([]);
+      rows.push([S('section', '■ ' + (r.payMonthLabel || r.payMonth || ''))].concat(fill(COLS - 1, 'section')));
+      merges.push('A' + rows.length + ':F' + rows.length);
+      rows.push([H('출근일자'), H('요일'), H('출근'), H('퇴근'), H('근무시간(h)'), H('식대')]);
+      var n = 0, hrs = 0, meals = 0;
+      (r.days || []).forEach(function (d) {
+        if (d.off || !(d.hours > 0)) return;
+        var mc = r.includeMeal && d.mealEligible ? (d.mealCount || 1) : 0;
+        n++; hrs += d.hours; meals += mc;
+        rows.push([S('cText', d.dateStr ? md(d.dateStr) : (d.date ? d.date + '일' : '')), S('cText', d.dayName || ''),
+          S('cText', d.start), S('cText', d.end), S('hours', d.hours),
+          mc ? S('okC', mealLabel(d) || '지급') : S('cText', '-')]);
+      });
+      if (!n) {
+        rows.push([S('cText', r.mode === 'daily' ? '출근한 날이 없습니다' : '날짜별 기록이 없어 합계만 표시합니다'), S('cText', ''), S('cText', ''), S('cText', ''), S('hours', r.totalHours), S('cText', '')]);
+        merges.push('A' + rows.length + ':D' + rows.length);
+      }
+      var mealTot = r.mode === 'daily' ? meals : (r.mealDays || 0);
+      rows.push([S('tot', '합계'), S('tot', n + '일 출근'), S('tot', ''), S('tot', ''), S('hoursTot', M.round2(n ? hrs : r.totalHours)),
+        S('tot', r.includeMeal ? mealTot + '회' : '-')]);
+    });
+    return { name: name || '내 근무 기록', rows: rows, colWidths: [13, 8, 10, 10, 14, 14], merges: merges, tabColor: 'FF10915A', hideGrid: true, rowHeights: { 0: 40 } };
+  }
+
+  function payrollPersonalXlsx(results) {
+    var map = {}, order = [];
+    results.forEach(function (r) { var k = r.name; if (!map[k]) { map[k] = []; order.push(k); } map[k].push(r); });
+    return M.buildXlsx(order.map(function (k) { return personalSheet(map[k], k); }));
+  }
+
+  function personalFileName(results) {
+    var names = {};
+    results.forEach(function (r) { names[r.name] = 1; });
+    var l = Object.keys(names);
+    return '근무기록_' + (l.length === 1 ? safeFilePart(l[0]) : l.length + '명') + '.xlsx';
+  }
+
   function payrollFileName(r) {
     return '급여명세서_' + safeFilePart(r.name) + (r.payMonth ? '_' + r.payMonth : '') + '.xlsx';
   }
@@ -2670,6 +2728,8 @@
     payrollMonthWeeklySheet: payrollMonthWeeklySheet,
     payrollSlipXlsx: payrollSlipXlsx,
     payrollRosterXlsx: payrollRosterXlsx,
+    payrollPersonalXlsx: payrollPersonalXlsx,
+    personalFileName: personalFileName,
     payrollFileName: payrollFileName,
     rosterFileName: rosterFileName,
     checklistSheet: checklistSheet,

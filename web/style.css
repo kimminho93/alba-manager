@@ -1485,7 +1485,7 @@ html[data-theme="dark"] .toast {
   }
 }
 
-@media (max-width: 560px) {
+@media screen {
   .app-header {
     flex-wrap: wrap;
   }
@@ -1532,7 +1532,7 @@ html[data-theme="dark"] .toast {
 html[data-fs="large"] body { zoom: 1.2; }
 html[data-fs="large"] .pay-banner .money { font-size: 48px; }
 .font-btn { font-weight: 800; font-size: 16px; }
-@media (max-width: 560px) {
+@media screen {
   .pay-banner .money { font-size: 36px; }
   html[data-fs="large"] body { zoom: 1.1; }
 }
@@ -1749,7 +1749,7 @@ html[data-fs="large"] .pay-banner .money { font-size: 48px; }
     page-break-inside: avoid;
   }
 }.font-btn, .icon-btn { white-space: nowrap; }
-@media (max-width: 560px) {
+@media screen {
   .segmented span { font-size: 14px; padding-left: 4px; padding-right: 4px; word-break: keep-all; }
 }
 
@@ -1931,7 +1931,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .75; }
 .set-field { min-width: 0; }
 .set-field input { width: 100%; font-size: 18px; min-height: 48px; }
 .set-note { margin: 18px 0 12px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2, rgba(120,140,200,.08)); font-size: 14.5px; line-height: 1.6; }
-@media (max-width: 560px) { .set-grid { grid-template-columns: minmax(0, 1fr); } }
+@media screen { .set-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- 식대 점심/저녁 체크 ---------- */
 .meal-pick { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 10px 0 4px; padding: 10px 14px; border-radius: 12px; background: rgba(34, 160, 90, .09); border: 1px solid rgba(34, 160, 90, .35); }
@@ -2032,7 +2032,7 @@ body.modal-open { overflow: hidden; }
 
 @media print { .worker-chips, .empty-card, .set-row, .sheet-backdrop { display: none !important; } }
 
-@media (max-width: 560px) {
+@media screen {
   #tab-payroll { padding-top: 4px; }
 
   /* 맨 위 알바생 칩: 이름이 많으면 손가락으로 옆으로 민다 */
@@ -2182,7 +2182,7 @@ body.modal-open { overflow: hidden; }
 .day-sheet .preset-head { flex-wrap: nowrap; }
 .day-sheet .preset-add, .day-sheet .preset-edit-toggle { padding: 6px 10px; font-size: 14px; min-height: 40px; border-color: transparent; background: var(--card-2); }
 
-@media (max-width: 560px) {
+@media screen {
   /* 빠른 시간대: 한 줄로 옆으로 밀어서 고름 */
   .day-sheet .preset-list { flex-wrap: nowrap; overflow-x: auto; max-height: none; margin: 0 -16px; padding: 2px 16px; scrollbar-width: none; }
   .day-sheet .preset-list::-webkit-scrollbar { display: none; }
@@ -2303,7 +2303,17 @@ body.locked .tabs, body.locked #cloudBtn, body.locked #tab-payroll, body.locked 
 .punch-timer span { display: block; height: 100%; width: 100%; background: var(--primary); transform-origin: left; }
 @keyframes punchTimer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 @media print { #tab-punch, .punch-modal, .lock-btn { display: none !important; } }
-@media (max-width: 560px) { .punch-time { font-size: 56px; } .punch-name { font-size: 22px; } }
-@media (max-width: 560px) {
+@media screen { .punch-time { font-size: 56px; } .punch-name { font-size: 22px; } }
+@media screen {
   #addWorkerForm select { width: 100%; box-sizing: border-box; min-height: 48px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card-2); color: var(--text); font-size: 17px; }
+}
+
+body.on-punch .app-footer, body.locked .app-footer { display: none; }
+.export-personal { display:flex; gap:10px; align-items:flex-start; padding:12px 4px; font-size:15px; line-height:1.4; }
+.export-personal input { width:22px; height:22px; flex:none; margin-top:1px; }
+
+/* ---------- PC: 휴대폰과 같은 토스식 한 줄 구성 (가운데 좁은 폭) ---------- */
+@media screen and (min-width: 700px) {
+  .app-header, .tabs, .container { max-width: 640px; }
+  #setSheet, #addWorkerForm { left: 50%; right: auto; bottom: auto; top: 50%; width: 500px; max-width: calc(100vw - 32px); transform: translate(-50%, -50%); border-radius: 18px; max-height: 86vh; }
 }

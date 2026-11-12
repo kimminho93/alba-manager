@@ -174,7 +174,17 @@
   function cleanPunch(raw) {
     if (!isObj(raw)) return null;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(raw.date)) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(raw.time))) return null;
-    return { date: raw.date, time: raw.time };
+    var o = { date: raw.date, time: raw.time };
+    if (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(raw.at))) o.at = raw.at;   // 실제로 찍은 시각(올림 전)
+    return o;
+  }
+
+  /** 출근 시각은 30분 단위로 올림: 09:00 → 09:00, 09:01 → 09:30, 09:31 → 10:00 (자정을 넘기면 23:59로 제한) */
+  function roundUp30(hm) {
+    var m = Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3));
+    var r = Math.ceil(m / 30) * 30;
+    if (r >= 1440) return '23:59';
+    return ('0' + Math.floor(r / 60)).slice(-2) + ':' + ('0' + (r % 60)).slice(-2);
   }
 
   function punchIsOpen(worker) { return !!(worker && cleanPunch(worker.punch)); }
@@ -192,16 +202,18 @@
     var today = ymdOf(now), time = hmOf(now);
     var note = '';
     if (open) {
-      var inMs = new Date(open.date + 'T' + open.time + ':00').getTime();
+      var inMs = new Date(open.date + 'T' + (open.at || open.time) + ':00').getTime();
       var elapsed = (now.getTime() - inMs) / 60000;
       if (elapsed >= 0 && elapsed <= PUNCH_MAX_MIN) {
         if (elapsed < 1) return { kind: 'too_soon', date: open.date, start: open.time, end: time, note: '' };
+        if (today === open.date && toMin(time) < toMin(open.time)) return { kind: 'too_soon', date: open.date, start: open.time, end: time, note: '출근 시각(' + open.time + ')이 아직 되지 않았어요' };
         return clockOut(worker, open, time);
       }
       note = '이전 출근(' + open.date + ' ' + open.time + ')은 퇴근 기록이 없어 무시하고 새로 출근 처리';
     }
-    worker.punch = { date: today, time: time };
-    return { kind: 'in', date: today, start: time, end: '', note: note };
+    var rounded = roundUp30(time);
+    worker.punch = { date: today, time: rounded, at: time };
+    return { kind: 'in', date: today, start: rounded, end: '', note: note };
   }
 
   function clockOut(worker, open, end) {

@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611121200">
+  <link rel="stylesheet" href="./style.css?v=202611122350">
 </head>
 <body>
   <header class="app-header">
@@ -84,7 +84,7 @@
           <label class="field"><span>알바생 이름</span>
             <input id="pName" type="text" maxlength="20" placeholder="아래 [알바생 추가]에서 먼저 등록하세요" disabled>
           </label>
-          <label class="field"><span>출퇴근 비밀번호 <em class="hint">(선택) 알바생이 자기 QR을 볼 때 입력</em></span>
+          <label class="field"><span>출퇴근 비밀번호 <em class="hint">(선택) 알바생이 출퇴근 찍을 때 입력</em></span>
             <input id="pPw" type="text" maxlength="20" autocomplete="off" placeholder="예) 1234" disabled>
           </label>
           <p id="noWorkerNote" class="no-worker-note">아래 <b>정산 명단</b>에서 <b>알바생을 추가</b>하면 근무 기록이 자동으로 저장됩니다.</p>
@@ -711,6 +711,7 @@
   <div id="exportSheet" class="export-sheet" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
     <div class="sheet-head"><b id="exportTitle">엑셀로 받을 알바생</b><button type="button" id="exportClose" class="sheet-done">닫기</button></div>
     <p class="export-note">체크한 사람의 모든 달 기록이 한 파일로 받아집니다.</p>
+    <label class="export-personal"><input type="checkbox" id="exportPersonal"> <span>알바생 본인용 (근무시간·식대·출근일자만, 급여 금액 없음)</span></label>
     <div id="exportList" class="export-list"></div>
     <div class="export-actions">
       <button type="button" id="exportAllToggle" class="btn">전체 선택</button>
@@ -867,8 +868,8 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611121200"></script>
-  <script src="./gsync.js?v=202611121200"></script>
-  <script src="./app.js?v=202611121200"></script>
+  <script src="./engine.js?v=202611122350"></script>
+  <script src="./gsync.js?v=202611122350"></script>
+  <script src="./app.js?v=202611122350"></script>
 </body>
 </html>

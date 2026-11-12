@@ -577,11 +577,27 @@ test('출퇴근: 출근 → 퇴근이면 그 날 달력 칸에 시각이 그대�
   assert.strictEqual(E.punchIsOpen(w), false);
   const sh = E.workerShifts(w, '2026-11')[11];
   assert.strictEqual(sh.off, false);
-  assert.strictEqual(sh.start, '09:03');
+  assert.strictEqual(a.start, '09:30');   // 출근은 30분 단위 올림
+  assert.strictEqual(sh.start, '09:30');
   assert.strictEqual(sh.end, '18:33');
   const sum = E.monthSummary(w, '2026-11');
   assert.strictEqual(sum.workDays, 1);
-  assert.ok(Math.abs(sum.totalHours - 9.5) < 0.01);
+  assert.ok(Math.abs(sum.totalHours - 9.05) < 0.01);
+});
+
+test('출근 30분 올림: 정각 유지, 1분이라도 지나면 다음 30분, 올림 전 시각 기준으로 중복 찍기 판단', () => {
+  const at = (h, m) => new Date(2026, 10, 12, h, m, 0);
+  const t = (h, m) => { const w = E.createWorker('가', 5, 10320); return E.applyPunch(w, at(h, m)).start; };
+  assert.strictEqual(t(9, 0), '09:00');
+  assert.strictEqual(t(9, 1), '09:30');
+  assert.strictEqual(t(9, 30), '09:30');
+  assert.strictEqual(t(9, 31), '10:00');
+  assert.strictEqual(t(23, 50), '23:59');
+  const w = E.createWorker('나', 5, 10320);
+  E.applyPunch(w, at(9, 5));                                   // 09:30로 기록
+  assert.strictEqual(E.applyPunch(w, at(9, 20)).kind, 'too_soon');   // 아직 출근 시각 전
+  assert.strictEqual(E.punchIsOpen(w), true);
+  assert.strictEqual(E.applyPunch(w, at(13, 0)).kind, 'out');
 });
 
 test('출퇴근: 1분 안에 다시 찍으면 무시, 출근 후 16시간이 넘으면 퇴근 누락으로 보고 새 출근', () => {
@@ -592,7 +608,7 @@ test('출퇴근: 1분 안에 다시 찍으면 무시, 출근 후 16시간이 넘
   const r = E.applyPunch(w, new Date(2026, 10, 13, 10, 0, 0));   // 25시간 뒤
   assert.strictEqual(r.kind, 'in');
   assert.ok(r.note.indexOf('무시') >= 0);
-  assert.deepStrictEqual(w.punch, { date: '2026-11-13', time: '10:00' });
+  assert.deepStrictEqual(w.punch, { date: '2026-11-13', time: '10:00', at: '10:00' });
   assert.strictEqual(E.workerShifts(w, '2026-11')[11].off, true);   // 전날은 기록되지 않음
 });
 
@@ -622,7 +638,7 @@ test('출퇴근: 출근 중 상태(punch)는 저장·불러오기 정리에서�
   const w = E.createWorker('최하나', 5, 10320);
   E.applyPunch(w, new Date(2026, 10, 12, 9, 0, 0));
   const [back] = E.normalizeWorkers(JSON.parse(JSON.stringify([w])));
-  assert.deepStrictEqual(back.punch, { date: '2026-11-12', time: '09:00' });
+  assert.deepStrictEqual(back.punch, { date: '2026-11-12', time: '09:00', at: '09:00' });
   const [bad] = E.normalizeWorkers([Object.assign({}, w, { punch: { date: 'x', time: '99:99' } })]);
   assert.strictEqual(bad.punch, undefined);
 });
