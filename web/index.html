@@ -431,12 +431,14 @@
               <tr><th>점검자</th><td id="chkInspector">-</td><th>종합 결과</th><td id="chkVerdict">-</td></tr>
               <tr><th>냉장 온도</th><td id="chkFridge">-</td><th>냉동 온도</th><td id="chkFreezer">-</td></tr>
             </table>
-            <div class="table-wrap">
+            <div class="table-wrap chk-table-view">
               <table class="doc-table chk-table">
                 <thead><tr><th>분류</th><th>No</th><th>점검 항목</th><th>결과</th><th>비고</th></tr></thead>
                 <tbody id="chkBody"></tbody>
               </table>
             </div>
+            <!-- 휴대폰용: 항목 카드 목록 (문서 영역 폭 560px 이하에서만 표시, 인쇄 시에는 위 표 사용) -->
+            <div id="chkCards" class="chk-cards-view" aria-label="점검 항목 목록"></div>
             <div class="memo-box"><b>특이사항</b><p id="chkMemo">-</p></div>
             <p class="doc-foot">점검자 : <span id="chkSign">________</span> (서명)</p>
           </div>

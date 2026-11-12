@@ -1004,6 +1004,24 @@
       });
     });
     $('chkBody').innerHTML = rowsHtml;
+
+    // 휴대폰용 카드 목록 (CSS가 문서 영역 폭에 따라 표/카드 중 하나만 표시)
+    var cardsHtml = '';
+    c.groups.forEach(function (g) {
+      cardsHtml += '<section class="chk-group"><h4 class="chk-group-title">' + escHtml(g.title) + '</h4>';
+      g.items.forEach(function (it) {
+        cardsHtml += '<div class="chk-item ' + (it.ok ? 'ok' : 'bad') + '">' +
+          '<span class="chk-item-no">' + it.no + '</span>' +
+          '<div class="chk-item-body">' +
+            '<div class="chk-item-text">' + escHtml(it.text) + '</div>' +
+            '<div class="chk-item-std">기준: ' + escHtml(it.standard) + (it.note ? ' · ' + escHtml(it.note) : '') + '</div>' +
+          '</div>' +
+          '<span class="result ' + (it.ok ? 'ok' : 'bad') + '">' + escHtml(it.status) + '</span>' +
+          '</div>';
+      });
+      cardsHtml += '</section>';
+    });
+    $('chkCards').innerHTML = cardsHtml;
   }
 
   function recalcChecklist() {

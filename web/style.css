@@ -1555,6 +1555,36 @@ html[data-fs="large"] .pay-banner .money { font-size: 48px; }
   .wk-card-foot { padding: 4px 6px 0; font-size: 15px; color: var(--muted); }
 }
 
+/* ---------- 문서(급여명세서/점검표): 좁은 칸에서 읽기 쉬운 모양으로 전환 ---------- */
+.doc { container-type: inline-size; }
+.chk-cards-view { display: none; }
+
+@container (max-width: 560px) {
+  /* 상단 정보표: 4칸 가로 배치 → 라벨/값 2칸씩 세로 배치 */
+  .doc-info, .doc-info tbody { display: block; }
+  .doc-info tr { display: grid; grid-template-columns: 6.5em 1fr; }
+  .doc-info th, .doc-info td { display: block; width: auto; font-size: 16px; padding: 8px 10px; }
+  .doc-info th { white-space: nowrap; }
+
+  /* 점검표: 표 → 항목 카드 */
+  .chk-table-view { display: none; }
+  .chk-cards-view { display: flex; flex-direction: column; gap: 14px; margin-bottom: 12px; }
+  .chk-group { display: flex; flex-direction: column; gap: 6px; }
+  .chk-group-title {
+    margin: 0; padding: 4px 4px 2px; font-size: 17px; color: var(--muted);
+  }
+  .chk-item {
+    display: grid; grid-template-columns: 2em 1fr auto; align-items: center; gap: 8px;
+    padding: 10px 12px; min-height: 56px;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--card-2);
+  }
+  .chk-item.bad { border-color: var(--bad); background: var(--bad-weak); }
+  .chk-item-no { font-weight: 800; color: var(--muted); text-align: center; }
+  .chk-item-text { font-size: 17px; font-weight: 700; line-height: 1.4; word-break: keep-all; }
+  .chk-item-std { font-size: 14px; color: var(--muted); margin-top: 2px; word-break: keep-all; }
+  .chk-item .result { font-size: 15px; }
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -1675,4 +1705,10 @@ html[data-fs="large"] .pay-banner .money { font-size: 48px; }
 }.font-btn, .icon-btn { white-space: nowrap; }
 @media (max-width: 560px) {
   .segmented span { font-size: 14px; padding-left: 4px; padding-right: 4px; word-break: keep-all; }
+}
+
+/* 인쇄(PDF) 시에는 화면 폭과 관계없이 항상 기존 표 모양 사용 */
+@media print {
+  .chk-cards-view { display: none !important; }
+  .chk-table-view { display: block !important; }
 }
