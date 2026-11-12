@@ -1400,8 +1400,7 @@
       saveWorkers();
       $('awName').value = '';
       selectWorker(w.id);
-      showToast('➕ ' + w.name + '님을 추가했습니다. 위 달력에서 근무 시간을 입력하세요.');
-      $('payForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      showToast('➕ ' + w.name + '님을 추가했습니다. 이름을 누르면 근무 기록을 입력할 수 있어요.');
     });
 
     // 명단에서 이름을 누르면 그 알바생의 기록을 달력에 불러옴
