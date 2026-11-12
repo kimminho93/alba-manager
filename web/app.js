@@ -18,14 +18,25 @@
   var KEYS = {
     theme: 'alba.theme',
     bigFont: 'alba.bigFont',
-    roster: 'alba.roster.v1',
+    roster: 'alba.roster.v1',        // 예전 형식(정산 명단) — 새 형식으로 옮기기 위해서만 읽음
+    workers: 'alba.workers.v2',
     archive: 'alba.archive.v1',
     store: 'alba.store.v1',
     presets: 'alba.timePresets.v1'
   };
 
   var SYNC_KEYS = {};
-  SYNC_KEYS[KEYS.roster] = SYNC_KEYS[KEYS.archive] = SYNC_KEYS[KEYS.store] = SYNC_KEYS[KEYS.presets] = true;
+  SYNC_KEYS[KEYS.workers] = SYNC_KEYS[KEYS.archive] = SYNC_KEYS[KEYS.store] = SYNC_KEYS[KEYS.presets] = true;
+
+  function loadWorkers() {
+    var list = loadJson(KEYS.workers, null);
+    if (Array.isArray(list)) return E.normalizeWorkers(list);
+    // 예전 형식(정산 명단)이 있으면 알바생별 월 기록으로 옮긴다 (원본은 그대로 둠)
+    var old = loadJson(KEYS.roster, []);
+    var moved = E.migrateRoster(old);
+    if (moved.length) { try { localStorage.setItem(KEYS.workers, JSON.stringify(moved)); } catch (e) {} }
+    return moved;
+  }
 
   var MINUTE_STEPS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
@@ -33,7 +44,8 @@
     serverAvailable: false,
     payroll: null,
     checklist: null,
-    roster: loadJson(KEYS.roster, []),
+    workers: loadWorkers(),
+    selId: '',          // 지금 달력에 불러온 알바생
     archive: loadJson(KEYS.archive, []),
     rightView: 'schedule', // 'schedule' | 'slip'
     calendar: null,
@@ -445,48 +457,14 @@
     }
   }
 
-  function ensureCalendarAndShifts(payMonth, resetDefault) {
+  /* 지급월 달력을 만든다. 근무 기록이 없는 달은 전부 휴무(0시간)로 시작한다. */
+  function ensureCalendarAndShifts(payMonth, force) {
     var cal = E.buildMonthCalendar(payMonth);
-    var prevCal = state.calendar;
     state.calendar = cal;
-
-    if (resetDefault || !state.dailyShifts || state.dailyShifts.length === 0) {
-      state.dailyShifts = cal.days.map(function (d) {
-        return {
-          off: d.isWeekend,
-          start: '09:00',
-          end: '14:00',
-          breakMinutes: 0
-        };
-      });
-      var firstWeekday = cal.days.findIndex(function (d) { return !d.isWeekend; });
-      state.selectedDayIdx = firstWeekday >= 0 ? firstWeekday : 0;
-      loadDayIntoEditor(state.selectedDayIdx);
-    } else if (!prevCal || prevCal.payMonth !== cal.payMonth) {
-      // 지급월이 바뀐 경우: 새 달의 요일(평일/주말)에 맞춰 기존 패턴 유지하며 재배치
-      var sampleWeekday = { off: false, start: '09:00', end: '14:00', breakMinutes: 0 };
-      var sampleWeekend = { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
-      if (prevCal && state.dailyShifts.length === prevCal.days.length) {
-        for (var i = 0; i < prevCal.days.length; i++) {
-          if (!prevCal.days[i].isWeekend && !state.dailyShifts[i].off) {
-            sampleWeekday = Object.assign({}, state.dailyShifts[i]);
-            break;
-          }
-        }
-        for (var j = 0; j < prevCal.days.length; j++) {
-          if (prevCal.days[j].isWeekend) {
-            sampleWeekend = Object.assign({}, state.dailyShifts[j]);
-            break;
-          }
-        }
-      }
-      state.dailyShifts = cal.days.map(function (d) {
-        return Object.assign({}, d.isWeekend ? sampleWeekend : sampleWeekday);
-      });
-      if (state.selectedDayIdx >= cal.daysInMonth) state.selectedDayIdx = 0;
-      loadDayIntoEditor(state.selectedDayIdx);
-    }
-
+    var reset = force || !state.dailyShifts || state.dailyShifts.length !== cal.daysInMonth;
+    if (reset && (!state.dailyShifts || state.dailyShifts.length !== cal.daysInMonth)) state.dailyShifts = E.emptyShifts(payMonth);
+    if (state.selectedDayIdx >= cal.daysInMonth) state.selectedDayIdx = 0;
+    if (reset) loadDayIntoEditor(state.selectedDayIdx);
   }
 
   function loadDayIntoEditor(dayIdx) {
@@ -566,7 +544,7 @@
       breakMinutes: sh.breakMinutes
     };
     renderTimeEditor();
-    recalcPayroll();
+    editPayroll();
   }
 
   function setRightView(view) {
@@ -839,31 +817,106 @@
     renderPayroll(r);
   }
 
+  /* ---------- 알바생 중심 기록: 선택 / 불러오기 / 자동 저장 ---------- */
+  function selWorker() {
+    for (var i = 0; i < state.workers.length; i++) if (state.workers[i].id === state.selId) return state.workers[i];
+    return null;
+  }
+
+  function saveWorkers() { saveJson(KEYS.workers, state.workers); }
+
+  function todayIndexIn(payMonth) {
+    var n = new Date();
+    return payMonth === n.getFullYear() + '-' + pad2(n.getMonth() + 1) ? n.getDate() - 1 : 0;
+  }
+
+  /* 선택한 알바생의 (지급월) 설정과 근무 기록을 화면에 채운다. 알바생이 없으면 빈 화면. */
+  function loadSelected() {
+    var w = selWorker();
+    var pm = $('pMonth').value;
+    var s = E.workerSettings(w, pm);
+    $('pName').value = w ? w.name : '';
+    $('pName').disabled = !w;
+    $('noWorkerNote').hidden = !!w;
+    $('pWage').value = s.wage;
+    state.contractDays = s.contractDays;
+    $('pWeekly').checked = s.includeWeekly;
+    $('pMeal').checked = s.includeMeal;
+    $('pMealMinHours').value = s.mealMinHours;
+    $('pMealAmount').value = s.mealAmount;
+    setSelectedTax(s.tax);
+    state.dailyShifts = w ? E.workerShifts(w, pm) : E.emptyShifts(pm);
+    state.weekExcuse = w ? E.workerExcuse(w, pm) : [];
+    state.weekAbsent = [];
+    state.selectedDayIdx = todayIndexIn(pm);
+    ensureCalendarAndShifts(pm, true);
+  }
+
+  /* 화면에서 고친 내용을 그 알바생의 그 달 기록으로 저장 (구글 연동 중이면 시트에도 자동 반영) */
+  function persistSelected() {
+    var w = selWorker();
+    if (!w) return;
+    var inp = readPayrollForm();
+    var nm = String(inp.name || '').trim();
+    if (nm) w.name = nm.slice(0, 20);
+    E.setRecord(w, inp.payMonth, {
+      wage: inp.hourlyWage, contractDays: inp.contractDays, includeWeekly: inp.includeWeekly,
+      includeMeal: inp.includeMeal, mealMinHours: inp.mealMinHours, mealAmount: inp.mealAmount,
+      tax: inp.tax, dailyShifts: inp.dailyShifts, weekExcuse: inp.weekExcuse
+    });
+    saveWorkers();
+  }
+
+  /* 사용자가 값을 바꿨을 때: 저장 + 다시 계산 + 명단 갱신 */
+  function editPayroll() {
+    persistSelected();
+    recalcPayroll();
+    renderRoster();
+  }
+
+  function selectWorker(id) {
+    state.selId = id || '';
+    loadSelected();
+    recalcPayroll();
+    renderRoster();
+  }
+
+  function monthResults() {
+    var pm = $('pMonth').value;
+    return state.workers.map(function (w) { return E.calculatePayroll(E.workerPayrollInput(w, pm)); });
+  }
+
   function renderRoster() {
-    var results = state.roster.map(function (inp) { return E.calculatePayroll(inp); });
+    var pm = $('pMonth').value;
+    var results = monthResults();
     var sum = E.summarizePayrolls(results);
     $('rosterCount').textContent = sum.count + '명';
     $('rosterTotal').textContent = E.formatWon(sum.totalNet) + '원';
+    $('rosterMonthLabel').textContent = pm.slice(0, 4) + '년 ' + Number(pm.slice(5)) + '월';
 
     if (!results.length) {
-      $('rosterBody').innerHTML = '<tr class="empty"><td colspan="11">아직 추가된 알바생이 없습니다. 위에서 [➕ 아래 정산 명단에 추가] 버튼을 눌러보세요.</td></tr>';
+      $('rosterBody').innerHTML = '<tr class="empty"><td colspan="11">아직 알바생이 없습니다. 위에서 이름·일하는 날·시급을 넣고 [➕ 알바생 추가]를 눌러주세요.</td></tr>';
       $('rosterFoot').innerHTML = '';
       return;
     }
 
     $('rosterBody').innerHTML = results.map(function (r, idx) {
-      return '<tr data-idx="' + idx + '">' +
+      var w = state.workers[idx];
+      var hasRec = !!(w.months && w.months[pm]);
+      var sel = w.id === state.selId;
+      return '<tr class="roster-row' + (sel ? ' selected' : '') + '" data-wid="' + escHtml(w.id) + '">' +
         '<td>' + (idx + 1) + '</td>' +
-        '<td><b>' + escHtml(r.name) + '</b></td>' +
+        '<td><button type="button" class="worker-link" data-pick-worker="' + escHtml(w.id) + '"><b>' + escHtml(r.name) + '</b></button>' +
+          (sel ? ' <span class="pill pill-ok">보는 중</span>' : '') + '</td>' +
         '<td>' + escHtml(r.payMonthLabel) + '</td>' +
-        '<td class="num">' + E.formatNum(r.totalHours, 2) + 'h</td>' +
+        '<td class="num">' + (hasRec ? E.formatNum(r.totalHours, 2) + 'h' : '<small class="muted">기록 없음</small>') + '</td>' +
         '<td class="num">' + E.formatWon(r.hourlyWage) + '원</td>' +
         '<td class="num">' + E.formatWon(r.weeklyAllowance) + '원 <span class="pill ' + (r.includeWeekly ? 'pill-ok' : 'pill-off') + '">' + (r.includeWeekly ? '포함' : '미포함') + '</span></td>' +
         '<td class="num">' + E.formatWon(r.mealAllowance) + '원 <span class="pill ' + (r.includeMeal ? 'pill-ok' : 'pill-off') + '">' + (r.includeMeal ? (r.mealDays + '일') : '미포함') + '</span></td>' +
         '<td class="num">' + E.formatWon(r.gross) + '원</td>' +
         '<td class="num">' + (r.tax.total ? '-' + E.formatWon(r.tax.total) : '0') + '원 <small class="muted">(' + escHtml(r.tax.type === 'none' ? '0%' : (r.tax.type === '3.3' ? '3.3%' : '4대')) + ')</small></td>' +
         '<td class="num net">' + E.formatWon(r.net) + '원</td>' +
-        '<td class="num"><button type="button" class="btn-del" data-del-roster="' + idx + '" title="삭제">✕</button></td>' +
+        '<td class="num"><button type="button" class="btn-del" data-del-worker="' + escHtml(w.id) + '" title="이 알바생 삭제">✕</button></td>' +
         '</tr>';
     }).join('');
 
@@ -1045,7 +1098,8 @@
     if (!$('pMonth').value) $('pMonth').value = yyyy + '-' + mm;
     if (!$('cDate').value) $('cDate').value = yyyy + '-' + mm + '-' + dd;
 
-    ensureCalendarAndShifts($('pMonth').value, true);
+    state.selId = state.workers.length ? state.workers[0].id : '';
+    loadSelected();
 
     var savedStore = loadJson(KEYS.store, null);
     if (savedStore) {
@@ -1072,7 +1126,7 @@
     // 주 근무 약속일수 − / +
     function shiftContractDays(delta) {
       state.contractDays = Math.min(7, Math.max(1, state.contractDays + delta));
-      recalcPayroll();
+      editPayroll();
     }
     $('pContractMinus').addEventListener('click', function () { shiftContractDays(-1); });
     $('pContractPlus').addEventListener('click', function () { shiftContractDays(1); });
@@ -1083,14 +1137,14 @@
       if (ex) {
         var wi = Number(ex.getAttribute('data-week-excuse'));
         state.weekExcuse[wi] = !state.weekExcuse[wi];
-        recalcPayroll();
+        editPayroll();
         return;
       }
       var ab = ev.target.closest('[data-week-absent]');
       if (ab) {
         var ai = Number(ab.getAttribute('data-week-absent'));
         state.weekAbsent[ai] = !state.weekAbsent[ai];
-        recalcPayroll();
+        editPayroll();
       }
     }
     $('monthCalBody').addEventListener('click', onWeekToggleClick);
@@ -1185,7 +1239,7 @@
           state.dailyShifts[i] = { off: sh.off, start: sh.start, end: sh.end, breakMinutes: sh.breakMinutes };
         }
       });
-      recalcPayroll();
+      editPayroll();
       showToast('📅 평일(월~금) 전체에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
     });
 
@@ -1196,7 +1250,7 @@
           state.dailyShifts[i] = { off: sh.off, start: sh.start, end: sh.end, breakMinutes: sh.breakMinutes };
         }
       });
-      recalcPayroll();
+      editPayroll();
       showToast('📅 주말(토·일) 전체에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
     });
 
@@ -1209,7 +1263,7 @@
           state.dailyShifts[i] = { off: sh.off, start: sh.start, end: sh.end, breakMinutes: sh.breakMinutes };
         }
       });
-      recalcPayroll();
+      editPayroll();
       showToast('📅 이번 달 모든 ' + dayName + '요일에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
     });
 
@@ -1225,7 +1279,7 @@
         return { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
       });
       state.editor.off = true;
-      recalcPayroll();
+      editPayroll();
       showToast('📅 이번 달 전체를 휴무(0시간)로 초기화했습니다.');
     });
 
@@ -1249,7 +1303,7 @@
     function renderMonthPicker() {
       var cur = curPayMonth();
       var has = {};
-      state.roster.forEach(function (x) { if (x && /^\d{4}-\d{2}$/.test(x.payMonth || '')) has[x.payMonth] = true; });
+      E.recordMonths(state.workers).forEach(function (k) { has[k] = true; });
       $('mpYearLabel').textContent = mpYear + '년';
       var html = '';
       for (var mo = 1; mo <= 12; mo++) {
@@ -1292,22 +1346,26 @@
     // 지급월 변경 시 해당 월의 실제 달력/주차 재구성
     $('pMonth').addEventListener('change', function () {
       syncPayMonthLabel();
-      state.weekExcuse = [];
-      state.weekAbsent = [];
-      ensureCalendarAndShifts($('pMonth').value, false);
+      var w = selWorker();
+      var pm = $('pMonth').value;
+      loadSelected();           // 그 알바생의 그 달 기록 (없으면 빈 달력)
       recalcPayroll();
-      showToast('📅 ' + state.calendar.year + '년 ' + state.calendar.month + '월 달력 (' + state.calendar.weekCount + '개 주차) 적용');
+      renderRoster();
+      var label = state.calendar.year + '년 ' + state.calendar.month + '월';
+      showToast(w
+        ? ('📅 ' + w.name + '님 ' + label + (w.months[pm] ? ' 기록을 불러왔습니다' : ' — 아직 기록이 없어 비어 있습니다'))
+        : ('📅 ' + label));
     });
 
     // 급여 폼 실시간 반응
     ['pName', 'pWage', 'pMealMinHours', 'pMealAmount'].forEach(function (id) {
-      $(id).addEventListener('input', recalcPayroll);
+      $(id).addEventListener('input', editPayroll);
     });
     ['pWeekly', 'pMeal'].forEach(function (id) {
-      $(id).addEventListener('change', recalcPayroll);
+      $(id).addEventListener('change', editPayroll);
     });
     document.querySelectorAll('input[name="pTax"]').forEach(function (el) {
-      el.addEventListener('change', recalcPayroll);
+      el.addEventListener('change', editPayroll);
     });
 
     // 카톡 명세서 복사
@@ -1324,50 +1382,81 @@
       var r = state.payroll || E.calculatePayroll(readPayrollForm());
       downloadXlsx('./api/payroll/excel', { input: r.input }, function () { return E.payrollSlipXlsx(r); }, E.payrollFileName(r));
     });
-    $('btnAddRoster').addEventListener('click', function () {
-      var r = state.payroll || E.calculatePayroll(readPayrollForm());
-      // 같은 사람·같은 달이 이미 있으면 새로 쌓지 않고 최신 내용으로 덮어씀 (엑셀 월별 탭 중복 방지)
-      var dupIdx = -1;
-      state.roster.forEach(function (x, i) {
-        if (dupIdx < 0 && x.name === r.input.name && x.payMonth === r.input.payMonth) dupIdx = i;
+    // 알바생 추가: 이름 + 계약서상 주 몇 일 + 시급 → 명단에 한 줄 생기고 바로 선택됨
+    $('addWorkerForm').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var name = $('awName').value.trim();
+      if (!name) { showToast('이름을 입력해 주세요. 예) 홍길동'); $('awName').focus(); return; }
+      var dup = state.workers.some(function (x) { return x.name === name; });
+      if (dup) { showToast('이미 있는 이름입니다. 구분되게 적어 주세요. 예) ' + name + '2'); $('awName').focus(); return; }
+      var wage = E.toNumber($('awWage').value, 0);
+      if (!(wage > 0)) { showToast('시급을 입력해 주세요. 예) 10320'); $('awWage').focus(); return; }
+      var cur = readPayrollForm();   // 식대·주휴·세금은 지금 화면의 설정으로 시작
+      var w = E.createWorker(name, Number($('awDays').value), wage, {
+        includeWeekly: cur.includeWeekly, includeMeal: cur.includeMeal,
+        mealMinHours: cur.mealMinHours, mealAmount: cur.mealAmount, tax: cur.tax
       });
-      if (dupIdx >= 0) {
-        state.roster[dupIdx] = r.input;
-      } else {
-        state.roster.push(r.input);
-      }
-      saveJson(KEYS.roster, state.roster);
-      renderRoster();
-      showToast((dupIdx >= 0 ? '🔄 ' : '➕ ') + '정산 명단에 ' + r.name + '님(' + E.formatWon(r.net) + '원) ' + (dupIdx >= 0 ? '갱신' : '추가'));
+      state.workers.push(w);
+      saveWorkers();
+      $('awName').value = '';
+      selectWorker(w.id);
+      showToast('➕ ' + w.name + '님을 추가했습니다. 위 달력에서 근무 시간을 입력하세요.');
+      $('payForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
+    // 명단에서 이름을 누르면 그 알바생의 기록을 달력에 불러옴
     $('rosterBody').addEventListener('click', function (ev) {
-      var btn = ev.target.closest('[data-del-roster]');
-      if (!btn) return;
-      var idx = Number(btn.getAttribute('data-del-roster'));
-      if (idx >= 0 && idx < state.roster.length) {
-        if (!window.confirm('"' + (state.roster[idx].name || '이 사람') + '"님을 정산 명단에서 삭제할까요?')) return;
-        state.roster.splice(idx, 1);
-        saveJson(KEYS.roster, state.roster);
+      var del = ev.target.closest('[data-del-worker]');
+      if (del) {
+        var id = del.getAttribute('data-del-worker');
+        var idx = state.workers.findIndex(function (x) { return x.id === id; });
+        if (idx < 0) return;
+        if (!window.confirm('"' + state.workers[idx].name + '"님과 지금까지의 모든 월 기록을 삭제할까요?\n(삭제하면 되돌릴 수 없습니다)')) return;
+        state.workers.splice(idx, 1);
+        saveWorkers();
+        if (state.selId === id) state.selId = state.workers.length ? state.workers[0].id : '';
+        loadSelected();
+        recalcPayroll();
         renderRoster();
-      }
-    });
-
-    $('btnRosterXlsx').addEventListener('click', function () {
-      if (!state.roster.length) {
-        showToast('정산 명단이 비어 있습니다. 먼저 명단에 알바생을 추가해주세요.');
         return;
       }
-      var results = state.roster.map(function (inp) { return E.calculatePayroll(inp); });
-      downloadXlsx('./api/payroll/excel', { roster: state.roster }, function () { return E.payrollRosterXlsx(results); }, E.rosterFileName(results));
+      var pick = ev.target.closest('[data-pick-worker]') || ev.target.closest('tr[data-wid]');
+      if (!pick) return;
+      var wid = pick.getAttribute('data-pick-worker') || pick.getAttribute('data-wid');
+      selectWorker(wid);
+      var w = selWorker();
+      if (w) showToast('👤 ' + w.name + '님 ' + state.calendar.month + '월 ' + (w.months[$('pMonth').value] ? '기록을 불러왔습니다' : '— 아직 기록이 없어 비어 있습니다'));
+      $('payForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    function allRecordInputs() {
+      var list = [];
+      state.workers.forEach(function (w) {
+        Object.keys(w.months).sort().forEach(function (pm) { list.push(E.workerPayrollInput(w, pm)); });
+      });
+      return list;
+    }
+
+    $('btnRosterXlsx').addEventListener('click', function () {
+      var inputs = allRecordInputs();
+      if (!inputs.length) {
+        showToast('저장된 근무 기록이 없습니다. 알바생을 추가하고 근무 시간을 입력해 주세요.');
+        return;
+      }
+      var results = inputs.map(function (inp) { return E.calculatePayroll(inp); });
+      downloadXlsx('./api/payroll/excel', { roster: inputs }, function () { return E.payrollRosterXlsx(results); }, E.rosterFileName(results));
     });
 
     $('btnRosterClear').addEventListener('click', function () {
-      if (!state.roster.length) return;
-      state.roster = [];
-      saveJson(KEYS.roster, state.roster);
+      if (!state.workers.length) return;
+      if (!window.confirm('알바생 ' + state.workers.length + '명과 모든 월 기록을 지울까요?\n(지우면 되돌릴 수 없습니다. 먼저 백업 파일을 받아 두면 안전합니다)')) return;
+      state.workers = [];
+      state.selId = '';
+      saveWorkers();
+      loadSelected();
+      recalcPayroll();
       renderRoster();
-      showToast('정산 명단을 비웠습니다.');
+      showToast('알바생 명단을 비웠습니다.');
     });
 
     // 체크리스트 실시간 반응
@@ -1433,19 +1522,52 @@
 
   function cloudData() {
     return {
-      roster: state.roster,
+      workers: state.workers,
       archive: state.archive,
       presets: presetState.list,
       store: loadJson(KEYS.store, {})
     };
   }
 
+  /* 구글 시트에 사람이 보기 좋게 적을 탭들: 월별(정산 요약 + 날짜별 근무 기록) / 알바생 / 점검 보관함 */
   function cloudTables() {
-    var roster = [['이름', '지급월', '총 근무시간(h)', '시급(원)', '주휴수당(원)', '식대(원)', '세전 합계(원)', '공제(원)', '실수령액(원)']];
-    state.roster.forEach(function (inp) {
-      var r = E.calculatePayroll(inp);
-      roster.push([r.name, r.payMonthLabel, r.totalHours, r.hourlyWage, r.weeklyAllowance, r.mealAllowance, r.gross, r.tax.total, r.net]);
+    var sheets = [];
+    var DOW = ['월', '화', '수', '목', '금', '토', '일'];
+
+    E.recordMonths(state.workers).forEach(function (pm) {
+      var rs = [];
+      state.workers.forEach(function (w) {
+        if (w.months && w.months[pm]) rs.push(E.calculatePayroll(E.workerPayrollInput(w, pm)));
+      });
+      if (!rs.length) return;
+      var sum = E.summarizePayrolls(rs);
+      var rows = [[pm.slice(0, 4) + '년 ' + Number(pm.slice(5)) + '월 정산'],
+        ['이름', '근무일수', '총 근무시간(h)', '시급(원)', '주휴수당(원)', '식대(원)', '세전 합계(원)', '공제(원)', '실수령액(원)']];
+      rs.forEach(function (r) {
+        rows.push([r.name, r.workDays, r.totalHours, r.hourlyWage, r.weeklyAllowance, r.mealAllowance, r.gross, r.tax.total, r.net]);
+      });
+      rows.push(['합계 (' + sum.count + '명)', rs.reduce(function (t, r) { return t + r.workDays; }, 0), sum.totalHours, '', sum.totalWeekly, sum.totalMeal, sum.totalGross, sum.totalTax, sum.totalNet]);
+      rows.push([]);
+      var logTitle = rows.length;
+      rows.push(['날짜별 근무 기록']);
+      var logHead = rows.length;
+      rows.push(['날짜', '요일', '이름', '출근', '퇴근', '휴게(분)', '근무시간(h)', '식대']);
+      rs.forEach(function (r) {
+        r.days.forEach(function (d) {
+          if (d.off) return;
+          rows.push([pm + '-' + pad2(d.date), DOW[d.dayIndex], r.name, d.start, d.end, d.breakMinutes, d.hours, d.mealEligible && r.includeMeal ? '지급' : '']);
+        });
+      });
+      sheets.push({ name: pm, rows: rows, bold: [0, 1, logTitle, logHead], sortKey: pm });
     });
+    sheets.sort(function (x, y) { return x.sortKey < y.sortKey ? 1 : -1; });   // 최근 달이 앞에
+
+    var wrows = [['이름', '계약서상 주 근무일', '시급(원)', '기록이 있는 달']];
+    state.workers.forEach(function (w) {
+      wrows.push([w.name, '주 ' + w.contractDays + '일', w.wage, Object.keys(w.months).length + '개월']);
+    });
+    sheets.push({ name: '알바생', rows: wrows.length > 1 ? wrows : [['(등록된 알바생이 없습니다)']], bold: [0] });
+
     var archive = [['점검일자', '매장명', '점검자', '냉장(°C)', '냉동(°C)', '적합 항목', '결과', '점검필요 항목', '특이사항']];
     state.archive.forEach(function (inp) {
       var c = E.buildChecklist(inp);
@@ -1453,16 +1575,18 @@
       archive.push([c.date || '-', c.store, c.inspector, c.fridgeTemp === null ? '' : c.fridgeTemp, c.freezerTemp === null ? '' : c.freezerTemp,
         c.passCount + ' / ' + c.total, c.verdict, fails || '-', c.memo || '-']);
     });
-    return { roster: roster.length > 1 ? roster : [], archive: archive.length > 1 ? archive : [] };
+    sheets.push({ name: '점검 보관함', rows: archive.length > 1 ? archive : [['(저장된 점검 기록이 없습니다)']], bold: [0] });
+    return { sheets: sheets };
   }
 
   function cloudApply(d) {
     d = d || {};
     syncSuspended = true;
     try {
-      state.roster = Array.isArray(d.roster) ? d.roster : [];
+      // 새 형식(workers) 또는 예전 형식(정산 명단 roster)을 받아 알바생별 기록으로 정리
+      state.workers = Array.isArray(d.workers) ? E.normalizeWorkers(d.workers) : E.migrateRoster(d.roster);
       state.archive = Array.isArray(d.archive) ? d.archive : [];
-      saveJson(KEYS.roster, state.roster);
+      saveWorkers();
       saveJson(KEYS.archive, state.archive);
       if (Array.isArray(d.presets) && d.presets.length) {
         saveJson(KEYS.presets, d.presets);
@@ -1474,6 +1598,9 @@
         if (d.store.store) $('cStore').value = d.store.store;
         if (d.store.inspector) $('cInspector').value = d.store.inspector;
       }
+      if (!selWorker()) state.selId = state.workers.length ? state.workers[0].id : '';
+      loadSelected();
+      recalcPayroll();
       renderRoster();
       renderArchive();
       recalcChecklist();
@@ -1482,7 +1609,9 @@
     }
   }
 
+  var shownNotice = '';
   function renderCloudUi(st) {
+    if (st && st.notice && st.notice !== shownNotice) { shownNotice = st.notice; showToast('🗑️ ' + st.notice); }
     var btn = $('cloudBtn');
     var body = $('cloudBody');
     if (!btn || !body) return;
@@ -1498,7 +1627,7 @@
     var html;
     if (!connected) {
       html =
-        '<p class="cloud-lead">알바 명단과 점검 기록을 <b>내 구글 드라이브</b>에 자동으로 저장합니다. 휴대폰을 바꾸거나 다른 컴퓨터에서 열어도 같은 기록을 볼 수 있어요.</p>' +
+        '<p class="cloud-lead">알바생 근무 기록과 점검 기록을 <b>내 구글 드라이브</b>에 자동으로 저장합니다. 휴대폰을 바꾸거나 다른 컴퓨터에서 열어도 같은 기록을 볼 수 있어요.</p>' +
         '<ul class="cloud-points">' +
         '<li>내 구글 드라이브에 <b>"사장님 도우미 데이터"</b> 파일이 만들어집니다</li>' +
         '<li>이 앱이 만든 파일 외에는 볼 수 없습니다</li>' +
@@ -1516,6 +1645,8 @@
       html =
         '<p class="cloud-state ' + cls + '">' + head + '</p>' +
         '<p class="cloud-sub">' + (clock ? '마지막 저장 ' + clock + ' · ' : '') + '내용을 바꾸면 몇 초 뒤 자동으로 저장됩니다.</p>' +
+        '<p class="cloud-sub">시트에는 달마다 탭이 만들어지고, 5년이 지난 달의 탭은 시트에서만 자동으로 정리됩니다. (이 기기의 기록은 지워지지 않습니다)</p>' +
+        (st.notice ? '<p class="cloud-warn">' + escHtml(st.notice) + '</p>' : '') +
         ((kind === 'needLogin' || kind === 'error') && st.text ? '<p class="cloud-warn">' + escHtml(st.text) + '</p>' : '') +
         '<div class="cloud-actions">' +
         ((kind === 'needLogin' || kind === 'error')
@@ -1547,7 +1678,7 @@
     document.body.appendChild(a);
     a.click();
     setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
-    showToast('💾 백업 파일을 내려받았습니다 (' + state.roster.length + '명 · 점검 ' + state.archive.length + '일)');
+    showToast('💾 백업 파일을 내려받았습니다 (' + state.workers.length + '명 · 점검 ' + state.archive.length + '일)');
   }
 
   function backupRestore(file) {
@@ -1557,8 +1688,8 @@
       var r = E.parseBackup(String(reader.result || ''));
       if (!r.ok) { window.alert(r.error); return; }
       var msg = '백업 파일의 기록으로 바꿉니다.\n\n' +
-        '불러올 기록: 정산 명단 ' + r.counts.roster + '명 · 점검 보관함 ' + r.counts.archive + '일\n' +
-        '지금 화면의 기록: 정산 명단 ' + state.roster.length + '명 · 점검 보관함 ' + state.archive.length + '일 (사라집니다)\n\n계속할까요?';
+        '불러올 기록: 알바생 ' + r.counts.workers + '명 · 점검 보관함 ' + r.counts.archive + '일\n' +
+        '지금 화면의 기록: 알바생 ' + state.workers.length + '명 · 점검 보관함 ' + state.archive.length + '일 (사라집니다)\n\n계속할까요?';
       if (!window.confirm(msg)) return;
       cloudApply(r.data);
       if (window.AlbaCloud) window.AlbaCloud.markDirty();

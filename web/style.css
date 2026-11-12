@@ -1896,3 +1896,32 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: .75; }
 .mp-month.current.has::after { color: #fff; }
 .month-picker-now { width: 100%; margin-top: 10px; justify-content: center; min-height: 46px; font-size: 16px; }
 .month-picker-hint { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+
+/* ---------- 알바생 중심 기록: 안내 / 알바생 추가 / 명단 ---------- */
+.no-worker-note {
+  margin: -4px 0 12px; padding: 10px 12px; border-radius: 10px;
+  background: var(--warn-bg, #fff6e0); color: var(--text, #222); font-size: 15px; line-height: 1.5;
+  border: 1px dashed var(--border, #d6b45a);
+}
+.no-worker-note[hidden] { display: none; }
+.add-worker {
+  display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 12px; align-items: end;
+  margin: 8px 0 6px; padding: 14px; border-radius: 12px;
+  background: var(--surface-2, rgba(120, 140, 200, .08)); border: 1px solid var(--border, #d9dde8);
+}
+.add-worker .field { margin: 0; }
+.add-worker select, .add-worker input { width: 100%; font-size: 17px; min-height: 46px; }
+.add-worker .btn { min-height: 46px; font-size: 17px; white-space: nowrap; }
+.roster-hint { margin: 4px 2px 10px; font-size: 14px; color: var(--muted, #667); }
+.worker-link {
+  background: none; border: 0; padding: 6px 4px; font: inherit; color: var(--accent, #2563eb);
+  cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-size: 1.05em;
+}
+.roster-row { cursor: pointer; }
+.roster-row.selected { background: rgba(37, 99, 235, .10); }
+.roster-row.selected td:first-child { box-shadow: inset 4px 0 0 var(--accent, #2563eb); }
+@media (max-width: 760px) {
+  .add-worker { grid-template-columns: 1fr 1fr; }
+  .add-worker .btn { grid-column: 1 / -1; }
+  .add-worker .field:first-child { grid-column: 1 / -1; }
+}

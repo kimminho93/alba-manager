@@ -5,8 +5,10 @@
  *  - 권한은 drive.file 하나뿐: 이 앱이 만든 파일만 접근할 수 있습니다.
  *  - 구글 로그인 스크립트(accounts.google.com)는 사용자가 연동을 켠 뒤에만 불러옵니다.
  *  - 저장 위치: "사장님 도우미 데이터" 스프레드시트
- *       [정산 명단] [점검 보관함] : 사람이 보기 쉬운 표 (앱이 자동으로 다시 씀)
- *       [데이터]                  : 앱이 읽는 원본 (수정하지 마세요)
+ *       [2026-11] 같은 월별 탭 : 그 달 정산 요약 + 날짜별 근무 기록 (바뀐 달만 다시 씀)
+ *       [알바생] [점검 보관함]  : 사람이 보기 쉬운 표 (앱이 자동으로 다시 씀)
+ *       [데이터]                : 앱이 읽는 원본 (수정하지 마세요)
+ *  - 월별 탭은 5년(60개월)이 지나면 시트에서만 자동 정리합니다. (앱 안의 기록은 지우지 않음)
  *  - 여러 기기에서 쓰면 마지막에 저장한 내용이 우선합니다.
  */
 (function (root, factory) {
@@ -78,9 +80,10 @@
 
   var META_KEY = 'alba.cloud.v1';
   var FILE_NAME = '사장님 도우미 데이터';
-  var SHEET_ROSTER = '정산 명단';
-  var SHEET_ARCHIVE = '점검 보관함';
+  var LEGACY_TABS = ['정산 명단'];   // 예전 버전이 만들던 탭 (저장할 때 정리)
   var SHEET_DATA = '데이터';
+  var MONTH_TAB = /^\d{4}-\d{2}$/;
+  var RETAIN_MONTHS = 60;
   var CHUNK = 40000;
   var SAVE_DELAY = 3000;
 
@@ -89,6 +92,8 @@
   var token = null, tokenExp = 0;
   var saveTimer = null, saving = false, again = false;
   var lastJson = null;         // 마지막으로 시트와 맞춘 데이터(JSON 문자열)
+  var lastTabs = {};           // 탭 이름 → 마지막으로 시트에 쓴 내용(JSON). 바뀐 탭만 다시 쓰기 위함
+  var notice = '';             // 시트 정리 안내 (5년 지난 월 탭 삭제 등)
   var status = { kind: 'off', text: '' };
 
   function readMeta() {
@@ -101,7 +106,7 @@
   function writeMeta() { deps.storage.set(META_KEY, JSON.stringify(meta)); }
 
   function setStatus(kind, text) {
-    status = { kind: kind, text: text || '', lastSaved: meta.lastSaved || 0, sheetId: meta.sheetId || '', connected: !!meta.connected };
+    status = { kind: kind, text: text || '', lastSaved: meta.lastSaved || 0, sheetId: meta.sheetId || '', connected: !!meta.connected, notice: notice };
     if (host && host.onStatus) host.onStatus(status);
   }
 
@@ -162,21 +167,9 @@
   function createSheet(mode) {
     var body = {
       properties: { title: FILE_NAME, locale: 'ko_KR' },
-      sheets: [{ properties: { title: SHEET_ROSTER } }, { properties: { title: SHEET_ARCHIVE } }, { properties: { title: SHEET_DATA } }]
+      sheets: [{ properties: { title: SHEET_DATA } }]
     };
-    return api('POST', SHEETS, body, mode).then(function (r) {
-      var reqs = [];
-      (r.sheets || []).slice(0, 2).forEach(function (s) {
-        var id = s.properties.sheetId;
-        reqs.push({ updateSheetProperties: { properties: { sheetId: id, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } });
-        reqs.push({ repeatCell: { range: { sheetId: id, startRowIndex: 0, endRowIndex: 1 },
-          cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.88, green: 0.92, blue: 1 } } },
-          fields: 'userEnteredFormat(textFormat,backgroundColor)' } });
-      });
-      var fin = function () { return r.spreadsheetId; };
-      if (!reqs.length) return fin();
-      return api('POST', SHEETS + '/' + r.spreadsheetId + ':batchUpdate', { requests: reqs }, mode).then(fin, fin);
-    });
+    return api('POST', SHEETS, body, mode).then(function (r) { return r.spreadsheetId; });
   }
 
   function ensureSheet(mode) {
@@ -202,35 +195,113 @@
     });
   }
 
+  /* 이번 달 기준 가장 오래 남길 달 (이번 달 포함 60개월) */
+  function cutoffMonth() {
+    var d = new Date(deps.now());
+    var t = new Date(d.getFullYear(), d.getMonth() - (RETAIN_MONTHS - 1), 1);
+    return t.getFullYear() + '-' + (t.getMonth() + 1 < 10 ? '0' : '') + (t.getMonth() + 1);
+  }
+
+  function tabKey(t) { return JSON.stringify([t.rows, t.bold || []]); }
+
+  function colorFmt() { return { textFormat: { bold: true }, backgroundColor: { red: 0.88, green: 0.92, blue: 1 } }; }
+
+  /* 시트의 탭 구성을 맞추고(추가/삭제/순서), 바뀐 탭만 다시 쓴다 */
   function push(mode) {
     var data = host.getData();
     var json = JSON.stringify(data);
     var stamp = new Date(deps.now()).toISOString();
     var chunks = [];
     for (var i = 0; i < json.length; i += CHUNK) chunks.push([json.slice(i, i + CHUNK)]);
-    var tables = host.getTables ? host.getTables() : { roster: [], archive: [] };
+    var tables = host.getTables ? host.getTables() : { sheets: [] };
+    var cutoff = cutoffMonth();
     var id = meta.sheetId;
-    var dataRows = [['사장님 도우미 데이터 — 이 탭은 앱이 사용하는 저장 공간입니다. 수정하지 마세요.'], [stamp]].concat(chunks);
-    return api('POST', SHEETS + '/' + id + '/values:batchClear', { ranges: [SHEET_ROSTER, SHEET_ARCHIVE, SHEET_DATA] }, mode).then(function () {
-      return api('POST', SHEETS + '/' + id + '/values:batchUpdate', {
-        valueInputOption: 'RAW',
-        data: [
-          { range: SHEET_ROSTER + '!A1', values: tables.roster && tables.roster.length ? tables.roster : [['(저장된 정산 명단이 없습니다)']] },
-          { range: SHEET_ARCHIVE + '!A1', values: tables.archive && tables.archive.length ? tables.archive : [['(저장된 점검 기록이 없습니다)']] },
-          { range: SHEET_DATA + '!A1', values: dataRows }
-        ]
-      }, mode);
+
+    // 시트에 둘 탭: 5년 이내 월 탭 + 그 외 표 탭 (오래된 월 탭은 시트에서만 뺌)
+    var wanted = (tables.sheets || []).filter(function (t) { return !MONTH_TAB.test(t.name) || t.name >= cutoff; });
+    wanted.push({ name: SHEET_DATA, rows: [['사장님 도우미 데이터 — 이 탭은 앱이 사용하는 저장 공간입니다. 수정하지 마세요.'], [stamp]].concat(chunks), bold: [], always: true });
+    var wantedNames = {};
+    wanted.forEach(function (t) { wantedNames[t.name] = true; });
+
+    var removedOld = 0;
+    var existing = {};
+    var created = {};   // 이번 저장에서 새로 만든 탭: 이름 → sheetId
+
+    return api('GET', SHEETS + '/' + id + '?fields=' + encodeURIComponent('sheets.properties(sheetId,title,index)'), undefined, mode).then(function (info) {
+      (info.sheets || []).forEach(function (s) { existing[s.properties.title] = s.properties.sheetId; });
+
+      var reqs = [];
+      var addNames = [];
+      wanted.forEach(function (t) {
+        if (existing[t.name] === undefined) { reqs.push({ addSheet: { properties: { title: t.name } } }); addNames.push(t.name); }
+      });
+      Object.keys(existing).forEach(function (name) {
+        var stale = LEGACY_TABS.indexOf(name) >= 0 || (MONTH_TAB.test(name) && !wantedNames[name]);
+        if (!stale) return;
+        reqs.push({ deleteSheet: { sheetId: existing[name] } });
+        if (MONTH_TAB.test(name) && name < cutoff) removedOld++;
+        delete existing[name];
+        delete lastTabs[name];
+      });
+      if (!reqs.length) return null;
+      return api('POST', SHEETS + '/' + id + ':batchUpdate', { requests: reqs }, mode).then(function (res) {
+        var ri = 0;
+        reqs.forEach(function (rq, k) {
+          if (rq.addSheet) {
+            var rp = (res.replies || [])[k];
+            var sid = rp && rp.addSheet && rp.addSheet.properties ? rp.addSheet.properties.sheetId : undefined;
+            if (sid !== undefined) { existing[rq.addSheet.properties.title] = sid; created[rq.addSheet.properties.title] = sid; }
+          }
+          ri++;
+        });
+        // 순서: 최근 월 → 알바생 → 점검 보관함 → 데이터
+        var order = wanted.map(function (t) { return t.name; });
+        var orderReqs = [];
+        order.forEach(function (name, idx) {
+          if (existing[name] !== undefined) orderReqs.push({ updateSheetProperties: { properties: { sheetId: existing[name], index: idx }, fields: 'index' } });
+        });
+        return orderReqs.length ? api('POST', SHEETS + '/' + id + ':batchUpdate', { requests: orderReqs }, mode) : null;
+      });
+    }).then(function () {
+      // 바뀐 탭만 골라서 쓴다 (새로 만든 탭은 무조건)
+      var changed = wanted.filter(function (t) {
+        return t.always || created[t.name] !== undefined || lastTabs[t.name] !== tabKey(t);
+      });
+      if (!changed.length) return null;
+      var names = changed.map(function (t) { return t.name; });
+      return api('POST', SHEETS + '/' + id + '/values:batchClear', { ranges: names }, mode).then(function () {
+        return api('POST', SHEETS + '/' + id + '/values:batchUpdate', {
+          valueInputOption: 'RAW',
+          data: changed.map(function (t) { return { range: t.name + '!A1', values: t.rows && t.rows.length ? t.rows : [['']] }; })
+        }, mode);
+      }).then(function () {
+        // 서식: 먼저 전체 서식을 지운 뒤 제목/머리글 줄만 굵게
+        var fmt = [];
+        changed.forEach(function (t) {
+          var sid = existing[t.name];
+          if (sid === undefined || t.name === SHEET_DATA) return;
+          fmt.push({ repeatCell: { range: { sheetId: sid }, cell: {}, fields: 'userEnteredFormat' } });
+          (t.bold || []).forEach(function (ri) {
+            fmt.push({ repeatCell: { range: { sheetId: sid, startRowIndex: ri, endRowIndex: ri + 1 },
+              cell: { userEnteredFormat: colorFmt() }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } });
+          });
+        });
+        return fmt.length ? api('POST', SHEETS + '/' + id + ':batchUpdate', { requests: fmt }, mode).catch(function () { /* 서식 실패는 저장 실패가 아님 */ }) : null;
+      }).then(function () {
+        changed.forEach(function (t) { lastTabs[t.name] = tabKey(t); });
+      });
     }).then(function () {
       lastJson = json;
       meta.stamp = stamp;
       meta.dirty = false;
       meta.lastSaved = deps.now();
+      notice = removedOld ? ('5년이 지난 ' + removedOld + '개 달의 탭을 구글 시트에서 정리했습니다. (이 기기의 기록은 그대로입니다)') : '';
       writeMeta();
     });
   }
 
   function hasContent(d) {
-    return !!d && ((d.roster && d.roster.length) || (d.archive && d.archive.length));
+    return !!d && ((d.workers && d.workers.length) || (d.roster && d.roster.length) || (d.archive && d.archive.length));
   }
 
   function applyRemote(r) {
@@ -378,6 +449,8 @@
     meta = { connected: false, sheetId: '', stamp: '', dirty: false, lastSaved: 0 };
     deps.storage.remove(META_KEY);
     lastJson = null;
+    lastTabs = {};
+    notice = '';
     setStatus('off');
   }
 

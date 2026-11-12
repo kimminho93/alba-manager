@@ -1,27 +1,27 @@
 /*
  * src/backup.js — 백업 파일(.json) 만들기 / 읽기
- *   구글 계정이 바뀌거나 기기를 옮길 때 기록(정산 명단·점검 보관함·빠른 시간대·매장 정보)을 파일로 옮긴다.
+ *   구글 계정이 바뀌거나 기기를 옮길 때 기록(알바생 기록·점검 보관함·빠른 시간대·매장 정보)을 파일로 옮긴다.
  */
 (function (root, factory) {
   'use strict';
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./payroll.js'), require('./checklist.js'));
+    module.exports = factory(require('./payroll.js'), require('./checklist.js'), require('./workers.js'));
   } else {
     root.AlbaEngine = root.AlbaEngine || {};
-    Object.assign(root.AlbaEngine, factory(root.AlbaEngine, root.AlbaEngine));
+    Object.assign(root.AlbaEngine, factory(root.AlbaEngine, root.AlbaEngine, root.AlbaEngine));
   }
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (P, C) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (P, C, W) {
   'use strict';
 
   var APP = 'alba-manager';
-  var VERSION = 1;
+  var VERSION = 2;
   var MAX_BYTES = 5 * 1024 * 1024;
-  var MAX_ROSTER = 500;
+  var MAX_ROSTER = 5000;
   var MAX_ARCHIVE = 3700;
 
   function isObj(x) { return x && typeof x === 'object' && !Array.isArray(x); }
 
-  /** 백업 파일 내용(문자열)을 만든다. data = { roster, archive, presets, store } */
+  /** 백업 파일 내용(문자열)을 만든다. data = { workers, archive, presets, store } */
   function buildBackup(data, now) {
     data = data || {};
     return JSON.stringify({
@@ -29,7 +29,7 @@
       version: VERSION,
       exportedAt: new Date(now === undefined ? Date.now() : now).toISOString(),
       data: {
-        roster: Array.isArray(data.roster) ? data.roster : [],
+        workers: Array.isArray(data.workers) ? data.workers : [],
         archive: Array.isArray(data.archive) ? data.archive : [],
         presets: Array.isArray(data.presets) ? data.presets : [],
         store: isObj(data.store) ? data.store : {}
@@ -53,17 +53,16 @@
     if (Number(obj.version) > VERSION) return { ok: false, error: '더 새로운 버전의 백업 파일입니다. 앱을 새로고침한 뒤 다시 시도해 주세요.' };
 
     var d = obj.data;
-    var roster = Array.isArray(d.roster) ? d.roster : [];
     var archive = Array.isArray(d.archive) ? d.archive : [];
     var presets = Array.isArray(d.presets) ? d.presets : [];
     var store = isObj(d.store) ? d.store : {};
-    if (roster.length > MAX_ROSTER || archive.length > MAX_ARCHIVE) return { ok: false, error: '기록이 너무 많은 파일입니다.' };
+    // 예전(1) 형식: 정산 명단(이름+달 한 줄씩) → 알바생별 월 기록으로 바꿈
+    var legacy = !Array.isArray(d.workers) && Array.isArray(d.roster);
+    var rawList = Array.isArray(d.workers) ? d.workers : (legacy ? d.roster : []);
+    if (rawList.length > MAX_ROSTER || archive.length > MAX_ARCHIVE) return { ok: false, error: '기록이 너무 많은 파일입니다.' };
 
-    // 실제로 계산할 수 있는 항목만 받는다 (깨진 항목이 화면을 망치지 않도록)
-    var okRoster = roster.filter(function (x) {
-      if (!isObj(x)) return false;
-      try { P.calculatePayroll(x); return true; } catch (e) { return false; }
-    });
+    var workers = legacy ? W.migrateRoster(rawList) : W.normalizeWorkers(rawList);
+    var okRoster = workers;
     var okArchive = archive.filter(function (x) {
       if (!isObj(x)) return false;
       try { C.buildChecklist(x); return true; } catch (e) { return false; }
@@ -78,8 +77,8 @@
 
     return {
       ok: true,
-      data: { roster: okRoster, archive: okArchive, presets: okPresets, store: okStore },
-      counts: { roster: okRoster.length, archive: okArchive.length, skipped: (roster.length - okRoster.length) + (archive.length - okArchive.length) },
+      data: { workers: okRoster, archive: okArchive, presets: okPresets, store: okStore },
+      counts: { workers: okRoster.length, archive: okArchive.length, skipped: (legacy ? 0 : rawList.length - okRoster.length) + (archive.length - okArchive.length) },
       exportedAt: typeof obj.exportedAt === 'string' ? obj.exportedAt : ''
     };
   }

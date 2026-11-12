@@ -52,8 +52,9 @@
           <h2 class="card-title">근무 정보</h2>
 
           <label class="field"><span>알바생 이름</span>
-            <input id="pName" type="text" value="철수" maxlength="20">
+            <input id="pName" type="text" maxlength="20" placeholder="아래 [알바생 추가]에서 먼저 등록하세요" disabled>
           </label>
+          <p id="noWorkerNote" class="no-worker-note">아래 <b>정산 명단</b>에서 <b>알바생을 추가</b>하면 근무 기록이 자동으로 저장됩니다.</p>
 
           <div class="field month-field"><span>지급월</span>
             <input id="pMonth" type="hidden">
@@ -70,7 +71,7 @@
               </div>
               <div id="mpGrid" class="month-picker-grid"></div>
               <button type="button" id="mpThisMonth" class="btn btn-sm month-picker-now">이번 달로 이동</button>
-              <p class="month-picker-hint">● 표시는 정산 명단에 저장된 달입니다</p>
+              <p class="month-picker-hint">● 표시는 근무 기록이 있는 달입니다</p>
             </div>
           </div>
 
@@ -327,7 +328,6 @@
           <div class="actions">
             <button id="btnPrintPay" type="button" class="btn">🖨️ PDF 출력/저장</button>
             <button id="btnXlsxPay" type="button" class="btn">📊 엑셀(.xlsx) 다운로드</button>
-            <button id="btnAddRoster" type="button" class="btn btn-primary">➕ 아래 정산 명단에 추가</button>
           </div>
         </div>
       </div>
@@ -336,11 +336,27 @@
         <div class="archive-head">
           <h2 class="card-title">📋 정산 명단 <span id="rosterCount" class="count">0명</span></h2>
           <div class="archive-actions">
-            <span class="total-pill">총 입금 합계 <b id="rosterTotal">0원</b></span>
+            <span class="total-pill"><span id="rosterMonthLabel">이번 달</span> 입금 합계 <b id="rosterTotal">0원</b></span>
             <button id="btnRosterXlsx" type="button" class="btn">📊 명단 전체 엑셀(.xlsx) 다운로드</button>
-            <button id="btnRosterClear" type="button" class="btn btn-ghost">비우기</button>
+            <button id="btnRosterClear" type="button" class="btn btn-ghost">전체 지우기</button>
           </div>
         </div>
+        <form id="addWorkerForm" class="add-worker" autocomplete="off" onsubmit="return false">
+          <label class="field"><span>이름</span>
+            <input id="awName" type="text" maxlength="20" placeholder="예) 홍길동">
+          </label>
+          <label class="field"><span>계약서상 일하는 날</span>
+            <select id="awDays" aria-label="계약서상 주 몇 일 근무">
+              <option value="1">주 1일</option><option value="2">주 2일</option><option value="3">주 3일</option>
+              <option value="4">주 4일</option><option value="5" selected>주 5일</option><option value="6">주 6일</option><option value="7">주 7일</option>
+            </select>
+          </label>
+          <label class="field"><span>시급 (원)</span>
+            <input id="awWage" type="number" inputmode="numeric" min="0" step="10" value="10320">
+          </label>
+          <button id="btnAddWorker" type="submit" class="btn btn-primary">➕ 알바생 추가</button>
+        </form>
+        <p class="roster-hint">이름을 누르면 그 알바생의 근무 기록이 위 달력에 나타납니다. 고치면 바로 저장됩니다.</p>
         <div class="table-wrap">
           <table class="list-table">
             <thead>
@@ -517,14 +533,15 @@
         </details>
 
         <details class="guide-item">
-          <summary><span class="guide-no">4</span>여러 명 한꺼번에 정산하기</summary>
+          <summary><span class="guide-no">4</span>알바생 여러 명 · 달마다 기록하기</summary>
           <div class="guide-body">
             <ol>
-              <li>한 명 계산이 끝나면 <b>[➕ 아래 정산 명단에 추가]</b>를 누릅니다.</li>
-              <li>이름을 바꿔 다음 알바생을 계산하고 또 추가합니다.</li>
-              <li>화면 아래 <b>정산 명단</b>에서 모두의 급여 합계를 볼 수 있습니다.</li>
-              <li><b>[📊 명단 전체 엑셀 다운로드]</b>를 누르면 한 파일로 받습니다. (월별 탭으로 나뉘고, 사람이 많아도 탭 수는 그대로입니다)</li>
-              <li>같은 이름·같은 달을 다시 추가하면 기존 내용이 새 내용으로 바뀝니다.</li>
+              <li>화면 아래 <b>정산 명단</b>에서 <b>이름 · 계약서상 일하는 날 · 시급</b>을 넣고 <b>[➕ 알바생 추가]</b>를 누릅니다.</li>
+              <li>추가한 알바생이 자동으로 선택되어 위 달력이 빈 상태로 나타납니다. 근무한 날의 시간을 넣으세요. <b>고치는 즉시 자동 저장</b>됩니다.</li>
+              <li>다른 알바생을 보려면 명단에서 <b>이름</b>을 누릅니다. 그 사람의 근무 기록이 달력에 나타납니다.</li>
+              <li>위쪽 <b>지급월</b>을 바꾸면 그 달의 기록이 나옵니다. 기록이 없는 달은 비어 있습니다(0원).</li>
+              <li>시급을 바꾸면 <b>바꾼 달부터</b> 적용되고, 지난 달 기록은 그대로입니다.</li>
+              <li><b>[📊 명단 전체 엑셀 다운로드]</b>를 누르면 모든 알바생의 모든 달이 한 파일로 받아집니다.</li>
             </ol>
           </div>
         </details>
@@ -558,7 +575,8 @@
             </ol>
             <p class="guide-step-title">그 다음부터</p>
             <ul>
-              <li>알바 명단이나 점검 기록을 바꾸면 <b>몇 초 뒤 자동으로 저장</b>됩니다.</li>
+              <li>근무 기록이나 점검 기록을 바꾸면 <b>몇 초 뒤 자동으로 저장</b>됩니다.</li>
+              <li>시트에는 <b>달마다 탭</b>(예: 2026-11)이 만들어지고, <b>5년이 지난 달의 탭은 시트에서만 자동으로 정리</b>됩니다. 이 기기의 기록은 지워지지 않습니다. 시트에서 직접 고친 내용은 앱에 반영되지 않습니다.</li>
               <li>내 구글 드라이브에 <b>"사장님 도우미 데이터"</b> 파일이 생깁니다. <b>[구글 시트 열어보기]</b>로 볼 수 있습니다. ("데이터" 탭은 앱이 쓰는 곳이니 고치지 마세요)</li>
               <li>다른 기기에서도 같은 구글 계정으로 연동하면 같은 기록이 나옵니다.</li>
               <li>이 앱은 <b>이 앱이 만든 파일만</b> 볼 수 있고, 저장된 내용은 개발자도 볼 수 없습니다.</li>
@@ -590,7 +608,7 @@
             <p class="guide-q">기록이 사라졌어요.</p>
             <p>기록은 사용 중인 브라우저에 저장됩니다. 브라우저의 "인터넷 사용 기록/사이트 데이터 삭제"를 하면 같이 지워집니다. 구글 연동이나 백업 파일이 있다면 [☁️ 구글 저장] 창에서 불러오세요.</p>
             <p class="guide-q">가게 공용 컴퓨터에서 써도 되나요?</p>
-            <p>쓰고 난 뒤 정산 명단과 점검 보관함의 <b>[비우기]</b>를 눌러 주세요. 다음 사람이 같은 브라우저에서 알바 이름과 시급을 볼 수 있습니다.</p>
+            <p>쓰고 난 뒤 정산 명단의 <b>[전체 지우기]</b>와 점검 보관함의 <b>[비우기]</b>를 눌러 주세요. 다음 사람이 같은 브라우저에서 알바 이름과 시급을 볼 수 있습니다.</p>
             <p class="guide-q">내가 입력한 급여 정보가 어디로 전송되나요?</p>
             <p>기본적으로 어디로도 전송되지 않고 이 기기에서만 계산됩니다. 구글 연동을 켠 경우에만 내 구글 드라이브로 저장됩니다.</p>
             <p class="guide-q">계산 결과를 그대로 신고해도 되나요?</p>
