@@ -2199,7 +2199,9 @@ body.modal-open { overflow: hidden; }
   .pay-banner, .pay-actions { display: none; }
   body.money-show .pay-banner { display: block; order: 4; }
   body.money-show .pay-actions { display: grid; order: 5; }
-  body.money-show .money-toggle { border-radius: 20px 20px 0 0; border-bottom-color: transparent; }
+  body.money-show .money-toggle { border-radius: 20px 20px 0 0; border-bottom: 0; padding-bottom: 8px; }
+  body.money-show .pay-banner { margin-top: -12px; border-top: 0; }
+  body.money-show .pay-actions { margin-top: -12px; }
   .pay-banner { padding-top: 6px; border-radius: 0; }
   /* 금액 가림 (명단·합계) */
   body:not(.money-show) .m-amt { font-size: 0 !important; }
@@ -2220,3 +2222,33 @@ body.modal-open { overflow: hidden; }
   .archive-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 }
 @media print { .roster-cards, .money-toggle { display: none !important; } }
+
+/* ---------- 엑셀로 받을 알바생 고르기 (폰·PC 공통) ---------- */
+.sheet-backdrop:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 900; background: rgba(0, 0, 0, .45); }
+.export-sheet {
+  display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 910; box-sizing: border-box;
+  max-height: 88vh; overflow-y: auto; padding: 16px 20px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 22px 22px 0 0; background: var(--card); box-shadow: 0 -8px 30px rgba(0, 0, 0, .25);
+}
+body.export-open .export-sheet { display: block; }
+body.export-open { overflow: hidden; }
+.export-sheet .sheet-head { display: flex; align-items: center; justify-content: space-between; font-size: 20px; }
+.export-note { margin: 4px 0 12px; font-size: 14px; color: var(--muted); }
+.export-list { display: flex; flex-direction: column; gap: 8px; }
+.export-row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card-2); cursor: pointer; }
+.export-row input { width: 24px; height: 24px; flex: none; }
+.export-row.off { opacity: .5; }
+.export-name { flex: 1; font-size: 17px; font-weight: 800; }
+.export-row small { color: var(--muted); font-size: 14px; }
+.export-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-top: 16px; }
+.export-actions .btn { min-height: 52px; font-size: 16px; font-weight: 800; justify-content: center; }
+@media (min-width: 700px) {
+  .export-sheet { left: 50%; right: auto; bottom: auto; top: 50%; width: 460px; transform: translate(-50%, -50%); border-radius: 18px; }
+}
+@media print { .export-sheet, .sheet-backdrop { display: none !important; } }
+
+/* ---------- 사용 방법 그림 ---------- */
+.guide-fig { margin: 12px auto 16px; max-width: 320px; text-align: center; }
+.guide-fig img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); background: #fff; }
+.guide-fig figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+@media print { .guide-fig { display: none; } }

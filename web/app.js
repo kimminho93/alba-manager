@@ -973,7 +973,7 @@
     $('sheetBackdrop').hidden = false;
   }
   function closeSheets() {
-    document.body.classList.remove('set-open', 'add-open', 'slip-open');
+    document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open');
     $('sheetBackdrop').hidden = true;
   }
 
@@ -1528,7 +1528,7 @@
       $('moneyToggleTitle').textContent = on ? '줄 돈 숨기기' : '줄 돈 보기';
     });
     document.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Escape' && /set-open|add-open|slip-open/.test(document.body.className)) closeSheets();
+      if (ev.key === 'Escape' && /set-open|add-open|slip-open|export-open/.test(document.body.className)) closeSheets();
     });
     // 폰에서는 '지급월'을 설정 창 밖(맨 위)에 두고, PC에서는 원래 자리(시급 위)에 둔다
     var phoneMq = window.matchMedia('(max-width: 560px)');
@@ -1617,23 +1617,61 @@
     $('rosterBody').addEventListener('click', onRosterClick);
     $('rosterCards').addEventListener('click', onRosterClick);
 
-    function allRecordInputs() {
+    function allRecordInputs(ids) {
       var list = [];
       state.workers.forEach(function (w) {
+        if (ids && ids.indexOf(w.id) < 0) return;
         Object.keys(w.months).sort().forEach(function (pm) { list.push(E.workerPayrollInput(w, pm)); });
       });
       return list;
     }
 
-    $('btnRosterXlsx').addEventListener('click', function () {
-      var inputs = allRecordInputs();
+    function downloadRosterXlsx(ids) {
+      var inputs = allRecordInputs(ids);
       if (!inputs.length) {
         showToast('저장된 근무 기록이 없습니다. 알바생을 추가하고 근무 시간을 입력해 주세요.');
         return;
       }
       var results = inputs.map(function (inp) { return E.calculatePayroll(inp); });
-      downloadXlsx('./api/payroll/excel', { roster: inputs }, function () { return E.payrollRosterXlsx(results); }, E.rosterFileName(results));
+      var names = {};
+      results.forEach(function (r) { names[r.name] = 1; });
+      var nameList = Object.keys(names);
+      var fname = nameList.length === 1
+        ? '알바_정산_' + nameList[0].replace(/[\\/:*?"<>|]/g, '') + '.xlsx'
+        : E.rosterFileName(results);
+      downloadXlsx('./api/payroll/excel', { roster: inputs }, function () { return E.payrollRosterXlsx(results); }, fname);
+    }
+
+    // 엑셀로 받을 사람 고르기 (한 명뿐이면 바로 받음)
+    function openExportPicker() {
+      var withRec = state.workers.filter(function (w) { return Object.keys(w.months).length; });
+      if (!withRec.length) { downloadRosterXlsx(null); return; }
+      if (state.workers.length === 1) { downloadRosterXlsx([state.workers[0].id]); return; }
+      $('exportList').innerHTML = state.workers.map(function (w) {
+        var n = Object.keys(w.months).length;
+        return '<label class="export-row' + (n ? '' : ' off') + '"><input type="checkbox" value="' + escHtml(w.id) + '"' + (n ? ' checked' : ' disabled') + '>' +
+          '<span class="export-name">' + escHtml(w.name) + '</span><small>' + (n ? n + '개월 기록' : '기록 없음') + '</small></label>';
+      }).join('');
+      document.body.classList.remove('set-open', 'add-open', 'slip-open');
+      $('exportAllToggle').textContent = '전체 해제';
+      document.body.classList.add('export-open');
+      $('sheetBackdrop').hidden = false;
+    }
+    $('btnRosterXlsx').addEventListener('click', openExportPicker);
+    $('exportClose').addEventListener('click', closeSheets);
+    $('exportAllToggle').addEventListener('click', function () {
+      var boxes = $('exportList').querySelectorAll('input:not(:disabled)');
+      var all = Array.prototype.every.call(boxes, function (b) { return b.checked; });
+      boxes.forEach(function (b) { b.checked = !all; });
+      $('exportAllToggle').textContent = all ? '전체 선택' : '전체 해제';
     });
+    $('exportGo').addEventListener('click', function () {
+      var ids = Array.prototype.map.call($('exportList').querySelectorAll('input:checked'), function (b) { return b.value; });
+      if (!ids.length) { showToast('엑셀로 받을 알바생을 한 명 이상 체크해 주세요.'); return; }
+      closeSheets();
+      downloadRosterXlsx(ids);
+    });
+
 
     $('btnRosterClear').addEventListener('click', function () {
       if (!state.workers.length) return;
