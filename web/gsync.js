@@ -377,6 +377,15 @@
       return withSheetRetry(function () { return pull('user'); }, 'user');
     }).then(function (remote) {
       var local = host.getData();
+      // 이미 연동돼 있던 기기가 다시 로그인한 경우: 묻지 않고 '앱을 열 때'와 같은 규칙으로 맞춘다
+      // (이 기기에 저장 안 된 변경이 있으면 이 기기 우선 → 시트에 저장 / 다른 기기가 더 최근에 저장했으면 시트 내용 / 아니면 이 기기 내용 유지)
+      if (meta.connected && meta.sheetId && remote && hasContent(remote.data)) {
+        if (meta.dirty) return push('user');
+        if (remote.stamp > (meta.stamp || '')) return applyRemote(remote);
+        if (JSON.stringify(remote.data) !== JSON.stringify(local)) return push('user');
+        lastJson = JSON.stringify(local);
+        return null;
+      }
       if (remote && hasContent(remote.data)) {
         var same = JSON.stringify(remote.data) === JSON.stringify(local);
         if (!same && hasContent(local)) {

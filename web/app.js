@@ -2136,12 +2136,17 @@
   function punchSubmit() {
     var w = punchState.target;
     if (!w) return;
+    // 창이 열려 있는 사이 시트에서 불러오기가 일어나 사람 객체가 바뀌었을 수 있으니 같은 사람을 다시 찾는다
+    w = state.workers.filter(function (x) { return x.id === w.id; })[0];
+    if (!w) { closePunchPw(); renderPunch(); return; }
+    punchState.target = w;
     var now = new Date();
     if (punchState.lockUntil > now.getTime()) {
       $('punchPwErr').textContent = '잠시 후에 다시 해 주세요. (' + Math.ceil((punchState.lockUntil - now.getTime()) / 1000) + '초)';
       return;
     }
     var typed = $('punchPwInput').value.trim();
+    if (!w.password) { $('punchPwErr').textContent = '이 알바생은 아직 비밀번호가 없어요. 사장님께 알려 주세요. (급여 계산 → 설정에서 정할 수 있어요)'; return; }
     if (!typed || typed !== w.password) {
       punchState.fails++;
       enqueuePunch([tsOf(now), w.code, w.name, '', '이름+비밀번호', '비밀번호 오류', punchState.fails + '번째 연속 실패']);

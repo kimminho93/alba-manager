@@ -529,5 +529,27 @@ function makeDevice(google, opts) {
     assert.ok(b.replayed);
   });
 
+  await test('이미 연동된 기기가 다시 로그인해도 묻지 않고, 이 기기의 저장 안 된 출퇴근 상태를 지키지 않고 덮어쓰지 않음', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', {})];
+    await a.cloud.connect();
+    // 출근을 찍었지만 시트 저장 전(저장 대기 중)에 로그인 창이 뜬 상황
+    a.data.workers[0].punch = { date: '2026-11-12', time: '09:30', at: '09:05' };
+    a.data.workers[0].password = '1234';
+    a.cloud.markDirty();
+    let asked = 0;
+    a.confirmAnswer = true;
+    const origConfirm = a.confirmAnswer;
+    a.tokenFail = true;                       // 토큰 만료 → 다시 로그인 필요
+    await a.cloud.resume();
+    a.tokenFail = false;
+    await a.cloud.connect();                  // 사용자가 [다시 로그인]
+    assert.strictEqual(a.data.workers[0].password, '1234');
+    assert.deepStrictEqual(a.data.workers[0].punch, { date: '2026-11-12', time: '09:30', at: '09:05' });
+    const saved = JSON.parse(g.rows('sheet1', '데이터').slice(2).map(r => r[0]).join(''));
+    assert.strictEqual(saved.workers[0].password, '1234');   // 시트에도 반영됨
+  });
+
   console.log('\n총 ' + passed + '개 구글 연동 테스트 통과!');
 })();
