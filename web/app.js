@@ -1585,9 +1585,12 @@
         includeWeekly: cur.includeWeekly, includeMeal: cur.includeMeal,
         mealMinHours: cur.mealMinHours, mealAmount: cur.mealAmount, tax: cur.tax
       });
+      var pw = E.cleanPassword($('awPw').value);
+      if (pw) w.password = pw;
       state.workers.push(w);
       saveWorkers();
       $('awName').value = '';
+      $('awPw').value = '';
       selectWorker(w.id);
       closeSheets();
       showToast('➕ ' + w.name + '님을 추가했습니다. 이름을 누르면 근무 기록을 입력할 수 있어요.');

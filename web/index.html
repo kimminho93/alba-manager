@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611122303">
+  <link rel="stylesheet" href="./style.css?v=202611122309">
 </head>
 <body>
   <header class="app-header">
@@ -280,6 +280,9 @@
           </label>
           <label class="field"><span>시급 (원)</span>
             <input id="awWage" type="number" inputmode="numeric" min="0" step="10" value="10320">
+          </label>
+          <label class="field"><span>출퇴근 비밀번호 <em class="hint">(선택)</em></span>
+            <input id="awPw" type="text" maxlength="20" autocomplete="off" placeholder="예) 1234">
           </label>
           <button id="btnAddWorker" type="submit" class="btn btn-primary">➕ 알바생 추가</button>
         </form>
@@ -847,8 +850,8 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611122303"></script>
-  <script src="./gsync.js?v=202611122303"></script>
-  <script src="./app.js?v=202611122303"></script>
+  <script src="./engine.js?v=202611122309"></script>
+  <script src="./gsync.js?v=202611122309"></script>
+  <script src="./app.js?v=202611122309"></script>
 </body>
 </html>
