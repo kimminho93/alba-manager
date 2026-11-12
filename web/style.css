@@ -2317,3 +2317,25 @@ body.on-punch .app-footer, body.locked .app-footer { display: none; }
   .app-header, .tabs, .container { max-width: 640px; }
   #setSheet, #addWorkerForm { left: 50%; right: auto; bottom: auto; top: 50%; width: 500px; max-width: calc(100vw - 32px); transform: translate(-50%, -50%); border-radius: 18px; max-height: 86vh; }
 }
+
+/* ---------- PC·가로 화면: 왼쪽 요약·명단 + 오른쪽 달력 두 칸 (옆 공간 활용) ---------- */
+@media screen and (min-width: 900px), screen and (orientation: landscape) and (min-width: 640px) {
+  .app-header, .tabs, .container { max-width: 1240px; }
+  #tab-payroll.active {
+    display: grid; grid-template-columns: 380px minmax(0, 1fr); column-gap: 20px; row-gap: 12px; align-items: start;
+    grid-template-rows: auto auto repeat(8, auto) 1fr;
+  }
+  #tab-payroll > * { grid-column: 1; min-width: 0; }
+  #tab-payroll > .worker-chips, #tab-payroll > .empty-card { grid-column: 1 / -1; }
+  #tab-payroll .worker-chips { flex-wrap: wrap; overflow: visible; margin: 12px 0 0; padding: 4px 0; }
+  #tab-payroll .grid { display: contents; }
+  #tab-payroll #monthField, #tab-payroll #moneyToggle, #tab-payroll .pay-banner, #tab-payroll .pay-actions, #tab-payroll #openSet, #tab-payroll #payDoc { grid-column: 1; }
+  #tab-payroll #moneyToggle { order: 2; }
+  #tab-payroll #scheduleBoard { grid-column: 2; grid-row: 2 / 12; }
+  #tab-payroll > .archive { grid-column: 1; margin: 0; order: 9; }
+  #monthField { margin: 0; }
+  .pay-banner .money { font-size: 36px; }
+  .roster-cards { display: flex; flex-direction: column; gap: 8px; }
+  .archive-head { flex-direction: column; align-items: stretch; gap: 10px; }
+  .archive-actions { flex-wrap: wrap; }
+}
