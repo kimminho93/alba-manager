@@ -144,18 +144,58 @@ test('월별 실제 달력 주차(buildMonthCalendar) & 출퇴근 시각(calcShi
   assert.strictEqual(r.weeks.length, 6);
 });
 
-test('식대는 하루에 1번만 지급 (하루 근무시간이 길어도 중복 지급 안 됨)', () => {
+test('식대: 점심/저녁 시간대에 따라 자동 체크, 둘 다 걸치면 하루 2회, 직접 고친 날은 그대로, 기준시간 미달이면 없음', () => {
+  const sh = (start, end, extra) => Object.assign({ off: false, start, end, breakMinutes: 0 }, extra || {});
+  const m = (s, e) => E.mealsForShift(sh(s, e), 4);
+  assert.deepStrictEqual([m('09:00', '14:00').lunch, m('09:00', '14:00').dinner], [true, false]);
+  assert.deepStrictEqual([m('14:00', '19:00').lunch, m('14:00', '19:00').dinner], [false, true]);
+  assert.deepStrictEqual([m('11:00', '21:00').lunch, m('11:00', '21:00').dinner], [true, true]);   // 풀타임: 점심·저녁 모두
+  assert.deepStrictEqual([m('22:00', '03:00').lunch, m('22:00', '03:00').dinner], [false, true]);  // 야간: 시간대 안 겹쳐도 한 번 (저녁)
+  assert.deepStrictEqual([m('06:00', '11:00').lunch, m('06:00', '11:00').dinner], [true, false]);  // 이른 근무: 한 번 (점심)
+  assert.deepStrictEqual([m('09:00', '12:59').lunch, m('09:00', '12:59').dinner], [false, false]); // 4시간 미만
+  // 직접 고침: 풀타임이지만 저녁은 제외 / 기준 미달이어도 직접 체크하면 인정
+  const mm = E.mealsForShift(sh('11:00', '21:00', { meals: ['L'] }), 4);
+  assert.deepStrictEqual([mm.lunch, mm.dinner, mm.manual], [true, false, true]);
+  assert.strictEqual(E.mealsForShift(sh('09:00', '12:00', { meals: ['L'] }), 4).lunch, true);
+  assert.strictEqual(E.mealsForShift({ off: true, start: '09:00', end: '14:00', breakMinutes: 0, meals: ['L', 'D'] }, 4).lunch, false);
+
+  // 한 달 계산: 2일 풀타임(점심+저녁), 3일은 4시간 근무 → 끼니 수로 센다
   const shifts = [];
   for (let d = 1; d <= 30; d++) shifts.push({ off: d !== 2 && d !== 3, start: d === 2 ? '06:00' : '09:00', end: d === 2 ? '23:00' : '13:00', breakMinutes: 0 });
-  const r = E.calculatePayroll({ name: '식대', hourlyWage: 10000, mode: 'daily', payMonth: '2026-11', dailyShifts: shifts,
+  const calc = (list) => E.calculatePayroll({ name: '식대', hourlyWage: 10000, mode: 'daily', payMonth: '2026-11', dailyShifts: list,
     includeMeal: true, mealMinHours: 4, mealAmount: 8000, tax: 'none' });
-  assert.strictEqual(r.mealDays, 2);          // 17시간 근무한 날도, 4시간 근무한 날도 각각 1번
-  assert.strictEqual(r.mealAllowance, 16000);
-  // 기준(4시간)에 못 미치면 지급 안 됨
+  const r = calc(shifts);
+  assert.strictEqual(r.mealDays, 3);          // 2일: 점심+저녁 2회, 3일: 점심 1회
+  assert.strictEqual(r.mealAllowance, 24000);
+  assert.strictEqual(r.days[1].mealCount, 2);
+  assert.deepStrictEqual(r.days[1].meals, { lunch: true, dinner: true });
+  // 2일의 저녁을 직접 뺌 → 2회
+  shifts[1] = Object.assign({}, shifts[1], { meals: ['L'] });
+  assert.strictEqual(calc(shifts).mealDays, 2);
+  // 기준(4시간)에 못 미치면 자동으로는 없음
+  shifts[1] = { off: false, start: '06:00', end: '23:00', breakMinutes: 0 };
   shifts[2] = { off: false, start: '09:00', end: '12:59', breakMinutes: 0 };
-  const r2 = E.calculatePayroll({ name: '식대', hourlyWage: 10000, mode: 'daily', payMonth: '2026-11', dailyShifts: shifts,
-    includeMeal: true, mealMinHours: 4, mealAmount: 8000, tax: 'none' });
-  assert.strictEqual(r2.mealDays, 1);
+  assert.strictEqual(calc(shifts).mealDays, 2);
+  // 식사 시간대 설정을 바꾸면 자동 판정도 바뀜
+  try {
+    E.setMealTimes({ lunchStart: '12:00', lunchEnd: '15:00' });
+    assert.strictEqual(E.mealsForShift(sh('09:00', '13:00'), 4).lunch, true);     // 12~13시 1시간 겹침
+    assert.strictEqual(E.mealsForShift(sh('09:00', '12:30'), 4).lunch, false);    // 3.5시간 근무라 기준시간(4시간) 미달
+  } finally { E.setMealTimes({}); }
+});
+
+test('식대 직접 고침은 알바생 월 기록에 저장되고 백업 후에도 유지됨', () => {
+  const w = E.createWorker('철수', 5, 10000);
+  const shifts = E.emptyShifts('2026-11');
+  shifts[0] = { off: false, start: '11:00', end: '21:00', breakMinutes: 0, meals: ['L'] };
+  shifts[1] = { off: false, start: '11:00', end: '21:00', breakMinutes: 0 };
+  E.setRecord(w, '2026-11', { wage: 10000, dailyShifts: shifts });
+  assert.deepStrictEqual(w.months['2026-11'].dailyShifts[0].meals, ['L']);
+  assert.strictEqual(w.months['2026-11'].dailyShifts[1].meals, undefined);
+  const back = E.parseBackup(E.buildBackup({ workers: [w], archive: [], presets: [], store: {} }));
+  assert.deepStrictEqual(back.data.workers[0].months['2026-11'].dailyShifts[0].meals, ['L']);
+  const r = E.calculatePayroll(E.workerPayrollInput(back.data.workers[0], '2026-11'));
+  assert.strictEqual(r.mealDays, 3);   // 1일 점심 1회 + 2일 점심·저녁 2회
 });
 
 test('주 5일 약속인데 4일만 출근한 주는 주휴수당 없음 (일별 모드)', () => {
@@ -406,6 +446,7 @@ test('설정: 세율·보험료율을 바꾸면 공제 계산이 바뀌고, 이�
     assert.strictEqual(r.pension, 4.5); assert.strictEqual(r.health, 3.545); assert.strictEqual(r.care, 12.95);
     assert.strictEqual(r.incomeTax, 2.5);
     // 설정 + 백업
+    assert.strictEqual(E.sanitizeSettings({ mealTimes: { lunchStart: '15:00', lunchEnd: '12:00' } }).mealTimes.lunchStart, '11:00');   // 끝이 시작보다 빠르면 기본값
     const st = E.sanitizeSettings({ minWage: '11000', rates: { pension: 5 } });
     assert.strictEqual(st.minWage, 11000); assert.strictEqual(st.rates.pension, 5);
     assert.strictEqual(E.sanitizeSettings({ minWage: -1 }).minWage, 10320);

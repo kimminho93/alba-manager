@@ -31,7 +31,8 @@
 
   function loadSettings() {
     var st = E.sanitizeSettings(loadJson(KEYS.settings, {}));
-    E.setRates(st.rates);   // 계산에 쓰이는 세율을 먼저 맞춘다
+    E.setRates(st.rates);
+    E.setMealTimes(st.mealTimes);   // 계산에 쓰이는 세율을 먼저 맞춘다
     return st;
   }
 
@@ -68,7 +69,8 @@
       endHour: 14,
       endMin: 0,
       breakMinutes: 0,
-      off: false
+      off: false,
+      meals: null        // 식대를 직접 고친 날: ['L','D'] 중 체크한 것 / null이면 자동
     }
   };
 
@@ -487,6 +489,7 @@
     state.editor.endMin = et.m;
     state.editor.breakMinutes = sh.breakMinutes || 0;
     state.editor.off = !!sh.off;
+    state.editor.meals = Array.isArray(sh.meals) ? sh.meals.slice() : null;
     renderTimeEditor();
   }
 
@@ -494,13 +497,30 @@
     var start = fmtTime(state.editor.startHour, state.editor.startMin);
     var end = state.editor.endHour === 24 ? '24:00' : fmtTime(state.editor.endHour, state.editor.endMin);
     var hrs = state.editor.off ? 0 : E.calcShiftHours(start, end, state.editor.breakMinutes);
-    return {
+    var out = {
       off: state.editor.off || hrs <= 0,
       start: start,
       end: end,
       breakMinutes: state.editor.breakMinutes,
       hours: hrs
     };
+    if (Array.isArray(state.editor.meals)) out.meals = state.editor.meals.slice();
+    return out;
+  }
+
+  /* 저장용 하루 근무 (계산용 hours 제외, 직접 고친 식대는 유지) */
+  function storeShift(sh) {
+    var o = { off: sh.off, start: sh.start, end: sh.end, breakMinutes: sh.breakMinutes };
+    if (Array.isArray(sh.meals)) o.meals = sh.meals.slice();
+    return o;
+  }
+
+  function mealShort(m) {
+    return m.lunch && m.dinner ? '점저' : (m.lunch ? '점' : (m.dinner ? '저' : ''));
+  }
+
+  function mealWords(m) {
+    return m.lunch && m.dinner ? '점심·저녁' : (m.lunch ? '점심' : (m.dinner ? '저녁' : ''));
   }
 
   function renderTimeEditor() {
@@ -516,7 +536,13 @@
     }
 
     var minMeal = E.toNumber($('pMealMinHours').value, 4);
-    var mealTag = ($('pMeal').checked && !sh.off && sh.hours >= minMeal) ? ' · 🍚 식대 지급' : '';
+    var ml = E.mealsForShift(storeShift(sh), minMeal);
+    var showMeal = $('pMeal').checked && !sh.off;
+    var mealTag = showMeal && (ml.lunch || ml.dinner) ? ' · 🍚 ' + mealWords(ml) + ' 식대' : '';
+    $('mealPick').hidden = !showMeal;
+    $('mealLunch').checked = ml.lunch;
+    $('mealDinner').checked = ml.dinner;
+    $('mealPickNote').textContent = ml.manual ? '직접 고침' : '자동';
     $('editorCalcPill').innerHTML = sh.off
       ? '🚫 <b>휴무 (0시간)</b>'
       : (sh.start + ' ~ ' + sh.end + (sh.breakMinutes ? ' (-' + sh.breakMinutes + '분)' : '') + ' · <b>' + E.formatNum(sh.hours, 2) + '시간</b>' + mealTag);
@@ -545,12 +571,7 @@
 
   function applyEditorToSelectedDay() {
     var sh = currentEditorShift();
-    state.dailyShifts[state.selectedDayIdx] = {
-      off: sh.off,
-      start: sh.start,
-      end: sh.end,
-      breakMinutes: sh.breakMinutes
-    };
+    state.dailyShifts[state.selectedDayIdx] = storeShift(sh);
     renderTimeEditor();
     editPayroll();
   }
@@ -640,7 +661,7 @@
         rowsHtml += '<td class="' + cls + '" data-day-idx="' + day.index + '">' +
           '<div class="cal-day-top">' +
             '<span class="cal-date-num' + dateColor + '">' + day.date + '일</span>' +
-            (isMeal ? '<span class="cal-meal-icon" title="식대 지급 대상">🍚</span>' : '') +
+            (isMeal ? '<span class="cal-meal-icon" title="식대: ' + mealWords(day.meals) + '">🍚' + mealShort(day.meals) + '</span>' : '') +
           '</div>';
 
         if (day.off || day.hours <= 0) {
@@ -656,7 +677,7 @@
       }
 
       var st = weekStatus(wkObj, r, wi);
-      var mealSub = r.includeMeal ? ('🍚 식대 ' + wkObj.mealDays + '일') : '';
+      var mealSub = r.includeMeal ? ('🍚 식대 ' + wkObj.mealDays + '회') : '';
 
       rowsHtml += '<td class="cal-sum-cell' + (wkObj.eligible && r.includeWeekly ? ' eligible' : '') + (st.cls === 'bad' ? ' absent' : '') + '">' +
         '<b>' + E.formatNum(wkObj.hours, 1) + '시간</b>' +
@@ -681,7 +702,7 @@
     for (var wi = 0; wi < cal.weekCount; wi++) {
       var wk = r.weeks[wi] || { hours: 0, eligible: false, allowance: 0, mealDays: 0 };
       var st = weekStatus(wk, r, wi);
-      var mealSub = r.includeMeal ? (' · 🍚 식대 ' + wk.mealDays + '일') : '';
+      var mealSub = r.includeMeal ? (' · 🍚 식대 ' + wk.mealDays + '회') : '';
       html += '<section class="wk-card">' +
         '<div class="wk-card-head"><b>' + (wi + 1) + '주차</b>' +
         '<span class="wk-card-sum' + (wk.eligible && r.includeWeekly ? ' eligible' : '') + '">' + E.formatNum(wk.hours, 1) + '시간</span></div>';
@@ -696,7 +717,7 @@
           '<span class="wk-day-date' + (di === 5 ? ' sat' : (di === 6 ? ' sun' : '')) + '">' +
             cal.month + '/' + day.date + ' (' + DOW[di] + ')</span>' +
           '<span class="wk-day-main">' + (off ? '휴무' : escHtml(day.start + '~' + day.end)) + '</span>' +
-          '<span class="wk-day-hours">' + (off ? '' : E.formatNum(day.hours, 1) + '시간') + (isMeal ? ' 🍚' : '') + '</span>' +
+          '<span class="wk-day-hours">' + (off ? '' : E.formatNum(day.hours, 1) + '시간') + (isMeal ? ' 🍚' + mealShort(day.meals) : '') + '</span>' +
           '</button>';
       }
       html += '<div class="wk-card-foot ' + st.cls + '"><span>' + st.text + mealSub + '</span>' + st.btn + '</div></section>';
@@ -759,8 +780,8 @@
       $('dailyMealDays').textContent = r.mealDays;
 
       $('mealSummaryText').textContent = r.includeMeal
-        ? ('일 ' + E.formatNum(r.mealMinHours, 1) + '시간 이상 근무 ' + r.mealDays + '일 × ' + E.formatWon(r.mealAmount) + '원 = +' + E.formatWon(r.mealAllowance) + '원')
-        : '체크 시 하루 기준시간 이상 근무한 날에 식대를 추가 지급합니다';
+        ? ('점심·저녁 ' + r.mealDays + '회 × ' + E.formatWon(r.mealAmount) + '원 = +' + E.formatWon(r.mealAllowance) + '원')
+        : '체크 시 점심·저녁 식사 시간에 일한 날 식대를 추가 지급합니다';
 
       renderMonthCalendar(r);
       renderTimeEditor();
@@ -785,7 +806,7 @@
     $('slipHours').textContent = E.formatNum(r.totalHours, 2) + '시간 (' + modeLabel + ')';
     $('slipWeekly').innerHTML =
       '주휴 <span class="pill ' + (r.includeWeekly ? 'pill-ok' : 'pill-off') + '">' + (r.includeWeekly ? '포함' : '미포함') + '</span> ' +
-      '· 식대 <span class="pill ' + (r.includeMeal ? 'pill-ok' : 'pill-off') + '">' + (r.includeMeal ? (r.mealDays + '일') : '미포함') + '</span>';
+      '· 식대 <span class="pill ' + (r.includeMeal ? 'pill-ok' : 'pill-off') + '">' + (r.includeMeal ? (r.mealDays + '회') : '미포함') + '</span>';
     $('slipTax').textContent = r.tax.label;
 
     $('slipBody').innerHTML = r.rows.map(function (row) {
@@ -806,7 +827,7 @@
 
     $('weekStrip').innerHTML = r.weeks.map(function (w) {
       var active = r.includeWeekly && w.eligible;
-      var mealSub = r.includeMeal && r.mode === 'daily' ? (' · 🍚 식대 ' + w.mealDays + '일') : '';
+      var mealSub = r.includeMeal && r.mode === 'daily' ? (' · 🍚 식대 ' + w.mealDays + '회') : '';
       return '<div class="week-cell ' + (active ? 'yes' : 'no') + '">' +
         '<b>' + w.week + '주차 · ' + E.formatNum(w.hours, 2) + 'h' + mealSub + '</b>' +
         '<span class="w-amt">' + (r.includeWeekly
@@ -826,16 +847,19 @@
   }
 
   /* ---------- 설정 (세율·보험료율·최저시급) ---------- */
+  var MEAL_TIME_KEYS = ['lunchStart', 'lunchEnd', 'dinnerStart', 'dinnerEnd'];
   var RATE_KEYS = ['incomeTax', 'localTax', 'pension', 'health', 'care', 'employment'];
 
   function fillSettingsForm() {
     $('sMinWage').value = state.settings.minWage;
+    MEAL_TIME_KEYS.forEach(function (k) { $('sMeal_' + k).value = state.settings.mealTimes[k]; });
     RATE_KEYS.forEach(function (k) { $('sRate_' + k).value = state.settings.rates[k]; });
   }
 
   /* 설정을 계산·화면에 반영 */
   function applySettings() {
     E.setRates(state.settings.rates);
+    E.setMealTimes(state.settings.mealTimes);
     var mw = state.settings.minWage;
     $('minWageHint').textContent = '최저시급 ' + E.formatWon(mw) + '원';
     $('awWage').value = mw;
@@ -849,11 +873,13 @@
   }
 
   function onSettingsInput() {
-    var raw = { minWage: $('sMinWage').value, rates: {} };
+    var raw = { minWage: $('sMinWage').value, rates: {}, mealTimes: {} };
     RATE_KEYS.forEach(function (k) { raw.rates[k] = $('sRate_' + k).value; });
+    MEAL_TIME_KEYS.forEach(function (k) { raw.mealTimes[k] = $('sMeal_' + k).value; });
     state.settings = E.sanitizeSettings(raw);
     saveJson(KEYS.settings, state.settings);
     E.setRates(state.settings.rates);
+    E.setMealTimes(state.settings.mealTimes);
     // 입력 중인 칸은 그대로 두고 계산 결과만 갱신
     var r = state.settings.rates;
     var eff = Math.round(r.incomeTax * (1 + r.localTax / 100) * 1000) / 1000;
@@ -961,7 +987,7 @@
         '<td class="num">' + (hasRec ? E.formatNum(r.totalHours, 2) + 'h' : '<small class="muted">기록 없음</small>') + '</td>' +
         '<td class="num">' + E.formatWon(r.hourlyWage) + '원</td>' +
         '<td class="num">' + E.formatWon(r.weeklyAllowance) + '원 <span class="pill ' + (r.includeWeekly ? 'pill-ok' : 'pill-off') + '">' + (r.includeWeekly ? '포함' : '미포함') + '</span></td>' +
-        '<td class="num">' + E.formatWon(r.mealAllowance) + '원 <span class="pill ' + (r.includeMeal ? 'pill-ok' : 'pill-off') + '">' + (r.includeMeal ? (r.mealDays + '일') : '미포함') + '</span></td>' +
+        '<td class="num">' + E.formatWon(r.mealAllowance) + '원 <span class="pill ' + (r.includeMeal ? 'pill-ok' : 'pill-off') + '">' + (r.includeMeal ? (r.mealDays + '회') : '미포함') + '</span></td>' +
         '<td class="num">' + E.formatWon(r.gross) + '원</td>' +
         '<td class="num">' + (r.tax.total ? '-' + E.formatWon(r.tax.total) : '0') + '원 <small class="muted">(' + escHtml(r.tax.type === 'none' ? '0%' : (r.tax.type === '3.3' ? '3.3%' : '4대')) + ')</small></td>' +
         '<td class="num net">' + E.formatWon(r.net) + '원</td>' +
@@ -1271,6 +1297,22 @@
       applyEditorToSelectedDay();
     });
 
+    // 식대 점심/저녁 체크: 자동 결과와 같게 되돌리면 '자동'으로, 다르게 고치면 '직접 고침'
+    ['mealLunch', 'mealDinner'].forEach(function (id) {
+      $(id).addEventListener('change', function () {
+        var base = currentEditorShift();
+        delete base.meals;
+        var minMeal = E.toNumber($('pMealMinHours').value, 4);
+        var auto = E.mealsForShift(storeShift(base), minMeal).auto;
+        var want = [];
+        if ($('mealLunch').checked) want.push('L');
+        if ($('mealDinner').checked) want.push('D');
+        var same = (auto.lunch === ($('mealLunch').checked)) && (auto.dinner === ($('mealDinner').checked));
+        state.editor.meals = same ? null : want;
+        applyEditorToSelectedDay();
+      });
+    });
+
     // 빠른 시간대 프리셋 (사용자 정의, 최대 20개)
     initTimePresets();
 
@@ -1285,7 +1327,7 @@
       var sh = currentEditorShift();
       state.calendar.days.forEach(function (cd, i) {
         if (!cd.isWeekend) {
-          state.dailyShifts[i] = { off: sh.off, start: sh.start, end: sh.end, breakMinutes: sh.breakMinutes };
+          state.dailyShifts[i] = storeShift(sh);
         }
       });
       editPayroll();
@@ -1296,7 +1338,7 @@
       var sh = currentEditorShift();
       state.calendar.days.forEach(function (cd, i) {
         if (cd.isWeekend) {
-          state.dailyShifts[i] = { off: sh.off, start: sh.start, end: sh.end, breakMinutes: sh.breakMinutes };
+          state.dailyShifts[i] = storeShift(sh);
         }
       });
       editPayroll();
@@ -1309,7 +1351,7 @@
       var dayName = E.DAY_NAMES[targetDow];
       state.calendar.days.forEach(function (cd, i) {
         if (cd.dow === targetDow) {
-          state.dailyShifts[i] = { off: sh.off, start: sh.start, end: sh.end, breakMinutes: sh.breakMinutes };
+          state.dailyShifts[i] = storeShift(sh);
         }
       });
       editPayroll();
@@ -1328,6 +1370,7 @@
         return { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
       });
       state.editor.off = true;
+      state.editor.meals = null;
       editPayroll();
       showToast('📅 이번 달 전체를 휴무(0시간)로 초기화했습니다.');
     });
@@ -1432,8 +1475,9 @@
       downloadXlsx('./api/payroll/excel', { input: r.input }, function () { return E.payrollSlipXlsx(r); }, E.payrollFileName(r));
     });
     // 설정 탭
-    ['sMinWage'].concat(RATE_KEYS.map(function (k) { return 'sRate_' + k; })).forEach(function (id) {
+    ['sMinWage'].concat(RATE_KEYS.map(function (k) { return 'sRate_' + k; }), MEAL_TIME_KEYS.map(function (k) { return 'sMeal_' + k; })).forEach(function (id) {
       $(id).addEventListener('input', onSettingsInput);
+      $(id).addEventListener('change', onSettingsInput);
       $(id).addEventListener('blur', fillSettingsForm);   // 비우거나 잘못 넣었으면 적용된 값으로 되돌려 보여줌
     });
     $('btnSettingsReset').addEventListener('click', function () {
@@ -1617,7 +1661,7 @@
       rs.forEach(function (r) {
         r.days.forEach(function (d) {
           if (d.off) return;
-          rows.push([pm + '-' + pad2(d.date), DOW[d.dayIndex], r.name, d.start, d.end, d.breakMinutes, d.hours, d.mealEligible && r.includeMeal ? '지급' : '']);
+          rows.push([pm + '-' + pad2(d.date), DOW[d.dayIndex], r.name, d.start, d.end, d.breakMinutes, d.hours, r.includeMeal && d.mealEligible ? mealWords(d.meals) : '']);
         });
       });
       sheets.push({ name: pm, rows: rows, bold: [0, 1, logTitle, logHead], sortKey: pm });

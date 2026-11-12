@@ -61,6 +61,64 @@
   function pct(v) { return String(Math.round(v * 1000) / 1000); }
   function bp(v) { return Math.round(v * 1000); }   // % → rateTrunc10 단위(1% = 1000)
 
+  /* 점심/저녁 식사 시간대 — 이 시간대에 1시간 이상 겹쳐 일하면 그 끼니 식대가 자동으로 체크된다 */
+  var DEFAULT_MEAL_TIMES = { lunchStart: '11:00', lunchEnd: '14:00', dinnerStart: '17:00', dinnerEnd: '20:00' };
+  var MEAL_TIMES = Object.assign({}, DEFAULT_MEAL_TIMES);
+  var MEAL_OVERLAP_MIN = 60;
+
+  function sanitizeMealTimes(raw) {
+    var out = Object.assign({}, DEFAULT_MEAL_TIMES);
+    if (raw && typeof raw === 'object') {
+      [['lunchStart', 'lunchEnd'], ['dinnerStart', 'dinnerEnd']].forEach(function (pair) {
+        var a = typeof raw[pair[0]] === 'string' ? parseTimeMinutes(raw[pair[0]]) : null;
+        var b = typeof raw[pair[1]] === 'string' ? parseTimeMinutes(raw[pair[1]]) : null;
+        if (a !== null && b !== null && a < b && b <= 1440) {
+          out[pair[0]] = minutesToTime(a);
+          out[pair[1]] = b === 1440 ? '24:00' : minutesToTime(b);
+        }
+      });
+    }
+    return out;
+  }
+  function setMealTimes(raw) { MEAL_TIMES = sanitizeMealTimes(raw); return Object.assign({}, MEAL_TIMES); }
+  function getMealTimes() { return Object.assign({}, MEAL_TIMES); }
+
+  function overlapMinutes(a1, a2, b1, b2) { return Math.max(0, Math.min(a2, b2) - Math.max(a1, b1)); }
+
+  /**
+   * 하루 근무에 대한 식대 판정.
+   *  - 자동: 기준시간(mealMinHours) 이상 일했고, 점심/저녁 시간대와 1시간 이상 겹치면 그 끼니 체크
+   *          (어느 시간대와도 안 겹치면 한 번은 지급: 야간 근무 등은 저녁, 이른 근무는 점심)
+   *  - 직접 고침: shift.meals = ['L','D'] 중 체크한 것 (자동 결과를 덮어씀)
+   */
+  function mealsForShift(sh, minMealH) {
+    var none = { lunch: false, dinner: false, auto: { lunch: false, dinner: false }, manual: false };
+    if (!sh || sh.off) return none;
+    var h = calcShiftHours(sh.start, sh.end, sh.breakMinutes);
+    if (!(h > 0)) return none;
+    var auto = { lunch: false, dinner: false };
+    if (h >= minMealH) {
+      var s = parseTimeMinutes(sh.start);
+      var e = parseTimeMinutes(sh.end);
+      var overnight = e <= s;
+      var end = overnight ? e + 1440 : e;
+      var T = MEAL_TIMES;
+      function hit(a, b) {
+        var A = parseTimeMinutes(a), B = b === '24:00' ? 1440 : parseTimeMinutes(b);
+        return overlapMinutes(s, end, A, B) >= MEAL_OVERLAP_MIN || overlapMinutes(s, end, A + 1440, B + 1440) >= MEAL_OVERLAP_MIN;
+      }
+      auto.lunch = hit(T.lunchStart, T.lunchEnd);
+      auto.dinner = hit(T.dinnerStart, T.dinnerEnd);
+      if (!auto.lunch && !auto.dinner) {
+        if (overnight || s >= 20 * 60) auto.dinner = true; else auto.lunch = true;
+      }
+    }
+    if (Array.isArray(sh.meals)) {
+      return { lunch: sh.meals.indexOf('L') >= 0, dinner: sh.meals.indexOf('D') >= 0, auto: auto, manual: true };
+    }
+    return { lunch: auto.lunch, dinner: auto.dinner, auto: auto, manual: false };
+  }
+
   var won = M.formatWon;
   function fmtH(h) { return M.formatNum(h, 2); }
 
@@ -161,7 +219,11 @@
     var start = typeof s.start === 'string' && parseTimeMinutes(s.start) !== null ? s.start.trim() : '09:00';
     var end = typeof s.end === 'string' && parseTimeMinutes(s.end) !== null ? s.end.trim() : '14:00';
     var brk = Math.max(0, Math.round(M.toNumber(s.breakMinutes, 0)));
-    return { off: off, start: start, end: end, breakMinutes: brk };
+    var out = { off: off, start: start, end: end, breakMinutes: brk };
+    if (Array.isArray(s.meals)) {
+      out.meals = ['L', 'D'].filter(function (k) { return s.meals.indexOf(k) >= 0; });   // 직접 고친 식대(점심 L / 저녁 D)
+    }
+    return out;
   }
 
   function normalizePayrollInput(raw) {
@@ -305,17 +367,17 @@
     });
 
     var mealFormula = r.includeMeal
-      ? '일 ' + fmtH(r.mealMinHours) + '시간 이상 근무 ' + r.mealDays + '일 × ' + won(r.mealAmount) + '원'
+      ? '점심·저녁 식사 ' + r.mealDays + '회 × ' + won(r.mealAmount) + '원'
       : '식대 미포함으로 정산 → 0원';
     var mealDetail = '';
     if (r.includeMeal && r.mode === 'daily') {
       mealDetail = r.weeks.map(function (w) {
-        return w.week + '주 ' + w.mealDays + '일';
-      }).join(' / ') + ' (총 ' + r.mealDays + '일 지급)';
+        return w.week + '주 ' + w.mealDays + '회';
+      }).join(' / ') + ' (총 ' + r.mealDays + '회 지급)';
     }
     rows.push({
       kind: 'pay', section: '지급', label: '식대 (식비)', amount: r.mealAllowance, sign: 1,
-      badge: r.includeMeal ? (r.mealDays + '일 지급') : '미포함',
+      badge: r.includeMeal ? (r.mealDays + '회 지급') : '미포함',
       formula: mealFormula,
       detail: mealDetail
     });
@@ -352,7 +414,7 @@
     L.push('▪ 기본급: ' + won(r.basePay) + '원');
     L.push('▪ 주휴수당: ' + won(r.weeklyAllowance) + '원 (' + (r.includeWeekly ? '포함' : '미포함') + ')');
     if (r.includeMeal || r.mealAllowance > 0) {
-      L.push('▪ 식대: ' + won(r.mealAllowance) + '원 (일 ' + fmtH(r.mealMinHours) + 'h↑ ' + r.mealDays + '일 × ' + won(r.mealAmount) + '원)');
+      L.push('▪ 식대: ' + won(r.mealAllowance) + '원 (' + r.mealDays + '회 × ' + won(r.mealAmount) + '원)');
     }
     if (r.lateMinutes > 0) L.push('▪ 지각·조퇴 차감: -' + won(r.lateDeduction) + '원 (' + r.lateMinutes + '분)');
     L.push('▪ 세전 지급총액: ' + won(r.gross) + '원');
@@ -392,16 +454,16 @@
       cal.days.forEach(function (cd, idx) {
         var sh = inp.dailyShifts[idx] || { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
         var h = sh.off ? 0 : calcShiftHours(sh.start, sh.end, sh.breakMinutes);
-        var mealEligible = h > 0 && h >= minMealH;
+        var ml = mealsForShift(sh, minMealH);
+        var mealCount = (ml.lunch ? 1 : 0) + (ml.dinner ? 1 : 0);
+        var mealEligible = mealCount > 0;
         if (h > 0) {
           workDays++;
           weekWorkDays[cd.weekIndex] += 1;
         }
         weekCalDays[cd.weekIndex] += 1;
-        if (mealEligible) {
-          dailyMealDays++;
-          weekMealDays[cd.weekIndex] += 1;
-        }
+        dailyMealDays += mealCount;           // 식대는 끼니 수(점심·저녁 각각 1회)로 센다
+        weekMealDays[cd.weekIndex] += mealCount;
         weekHours[cd.weekIndex] = M.round2(weekHours[cd.weekIndex] + h);
         daysDetail.push({
           index: idx,
@@ -417,7 +479,11 @@
           end: sh.end,
           breakMinutes: sh.breakMinutes,
           hours: M.round2(h),
-          mealEligible: mealEligible
+          mealEligible: mealEligible,
+          mealCount: mealCount,
+          meals: { lunch: ml.lunch, dinner: ml.dinner },
+          mealAuto: ml.auto,
+          mealManual: ml.manual
         });
       });
     } else {
@@ -449,7 +515,11 @@
             end: minutesToTime(9 * 60 + Math.round(h2 * 60)),
             breakMinutes: 0,
             hours: M.round2(h2),
-            mealEligible: mealElig2
+            mealEligible: mealElig2,
+            mealCount: mealElig2 ? 1 : 0,
+            meals: { lunch: mealElig2, dinner: false },
+            mealAuto: { lunch: mealElig2, dinner: false },
+            mealManual: false
           });
         }
         weekHours.push(M.round2(wSum));
@@ -559,6 +629,11 @@
     weeklyAllowanceFor: weeklyAllowanceFor,
     lateDeductionFor: lateDeductionFor,
     calcTax: calcTax,
+    DEFAULT_MEAL_TIMES: DEFAULT_MEAL_TIMES,
+    sanitizeMealTimes: sanitizeMealTimes,
+    setMealTimes: setMealTimes,
+    getMealTimes: getMealTimes,
+    mealsForShift: mealsForShift,
     DEFAULT_RATES: DEFAULT_RATES,
     sanitizeRates: sanitizeRates,
     setRates: setRates,

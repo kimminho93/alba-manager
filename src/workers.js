@@ -66,7 +66,9 @@
       mealAmount: n.mealAmount,
       tax: n.tax,
       dailyShifts: n.dailyShifts.map(function (s) {
-        return { off: !!s.off, start: s.start, end: s.end, breakMinutes: s.breakMinutes };
+        var o = { off: !!s.off, start: s.start, end: s.end, breakMinutes: s.breakMinutes };
+        if (Array.isArray(s.meals)) o.meals = s.meals.slice();
+        return o;
       }),
       weekExcuse: n.weekExcuse.slice(0, 6)
     };
@@ -255,7 +257,8 @@
     var mw = Math.round(Number(raw.minWage));
     return {
       minWage: isFinite(mw) && mw > 0 && mw < 1000000 ? mw : DEFAULT_MIN_WAGE,
-      rates: P.sanitizeRates(raw.rates)
+      rates: P.sanitizeRates(raw.rates),
+      mealTimes: P.sanitizeMealTimes(raw.mealTimes)
     };
   }
 

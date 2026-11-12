@@ -508,6 +508,64 @@
   function pct(v) { return String(Math.round(v * 1000) / 1000); }
   function bp(v) { return Math.round(v * 1000); }   // % → rateTrunc10 단위(1% = 1000)
 
+  /* 점심/저녁 식사 시간대 — 이 시간대에 1시간 이상 겹쳐 일하면 그 끼니 식대가 자동으로 체크된다 */
+  var DEFAULT_MEAL_TIMES = { lunchStart: '11:00', lunchEnd: '14:00', dinnerStart: '17:00', dinnerEnd: '20:00' };
+  var MEAL_TIMES = Object.assign({}, DEFAULT_MEAL_TIMES);
+  var MEAL_OVERLAP_MIN = 60;
+
+  function sanitizeMealTimes(raw) {
+    var out = Object.assign({}, DEFAULT_MEAL_TIMES);
+    if (raw && typeof raw === 'object') {
+      [['lunchStart', 'lunchEnd'], ['dinnerStart', 'dinnerEnd']].forEach(function (pair) {
+        var a = typeof raw[pair[0]] === 'string' ? parseTimeMinutes(raw[pair[0]]) : null;
+        var b = typeof raw[pair[1]] === 'string' ? parseTimeMinutes(raw[pair[1]]) : null;
+        if (a !== null && b !== null && a < b && b <= 1440) {
+          out[pair[0]] = minutesToTime(a);
+          out[pair[1]] = b === 1440 ? '24:00' : minutesToTime(b);
+        }
+      });
+    }
+    return out;
+  }
+  function setMealTimes(raw) { MEAL_TIMES = sanitizeMealTimes(raw); return Object.assign({}, MEAL_TIMES); }
+  function getMealTimes() { return Object.assign({}, MEAL_TIMES); }
+
+  function overlapMinutes(a1, a2, b1, b2) { return Math.max(0, Math.min(a2, b2) - Math.max(a1, b1)); }
+
+  /**
+   * 하루 근무에 대한 식대 판정.
+   *  - 자동: 기준시간(mealMinHours) 이상 일했고, 점심/저녁 시간대와 1시간 이상 겹치면 그 끼니 체크
+   *          (어느 시간대와도 안 겹치면 한 번은 지급: 야간 근무 등은 저녁, 이른 근무는 점심)
+   *  - 직접 고침: shift.meals = ['L','D'] 중 체크한 것 (자동 결과를 덮어씀)
+   */
+  function mealsForShift(sh, minMealH) {
+    var none = { lunch: false, dinner: false, auto: { lunch: false, dinner: false }, manual: false };
+    if (!sh || sh.off) return none;
+    var h = calcShiftHours(sh.start, sh.end, sh.breakMinutes);
+    if (!(h > 0)) return none;
+    var auto = { lunch: false, dinner: false };
+    if (h >= minMealH) {
+      var s = parseTimeMinutes(sh.start);
+      var e = parseTimeMinutes(sh.end);
+      var overnight = e <= s;
+      var end = overnight ? e + 1440 : e;
+      var T = MEAL_TIMES;
+      function hit(a, b) {
+        var A = parseTimeMinutes(a), B = b === '24:00' ? 1440 : parseTimeMinutes(b);
+        return overlapMinutes(s, end, A, B) >= MEAL_OVERLAP_MIN || overlapMinutes(s, end, A + 1440, B + 1440) >= MEAL_OVERLAP_MIN;
+      }
+      auto.lunch = hit(T.lunchStart, T.lunchEnd);
+      auto.dinner = hit(T.dinnerStart, T.dinnerEnd);
+      if (!auto.lunch && !auto.dinner) {
+        if (overnight || s >= 20 * 60) auto.dinner = true; else auto.lunch = true;
+      }
+    }
+    if (Array.isArray(sh.meals)) {
+      return { lunch: sh.meals.indexOf('L') >= 0, dinner: sh.meals.indexOf('D') >= 0, auto: auto, manual: true };
+    }
+    return { lunch: auto.lunch, dinner: auto.dinner, auto: auto, manual: false };
+  }
+
   var won = M.formatWon;
   function fmtH(h) { return M.formatNum(h, 2); }
 
@@ -608,7 +666,11 @@
     var start = typeof s.start === 'string' && parseTimeMinutes(s.start) !== null ? s.start.trim() : '09:00';
     var end = typeof s.end === 'string' && parseTimeMinutes(s.end) !== null ? s.end.trim() : '14:00';
     var brk = Math.max(0, Math.round(M.toNumber(s.breakMinutes, 0)));
-    return { off: off, start: start, end: end, breakMinutes: brk };
+    var out = { off: off, start: start, end: end, breakMinutes: brk };
+    if (Array.isArray(s.meals)) {
+      out.meals = ['L', 'D'].filter(function (k) { return s.meals.indexOf(k) >= 0; });   // 직접 고친 식대(점심 L / 저녁 D)
+    }
+    return out;
   }
 
   function normalizePayrollInput(raw) {
@@ -752,17 +814,17 @@
     });
 
     var mealFormula = r.includeMeal
-      ? '일 ' + fmtH(r.mealMinHours) + '시간 이상 근무 ' + r.mealDays + '일 × ' + won(r.mealAmount) + '원'
+      ? '점심·저녁 식사 ' + r.mealDays + '회 × ' + won(r.mealAmount) + '원'
       : '식대 미포함으로 정산 → 0원';
     var mealDetail = '';
     if (r.includeMeal && r.mode === 'daily') {
       mealDetail = r.weeks.map(function (w) {
-        return w.week + '주 ' + w.mealDays + '일';
-      }).join(' / ') + ' (총 ' + r.mealDays + '일 지급)';
+        return w.week + '주 ' + w.mealDays + '회';
+      }).join(' / ') + ' (총 ' + r.mealDays + '회 지급)';
     }
     rows.push({
       kind: 'pay', section: '지급', label: '식대 (식비)', amount: r.mealAllowance, sign: 1,
-      badge: r.includeMeal ? (r.mealDays + '일 지급') : '미포함',
+      badge: r.includeMeal ? (r.mealDays + '회 지급') : '미포함',
       formula: mealFormula,
       detail: mealDetail
     });
@@ -799,7 +861,7 @@
     L.push('▪ 기본급: ' + won(r.basePay) + '원');
     L.push('▪ 주휴수당: ' + won(r.weeklyAllowance) + '원 (' + (r.includeWeekly ? '포함' : '미포함') + ')');
     if (r.includeMeal || r.mealAllowance > 0) {
-      L.push('▪ 식대: ' + won(r.mealAllowance) + '원 (일 ' + fmtH(r.mealMinHours) + 'h↑ ' + r.mealDays + '일 × ' + won(r.mealAmount) + '원)');
+      L.push('▪ 식대: ' + won(r.mealAllowance) + '원 (' + r.mealDays + '회 × ' + won(r.mealAmount) + '원)');
     }
     if (r.lateMinutes > 0) L.push('▪ 지각·조퇴 차감: -' + won(r.lateDeduction) + '원 (' + r.lateMinutes + '분)');
     L.push('▪ 세전 지급총액: ' + won(r.gross) + '원');
@@ -839,16 +901,16 @@
       cal.days.forEach(function (cd, idx) {
         var sh = inp.dailyShifts[idx] || { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
         var h = sh.off ? 0 : calcShiftHours(sh.start, sh.end, sh.breakMinutes);
-        var mealEligible = h > 0 && h >= minMealH;
+        var ml = mealsForShift(sh, minMealH);
+        var mealCount = (ml.lunch ? 1 : 0) + (ml.dinner ? 1 : 0);
+        var mealEligible = mealCount > 0;
         if (h > 0) {
           workDays++;
           weekWorkDays[cd.weekIndex] += 1;
         }
         weekCalDays[cd.weekIndex] += 1;
-        if (mealEligible) {
-          dailyMealDays++;
-          weekMealDays[cd.weekIndex] += 1;
-        }
+        dailyMealDays += mealCount;           // 식대는 끼니 수(점심·저녁 각각 1회)로 센다
+        weekMealDays[cd.weekIndex] += mealCount;
         weekHours[cd.weekIndex] = M.round2(weekHours[cd.weekIndex] + h);
         daysDetail.push({
           index: idx,
@@ -864,7 +926,11 @@
           end: sh.end,
           breakMinutes: sh.breakMinutes,
           hours: M.round2(h),
-          mealEligible: mealEligible
+          mealEligible: mealEligible,
+          mealCount: mealCount,
+          meals: { lunch: ml.lunch, dinner: ml.dinner },
+          mealAuto: ml.auto,
+          mealManual: ml.manual
         });
       });
     } else {
@@ -896,7 +962,11 @@
             end: minutesToTime(9 * 60 + Math.round(h2 * 60)),
             breakMinutes: 0,
             hours: M.round2(h2),
-            mealEligible: mealElig2
+            mealEligible: mealElig2,
+            mealCount: mealElig2 ? 1 : 0,
+            meals: { lunch: mealElig2, dinner: false },
+            mealAuto: { lunch: mealElig2, dinner: false },
+            mealManual: false
           });
         }
         weekHours.push(M.round2(wSum));
@@ -1006,6 +1076,11 @@
     weeklyAllowanceFor: weeklyAllowanceFor,
     lateDeductionFor: lateDeductionFor,
     calcTax: calcTax,
+    DEFAULT_MEAL_TIMES: DEFAULT_MEAL_TIMES,
+    sanitizeMealTimes: sanitizeMealTimes,
+    setMealTimes: setMealTimes,
+    getMealTimes: getMealTimes,
+    mealsForShift: mealsForShift,
     DEFAULT_RATES: DEFAULT_RATES,
     sanitizeRates: sanitizeRates,
     setRates: setRates,
@@ -1275,7 +1350,9 @@
       mealAmount: n.mealAmount,
       tax: n.tax,
       dailyShifts: n.dailyShifts.map(function (s) {
-        return { off: !!s.off, start: s.start, end: s.end, breakMinutes: s.breakMinutes };
+        var o = { off: !!s.off, start: s.start, end: s.end, breakMinutes: s.breakMinutes };
+        if (Array.isArray(s.meals)) o.meals = s.meals.slice();
+        return o;
       }),
       weekExcuse: n.weekExcuse.slice(0, 6)
     };
@@ -1464,7 +1541,8 @@
     var mw = Math.round(Number(raw.minWage));
     return {
       minWage: isFinite(mw) && mw > 0 && mw < 1000000 ? mw : DEFAULT_MIN_WAGE,
-      rates: P.sanitizeRates(raw.rates)
+      rates: P.sanitizeRates(raw.rates),
+      mealTimes: P.sanitizeMealTimes(raw.mealTimes)
     };
   }
 
@@ -1990,6 +2068,18 @@
   /* ---------------- 급여 ---------------- */
 
   // 주 판정 문구/스타일 (엑셀용)
+  /* 하루 식대 표시: 점심 / 저녁 / 점심·저녁 */
+  function mealLabel(d) {
+    var m = d.meals || {};
+    return m.lunch && m.dinner ? '점심·저녁' : (m.lunch ? '점심' : (m.dinner ? '저녁' : ''));
+  }
+
+  /* 하루 식대 표시: 점심 / 저녁 / 점심·저녁 */
+  function mealLabel(d) {
+    var m = d.meals || {};
+    return m.lunch && m.dinner ? '점심·저녁' : (m.lunch ? '점심' : (m.dinner ? '저녁' : ''));
+  }
+
   function weekVerdict(r, w) {
     if (!r.includeWeekly) return { text: '주휴 미포함', style: 'cText' };
     if (w.eligible && !w.excused) return { text: '대상 (개근)', style: 'okC' };
@@ -2029,7 +2119,7 @@
     merges.push('A7:F7');
     rows.push([S('label', '총 근무시간'), S('hours', r.totalHours), S('label', '출근일수'), isDaily ? S('cText', r.workDays + '일') : S('cText', '-'),
       S('label', '주 약속일수'), S('cText', '주 ' + r.contractDays + '일')]);
-    rows.push([S('label', '식대 지급일'), S('cText', r.includeMeal ? r.mealDays + '일' : '미포함'), S('label', '주휴 대상 주'),
+    rows.push([S('label', '식대 지급 횟수'), S('cText', r.includeMeal ? r.mealDays + '회' : '미포함'), S('label', '주휴 대상 주'),
       S('cText', r.includeWeekly ? (eligibleWeeks + ' / ' + r.weeks.length + '주') : '미포함'),
       S('label', '결근으로 제외된 주'), S(absentWeeks ? 'badC' : 'okC', absentWeeks + '주')]);
     rows.push([]);
@@ -2045,7 +2135,7 @@
     }
     line('기본급', r.basePay, M.formatNum(r.totalHours, 2) + '시간 × ' + won(r.hourlyWage) + '원');
     line('주휴수당', r.weeklyAllowance, r.includeWeekly ? (eligibleWeeks + '주 대상 (15시간 이상 + 약속 출근일 개근)') : '미포함');
-    line('식대', r.mealAllowance || 0, r.includeMeal ? (r.mealDays + '일 × ' + won(r.mealAmount) + '원 (하루 ' + M.formatNum(r.mealMinHours, 1) + '시간 이상 근무한 날)') : '미포함');
+    line('식대', r.mealAllowance || 0, r.includeMeal ? (r.mealDays + '회 × ' + won(r.mealAmount) + '원 (점심·저녁 끼니마다 1회)') : '미포함');
     if (r.lateDeduction) line('지각·조퇴 차감', -r.lateDeduction, r.lateMinutes + '분');
     line('세전 총액', r.gross, '기본급 + 주휴수당 + 식대', true);
     line('공제 합계', r.tax.total ? -r.tax.total : 0, r.tax.label);
@@ -2069,7 +2159,7 @@
     rows.push([S('label', '시급'), S('moneyC', r.hourlyWage), S('label', '총 근무시간'), S('hours', r.totalHours)]);
     rows.push([
       S('label', '주휴수당 / 식대'),
-      S('value', '주휴 ' + (r.includeWeekly ? '포함' : '미포함') + ' / 식대 ' + (r.includeMeal ? (r.mealDays + '일 지급') : '미포함')),
+      S('value', '주휴 ' + (r.includeWeekly ? '포함' : '미포함') + ' / 식대 ' + (r.includeMeal ? (r.mealDays + '회 지급') : '미포함')),
       S('label', '세금 방식'),
       S('value', r.tax.label)
     ]);
@@ -2100,9 +2190,9 @@
     var COLS = 10;
     rows.push([S('band', '출퇴근 기록  ·  ' + r.name + ' (' + r.payMonthLabel + ')')].concat(fill(COLS - 1, 'band')));
     rows.push([S('sub', '출근·퇴근 시각, 휴게시간을 뺀 근무시간, 식대 지급 여부를 날짜별로 정리했습니다.  ' +
-      (r.includeMeal ? '식대: 하루 ' + M.formatNum(r.mealMinHours, 1) + '시간 이상 근무한 날 ' + won(r.mealAmount) + '원' : ''))].concat(fill(COLS - 1, 'sub')));
+      (r.includeMeal ? '식대: 점심·저녁 끼니마다 ' + won(r.mealAmount) + '원' : ''))].concat(fill(COLS - 1, 'sub')));
     rows.push([]);
-    rows.push([H('날짜'), H('요일'), H('주차'), H('출근'), H('퇴근'), H('휴게(분)'), H('근무시간(h)'), H('식대 지급'), H('식대(원)'), H('비고')]);
+    rows.push([H('날짜'), H('요일'), H('주차'), H('출근'), H('퇴근'), H('휴게(분)'), H('근무시간(h)'), H('식대'), H('식대(원)'), H('비고')]);
 
     var workDays = 0, totalH = 0, mealDaysN = 0, mealSum = 0;
     (r.days || []).forEach(function (d) {
@@ -2113,9 +2203,10 @@
       var meal = r.includeMeal && d.mealEligible;
       var note = '';
       if (off) note = '휴무';
-      else if (r.includeMeal && !meal) note = '식대 기준(' + M.formatNum(r.mealMinHours, 1) + '시간) 미달';
+      else if (r.includeMeal && !meal) note = '식대 없음';
       if (!off) { workDays++; totalH += d.hours; }
-      if (meal) { mealDaysN++; mealSum += r.mealAmount; }
+      var mc = meal ? (d.mealCount || 1) : 0;
+      if (mc) { mealDaysN += mc; mealSum += mc * r.mealAmount; }
       rows.push([
         S(dateStyle, d.dateStr ? md(d.dateStr) : (d.date ? d.date + '일' : '')),
         S(dateStyle, dow),
@@ -2124,13 +2215,13 @@
         S(off ? 'cOff' : 'cText', off ? '-' : d.end),
         off ? S('cOff', '-') : S('cText', d.breakMinutes || 0),
         off ? S('cOff', '-') : S('hours', d.hours),
-        r.includeMeal ? (meal ? S('okC', '지급') : S(off ? 'cOff' : 'cText', '-')) : S(off ? 'cOff' : 'cText', '미포함'),
-        meal ? S('moneyC', r.mealAmount) : S(off ? 'cOff' : 'cText', '-'),
+        r.includeMeal ? (meal ? S('okC', mealLabel(d) || '지급') : S(off ? 'cOff' : 'cText', '-')) : S(off ? 'cOff' : 'cText', '미포함'),
+        meal ? S('moneyC', mc * r.mealAmount) : S(off ? 'cOff' : 'cText', '-'),
         S(off ? 'cOff' : 'value', note)
       ]);
     });
     rows.push([S('tot', '합계'), S('tot', workDays + '일 출근'), S('tot', ''), S('tot', ''), S('tot', ''), S('tot', ''),
-      S('hoursTot', M.round2(totalH)), S('tot', r.includeMeal ? mealDaysN + '일' : '-'),
+      S('hoursTot', M.round2(totalH)), S('tot', r.includeMeal ? mealDaysN + '회' : '-'),
       S('moneyCBold', r.includeMeal ? mealSum : 0), S('tot', '')]);
 
     return { name: name || '출퇴근 기록', rows: rows, colWidths: [10, 8, 9, 10, 10, 10, 13, 11, 12, 30], merges: merges,
@@ -2145,7 +2236,7 @@
     rows.push([S('band', '주차별 요약  ·  ' + r.name + ' (' + r.payMonthLabel + ')')].concat(fill(COLS - 1, 'band')));
     rows.push([S('sub', '약속한 출근일수(주 ' + r.contractDays + '일)와 실제 출근일수를 비교해 주휴수당 지급 여부를 판정했습니다.')].concat(fill(COLS - 1, 'sub')));
     rows.push([]);
-    rows.push([H('주차'), H('기간'), H('약속 출근일수'), H('실제 출근일수'), H('근무시간(h)'), H('식대 지급일'), H('식대(원)'), H('주휴 판정'), H('주휴수당(원)')]);
+    rows.push([H('주차'), H('기간'), H('약속 출근일수'), H('실제 출근일수'), H('근무시간(h)'), H('식대 횟수'), H('식대(원)'), H('주휴 판정'), H('주휴수당(원)')]);
 
     var isDaily = r.mode === 'daily';
     var totH = 0, totMeal = 0, totMealWon = 0, totAllow = 0;
@@ -2161,7 +2252,7 @@
         S('cText', w.partial ? '월 경계 주' : w.contractDays + '일'),
         isDaily ? S(w.partial ? 'cText' : (w.absent && !w.excused ? 'badC' : (ok ? 'okC' : 'cText')), w.workDays + '일') : S(w.absent ? 'badC' : 'cText', w.absent ? '결근 있음' : '-'),
         S('hours', w.hours),
-        r.includeMeal ? (isDaily ? S('cText', mealN + '일') : S('cText', '-')) : S('cText', '미포함'),
+        r.includeMeal ? (isDaily ? S('cText', mealN + '회') : S('cText', '-')) : S('cText', '미포함'),
         r.includeMeal && isDaily ? S('moneyC', mealN * r.mealAmount) : S('cText', '-'),
         S(v.style, v.text),
         S('moneyC', w.allowance)
@@ -2169,7 +2260,7 @@
     });
     rows.push([S('tot', '합계'), S('tot', ''), S('tot', ''), S('tot', isDaily ? r.workDays + '일' : '-'),
       S('hoursTot', M.round2(totH)),
-      S('tot', r.includeMeal ? (isDaily ? totMeal + '일' : r.mealDays + '일') : '-'),
+      S('tot', r.includeMeal ? (isDaily ? totMeal + '회' : r.mealDays + '회') : '-'),
       S('moneyCBold', r.includeMeal ? (isDaily ? totMealWon : r.mealAllowance) : 0), S('tot', ''), S('moneyCBold', totAllow)]);
     rows.push([]);
     rows.push([S('sub', '※ 주휴수당 조건: 주 15시간 이상 + 약속한 출근일을 모두 출근한 주. 공휴일·사업주 사정으로 쉰 주는 사업주가 "지급"으로 인정하면 지급됩니다.')].concat(fill(COLS - 1, 'sub')));
@@ -2285,7 +2376,7 @@
     rows.push([S('band', g.title + ' 근무기록  (날짜별 출근한 사람)')].concat(fill(COLS - 1, 'band')));
     rows.push([S('sub', '날짜 순으로 그날 출근한 사람의 출근·퇴근 시각, 근무시간, 식대를 정리했습니다. "누적" 열은 그 사람이 그날까지 일한 일수·시간이며, 마지막 값이 그 사람의 총 근무일수·시간입니다 ([정산] 탭에도 있습니다). 제목 행 ▼ 버튼으로 이름·날짜별로 걸러볼 수 있습니다.')].concat(fill(COLS - 1, 'sub')));
     rows.push([]);
-    rows.push([H('날짜'), H('요일'), H('이름'), H('출근'), H('퇴근'), H('휴게(분)'), H('근무시간(h)'), H('누적 근무일수'), H('누적 근무시간(h)'), H('식대 지급'), H('식대(원)'), H('그날 출근 인원')]);
+    rows.push([H('날짜'), H('요일'), H('이름'), H('출근'), H('퇴근'), H('휴게(분)'), H('근무시간(h)'), H('누적 근무일수'), H('누적 근무시간(h)'), H('식대'), H('식대(원)'), H('그날 출근 인원')]);
     var headerRow = rows.length;
     var lastKey = null, zebra = false;
     var cum = {};
@@ -2296,6 +2387,7 @@
       var z = zebra ? 'Z' : '';
       var cT = zebra ? 'cTextZ' : 'cText';
       var meal = r.includeMeal && d.mealEligible;
+      var mc2 = meal ? (d.mealCount || 1) : 0;
       var c = cum[x.ri] = cum[x.ri] || { days: 0, hours: 0 };
       c.days += 1; c.hours = M.round2(c.hours + d.hours);
       var dateStyle = d.dayIndex === 6 ? 'cSun' : (d.dayIndex === 5 ? 'cSat' : cT);
@@ -2303,8 +2395,8 @@
         S(dateStyle, d.dateStr ? md(d.dateStr) : ''), S(dateStyle, d.dayName || ''), S(cT, r.name),
         S(cT, d.start), S(cT, d.end), S(cT, d.breakMinutes || 0), S('hours' + z, d.hours),
         S(cT, c.days + '일'), S('hours' + z, c.hours),
-        r.includeMeal ? (meal ? S('okC', '지급') : S(cT, '기준 미달')) : S(cT, '미포함'),
-        meal ? S('moneyC' + z, r.mealAmount) : S(cT, '-'),
+        r.includeMeal ? (meal ? S('okC', mealLabel(d) || '지급') : S(cT, '없음')) : S(cT, '미포함'),
+        meal ? S('moneyC' + z, mc2 * r.mealAmount) : S(cT, '-'),
         first ? S(cT, perDate[x.key] + '명') : S(cT, '')
       ]);
     });
@@ -2327,7 +2419,7 @@
     rows.push([S('band', g.title + ' 주휴수당 판정')].concat(fill(COLS - 1, 'band')));
     rows.push([S('sub', '주 15시간 이상 + 약속한 출근일을 모두 출근한 주에 주휴수당이 지급됩니다. 공휴일·사업주 사정으로 쉰 주는 사업주가 "지급"으로 인정하면 지급됩니다.')].concat(fill(COLS - 1, 'sub')));
     rows.push([]);
-    rows.push([H('이름'), H('주차'), H('기간'), H('약속 출근일수'), H('실제 출근일수'), H('근무시간(h)'), H('주휴 판정'), H('주휴수당(원)'), H('식대 지급일')]);
+    rows.push([H('이름'), H('주차'), H('기간'), H('약속 출근일수'), H('실제 출근일수'), H('근무시간(h)'), H('주휴 판정'), H('주휴수당(원)'), H('식대 횟수')]);
     var headerRow = rows.length;
     var totH = 0, totA = 0;
     g.list.forEach(function (r) {
@@ -2340,7 +2432,7 @@
           S('cText', w.partial ? '월 경계 주' : w.contractDays + '일'),
           isDaily ? S(w.partial ? 'cText' : (w.absent && !w.excused ? 'badC' : 'okC'), w.workDays + '일') : S(w.absent ? 'badC' : 'cText', w.absent ? '결근 있음' : '-'),
           S('hours', w.hours), S(v.style, v.text), S('moneyC', w.allowance),
-          S('cText', r.includeMeal && isDaily ? (w.mealDays || 0) + '일' : '-')
+          S('cText', r.includeMeal && isDaily ? (w.mealDays || 0) + '회' : '-')
         ]);
       });
     });

@@ -96,7 +96,7 @@
             <div class="notice-stats">
               <span>총 <b id="dailyTotalHours">0</b>시간 (<b id="dailyWorkDays">0</b>일)</span>
               <span>·</span>
-              <span>🍚 식대 대상 <b id="dailyMealDays">0</b>일</span>
+              <span>🍚 식대 <b id="dailyMealDays">0</b>회</span>
             </div>
             <button id="btnOpenScheduleView" type="button" class="btn btn-xs btn-primary">달력으로 이동</button>
           </div>
@@ -123,19 +123,19 @@
               <input id="pMeal" type="checkbox" checked>
               <span class="weekly-text">
                 <b>🍚 식대 추가 지급</b>
-                <small id="mealSummaryText">하루 기준시간 이상 근무한 날에 식대를 추가 지급합니다</small>
+                <small id="mealSummaryText">점심·저녁 식사 시간에 일한 날 식대를 추가 지급합니다</small>
               </span>
             </label>
             <div id="mealConfig" class="meal-config">
               <label class="field">
-                <span>하루 근무 기준</span>
+                <span>식대 받는 최소 근무</span>
                 <div class="input-unit">
                   <input id="pMealMinHours" type="number" min="0.5" max="24" step="0.5" value="4">
                   <b>시간 이상</b>
                 </div>
               </label>
               <label class="field">
-                <span>1일 식대 금액</span>
+                <span>1회(끼니) 식대 금액</span>
                 <div class="input-unit">
                   <input id="pMealAmount" type="number" min="0" step="500" value="8000">
                   <b>원</b>
@@ -256,6 +256,14 @@
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <!-- 식대: 점심/저녁 (근무 시간으로 자동 체크, 필요하면 빼기) -->
+              <div id="mealPick" class="meal-pick" hidden>
+                <span class="meal-pick-title">🍚 식대</span>
+                <label class="meal-check"><input id="mealLunch" type="checkbox"><span>점심</span></label>
+                <label class="meal-check"><input id="mealDinner" type="checkbox"><span>저녁</span></label>
+                <small id="mealPickNote" class="meal-pick-note">자동</small>
               </div>
 
               <!-- 휴게시간 & 일괄 적용 버튼 바 -->
@@ -472,6 +480,15 @@
           <input id="sMinWage" type="number" inputmode="numeric" min="0" step="10">
         </label>
 
+        <h3 class="set-title">식사 시간대</h3>
+        <p class="set-sub">이 시간대에 1시간 이상 겹쳐 일하면 그 끼니 식대가 자동으로 체크됩니다. (달력에서 날짜마다 직접 고칠 수 있습니다)</p>
+        <div class="set-grid">
+          <label class="field set-field"><span>점심 시작</span><input id="sMeal_lunchStart" type="time"></label>
+          <label class="field set-field"><span>점심 끝</span><input id="sMeal_lunchEnd" type="time"></label>
+          <label class="field set-field"><span>저녁 시작</span><input id="sMeal_dinnerStart" type="time"></label>
+          <label class="field set-field"><span>저녁 끝</span><input id="sMeal_dinnerEnd" type="time"></label>
+        </div>
+
         <h3 class="set-title">3.3% 공제 (사업소득세)</h3>
         <div class="set-grid">
           <label class="field set-field"><span>소득세 (%)</span><input id="sRate_incomeTax" type="number" inputmode="decimal" min="0" max="100" step="0.001"></label>
@@ -557,8 +574,8 @@
             </ul>
             <p class="guide-step-title">식대</p>
             <ul>
-              <li>하루에 <b>기준 시간(기본 4시간) 이상</b> 일한 날마다 <b>하루에 한 번</b> 식대가 붙습니다.</li>
-              <li>기준 시간과 1일 식대 금액은 직접 바꿀 수 있고, 안 주시면 체크를 끄세요.</li>
+              <li>하루 <b>기준 시간(기본 4시간) 이상</b> 일하면 식대가 붙습니다. 근무 시간이 <b>점심(기본 11~14시)·저녁(기본 17~20시)</b> 시간대와 1시간 이상 겹치면 그 끼니가 자동 체크되고, 풀타임이면 <b>점심·저녁 2회</b>가 됩니다.</li>
+              <li>달력에서 날짜를 누르면 나오는 <b>점심 / 저녁 체크박스</b>로 직접 빼거나 더할 수 있습니다. 시간대·기준 시간·1회 금액은 ⚙️ 설정과 식대 박스에서 바꿀 수 있어요.</li>
             </ul>
           </div>
         </details>
