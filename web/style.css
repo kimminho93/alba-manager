@@ -2018,3 +2018,136 @@ body.modal-open { overflow: hidden; }
 }
 .set-field input[type="time"]::-webkit-date-and-time-value { text-align: left; min-width: 0; }
 .set-field input[type="time"]::-webkit-datetime-edit { padding: 0; }
+
+/* ==========================================================
+   폰 새 화면 (560px 이하만) — 알바생 칩 · 줄 돈 카드 · 달력 · 설정 창
+   PC 화면(561px 이상)은 위 스타일 그대로이며 여기서 숨기는 것들만 따로 둔다.
+   ========================================================== */
+.worker-chips, .empty-card, .set-row, .btn-slip-open, .slip-close, .sheet-head, .sheet-backdrop, .pay-sub { display: none; }
+.sheet-backdrop[hidden] { display: none !important; }
+.set-sheet { display: contents; }
+.l-ph { display: none; }
+
+@media print { .worker-chips, .empty-card, .set-row, .sheet-backdrop { display: none !important; } }
+
+@media (max-width: 560px) {
+  #tab-payroll { padding-top: 4px; }
+
+  /* 맨 위 알바생 칩: 이름이 많으면 손가락으로 옆으로 민다 */
+  .worker-chips {
+    display: flex; gap: 8px; align-items: center;
+    margin: 12px -20px 0; padding: 4px 20px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .worker-chips::-webkit-scrollbar { display: none; }
+  .wchip {
+    flex: none; min-height: 44px; padding: 0 18px; border-radius: 22px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  }
+  .wchip.on { background: var(--text); border-color: var(--text); color: var(--card); }
+  .wchip-add { width: 44px; padding: 0; font-size: 22px; color: var(--primary); position: sticky; left: 0; }
+
+  /* 카드들을 낱장으로 풀어서 순서를 다시 정한다 */
+  #tab-payroll .grid { display: flex; flex-direction: column; align-items: stretch; gap: 12px; margin-top: 8px; }
+  #tab-payroll .grid > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+  #tab-payroll .input-card, #tab-payroll .preview-card { display: contents; }
+  #tab-payroll .input-card > .card-title { display: none; }
+  #monthField { order: 1; margin: 4px 0 0; }
+  #monthField > span { display: none; }
+  #monthField .month-stepper { justify-content: flex-start; }
+  .pay-banner { order: 2; }
+  .pay-actions { order: 3; }
+  #scheduleBoard { order: 4; }
+  #payDoc { order: 5; }
+  #openSet { order: 6; }
+  .right-view-switch { display: none !important; }
+  #dailyLeftNotice { display: none; }
+
+  /* 줄 돈 큰 카드 (카톡 버튼 + 명세서/엑셀/PDF 버튼이 한 카드 안에 모두 보임) */
+  .pay-banner {
+    display: block; margin: 0; padding: 22px 20px 0; border-radius: 20px 20px 0 0;
+    background: var(--card); border: 1px solid var(--line); border-bottom: 0;
+  }
+  .pay-banner p { gap: 6px; }
+  .pay-banner .pay-label { font-size: 15px; font-weight: 500; }
+  .pay-banner .money { font-size: 40px; }
+  .pay-sub { display: block; font-size: 14px; color: var(--muted); line-height: 1.5; }
+  .pay-banner .btn-kakao { width: 100%; min-height: 54px; margin-top: 16px; border-radius: 14px; font-size: 17px; font-weight: 800; justify-content: center; }
+  .pay-actions {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0;
+    padding: 10px 20px 20px; border-radius: 0 0 20px 20px;
+    background: var(--card); border: 1px solid var(--line); border-top: 0;
+  }
+  .pay-actions .btn { flex: none; min-height: 46px; padding: 0 4px; border-radius: 12px; font-size: 15px; font-weight: 700; justify-content: center; }
+  .btn-slip-open { display: inline-flex; }
+  .l-pc { display: none; }
+  .l-ph { display: inline; }
+
+  /* 정산 설정 한 줄 */
+  .set-row {
+    display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box;
+    padding: 16px 18px; border-radius: 20px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  }
+  .set-row-text { flex: 1; min-width: 0; }
+  .set-row-text b { display: block; font-size: 17px; font-weight: 800; }
+  .set-row-text small { display: block; margin-top: 4px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+  .set-row-chev { font-size: 26px; color: var(--muted); }
+
+  /* 아래에서 올라오는 창 (정산 설정 / 알바생 추가) */
+  .sheet-backdrop { position: fixed; inset: 0; z-index: 900; background: rgba(0, 0, 0, .45); }
+  .sheet-backdrop:not([hidden]) { display: block; }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 6px; font-size: 20px; }
+  .sheet-done {
+    min-height: 44px; padding: 0 18px; border: 0; border-radius: 12px;
+    background: var(--primary); color: var(--primary-ink); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer;
+  }
+  #setSheet, #addWorkerForm {
+    display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 910; box-sizing: border-box;
+    max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding: 16px 20px calc(24px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0;
+    background: var(--card); box-shadow: 0 -8px 30px rgba(0, 0, 0, .25);
+  }
+  .sheet-head { display: flex; }
+  body.set-open #setSheet, body.add-open #addWorkerForm { display: block; }
+  body.set-open, body.add-open, body.slip-open { overflow: hidden; }
+  #addWorkerForm { grid-template-columns: 1fr; border: 0; gap: 10px; margin: 0; }
+  body.add-open #addWorkerForm { display: grid; }
+  #addWorkerForm .sheet-head { grid-column: 1 / -1; }
+  #setSheet .no-worker-note { display: none; }
+
+  /* 명세서 보기: 화면 전체 */
+  .slip-close {
+    display: block; margin: 0 0 10px auto; min-height: 44px; padding: 0 18px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text); font: inherit; font-weight: 700; cursor: pointer;
+  }
+  body.slip-open #payDoc {
+    display: block !important; position: fixed; inset: 0; z-index: 920; overflow: auto; box-sizing: border-box;
+    background: var(--bg); padding: 12px 12px 32px;
+  }
+  @media print { body.slip-open #payDoc { position: static; } .slip-close { display: none !important; } }
+
+  /* 달력 카드 */
+  .month-cal-head h4 { font-size: 17px; }
+
+  /* 알바생이 없을 때: 안내 카드만 보인다 */
+  .empty-card {
+    margin-top: 40px; padding: 36px 24px 24px; border-radius: 20px; text-align: center;
+    background: var(--card); border: 1px solid var(--line);
+  }
+  body:not(.no-workers) .empty-card { display: none; }
+  body.no-workers .empty-card { display: block; }
+  .empty-plus {
+    width: 72px; height: 72px; margin: 0 auto; border-radius: 50%; line-height: 72px;
+    background: var(--primary-weak); color: var(--primary); font-size: 34px; font-weight: 700;
+  }
+  .empty-card h2 { margin: 18px 0 6px; font-size: 22px; }
+  .empty-card p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
+  .empty-card .btn-big { width: 100%; min-height: 56px; margin-top: 24px; border-radius: 14px; font-size: 17px; font-weight: 800; justify-content: center; }
+  .btn-link { margin-top: 8px; min-height: 48px; width: 100%; border: 0; background: none; color: var(--muted); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  body.no-workers .worker-chips { display: none; }
+  body.no-workers #tab-payroll .grid { display: none; }
+  body.no-workers #tab-payroll .archive { display: contents; }
+  body.no-workers #tab-payroll .archive > :not(#addWorkerForm) { display: none; }
+}

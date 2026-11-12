@@ -48,10 +48,25 @@
   <main class="container">
     <!-- ======================= 탭 1: 급여 ======================= -->
     <section id="tab-payroll" class="tab-panel active" role="tabpanel">
+      <!-- 폰 전용: 맨 위 알바생 칩 (PC에서는 숨김) -->
+      <div id="workerChips" class="worker-chips" role="tablist" aria-label="알바생 선택"></div>
+      <!-- 폰 전용: 알바생이 없을 때 안내 -->
+      <div id="emptyCard" class="empty-card">
+        <div class="empty-plus" aria-hidden="true">＋</div>
+        <h2>아직 알바생이 없어요</h2>
+        <p>한 명만 추가하면 급여와 주휴수당이<br>자동으로 계산돼요</p>
+        <button id="emptyAdd" type="button" class="btn btn-primary btn-big">알바생 추가하기</button>
+        <button id="emptyGuide" type="button" class="btn-link">사용 방법 보기</button>
+      </div>
       <div class="grid">
         <form id="payForm" class="card input-card" autocomplete="off" onsubmit="return false">
           <h2 class="card-title">근무 정보</h2>
 
+          <div id="setSheet" class="set-sheet">
+          <div class="sheet-head">
+            <b id="setSheetTitle">정산 설정</b>
+            <button type="button" id="setSheetDone" class="sheet-done">완료</button>
+          </div>
           <label class="field"><span>알바생 이름</span>
             <input id="pName" type="text" maxlength="20" placeholder="아래 [알바생 추가]에서 먼저 등록하세요" disabled>
           </label>
@@ -60,7 +75,7 @@
           </label>
           <p id="noWorkerNote" class="no-worker-note">아래 <b>정산 명단</b>에서 <b>알바생을 추가</b>하면 근무 기록이 자동으로 저장됩니다.</p>
 
-          <div class="field month-field"><span>지급월</span>
+          <div class="field month-field" id="monthField"><span>지급월</span>
             <input id="pMonth" type="hidden">
             <div class="month-stepper" role="group" aria-label="지급월 선택">
               <button type="button" id="pMonthPrev" class="month-step" aria-label="이전 달">◀</button>
@@ -79,7 +94,7 @@
             </div>
           </div>
 
-          <label class="field"><span>시급 (원) <em class="hint" id="minWageHint">2026 최저시급 10,320원</em></span>
+          <label class="field" id="fieldWage"><span>시급 (원) <em class="hint" id="minWageHint">2026 최저시급 10,320원</em></span>
             <input id="pWage" type="number" inputmode="numeric" min="0" step="10" value="10320">
           </label>
 
@@ -145,6 +160,11 @@
               </label>
             </div>
           </div>
+          </div><!-- /setSheet -->
+          <button id="openSet" type="button" class="set-row" aria-haspopup="dialog">
+            <span class="set-row-text"><b>정산 설정</b><small id="setSummary">-</small></span>
+            <span class="set-row-chev" aria-hidden="true">›</span>
+          </button>
         </form>
 
         <!-- 우측 프리뷰 & 일별 출퇴근 시간표 대형 보드 카드 -->
@@ -189,6 +209,7 @@
 
           <!-- [우측 뷰 B] 표준 급여명세서 문서 -->
           <div class="doc" id="payDoc">
+            <button type="button" id="slipClose" class="slip-close">닫기</button>
             <div class="doc-head">
               <h3>급여명세서</h3>
               
@@ -208,9 +229,10 @@
             <p class="doc-foot">위 금액을 정히 지급합니다. &nbsp; 사업주 : ____________ (인)</p>
           </div>
 
-          <div class="actions">
-            <button id="btnPrintPay" type="button" class="btn">🖨️ PDF 출력/저장</button>
-            <button id="btnXlsxPay" type="button" class="btn">📊 엑셀(.xlsx) 다운로드</button>
+          <div class="actions pay-actions">
+            <button id="btnSlipOpen" type="button" class="btn btn-slip-open">명세서 보기</button>
+            <button id="btnPrintPay" type="button" class="btn"><span class="l-pc">🖨️ PDF 출력/저장</span><span class="l-ph">PDF</span></button>
+            <button id="btnXlsxPay" type="button" class="btn"><span class="l-pc">📊 엑셀(.xlsx) 다운로드</span><span class="l-ph">엑셀</span></button>
           </div>
         </div>
       </div>
@@ -225,6 +247,10 @@
           </div>
         </div>
         <form id="addWorkerForm" class="add-worker" autocomplete="off" onsubmit="return false">
+          <div class="sheet-head">
+            <b>알바생 추가</b>
+            <button type="button" id="addSheetClose" class="sheet-done">닫기</button>
+          </div>
           <label class="field"><span>이름</span>
             <input id="awName" type="text" maxlength="20" placeholder="예) 홍길동">
           </label>
@@ -547,6 +573,7 @@
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
   </footer>
 
+  <div id="sheetBackdrop" class="sheet-backdrop" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <!-- 구글 연동 창 -->

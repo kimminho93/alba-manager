@@ -777,7 +777,12 @@
 
     $('bannerText').innerHTML =
       '<span class="pay-label"><b>' + escHtml(r.name) + '</b>님에게 줄 돈 (실수령액)</span>' +
-      '<b class="money">' + E.formatWon(r.net) + '<small>원</small></b>';
+      '<b class="money">' + E.formatWon(r.net) + '<small>원</small></b>' +
+      '<span class="pay-sub">' + E.formatNum(r.totalHours, 2) + '시간 · 주휴 ' + (r.includeWeekly ? '포함' : '미포함') +
+        (r.includeMeal ? (' · 식대 ' + r.mealDays + '회 포함') : '') + ' · ' + escHtml(r.tax.label) + '</span>';
+    $('setSummary').textContent = '시급 ' + E.formatWon(r.hourlyWage) + '원 · 주 ' + state.contractDays + '일 · ' +
+      r.tax.label + ' · 주휴 ' + (r.includeWeekly ? '포함' : '미포함') +
+      (r.includeMeal ? (' · 식대 ' + E.formatWon(r.mealAmount) + '원') : ' · 식대 없음');
 
     $('slipName').textContent = r.name;
     $('slipMonth').textContent = r.payMonthLabel;
@@ -945,6 +950,35 @@
     return state.workers.map(function (w) { return E.calculatePayroll(E.workerPayrollInput(w, pm)); });
   }
 
+  /* 폰 전용: 맨 위 알바생 칩 (많으면 손가락으로 옆으로 밀어서 넘김) */
+  function renderChips() {
+    var box = $('workerChips');
+    document.body.classList.toggle('no-workers', !state.workers.length);
+    var html = '<button type="button" class="wchip wchip-add" id="chipAdd" aria-label="알바생 추가">＋</button>' +
+      state.workers.map(function (w) {
+        return '<button type="button" class="wchip' + (w.id === state.selId ? ' on' : '') + '" data-chip="' + escHtml(w.id) + '">' + escHtml(w.name) + '</button>';
+      }).join('');
+    var keep = box.scrollLeft;
+    box.innerHTML = html;
+    box.scrollLeft = keep;
+    var on = box.querySelector('.wchip.on');
+    if (on) {   // 고른 칩이 가려져 있으면 칩 줄만 가로로 이동 (화면은 안 움직임)
+      var l = on.offsetLeft - box.offsetLeft, r = l + on.offsetWidth;
+      if (l < box.scrollLeft + 56) box.scrollLeft = Math.max(0, l - 64);
+      else if (r > box.scrollLeft + box.clientWidth) box.scrollLeft = r - box.clientWidth + 16;
+    }
+  }
+
+  function openSheet(kind) {   // 'set' | 'add'
+    document.body.classList.remove('set-open', 'add-open');
+    document.body.classList.add(kind + '-open');
+    $('sheetBackdrop').hidden = false;
+  }
+  function closeSheets() {
+    document.body.classList.remove('set-open', 'add-open', 'slip-open');
+    $('sheetBackdrop').hidden = true;
+  }
+
   function renderRoster() {
     var pm = $('pMonth').value;
     var results = monthResults();
@@ -952,6 +986,7 @@
     $('rosterCount').textContent = sum.count + '명';
     $('rosterTotal').textContent = E.formatWon(sum.totalNet) + '원';
     $('rosterMonthLabel').textContent = pm.slice(0, 4) + '년 ' + Number(pm.slice(5)) + '월';
+    renderChips();
 
     if (!results.length) {
       $('rosterBody').innerHTML = '<tr class="empty"><td colspan="11">아직 알바생이 없습니다. 위에서 이름·일하는 날·시급을 넣고 [➕ 알바생 추가]를 눌러주세요.</td></tr>';
@@ -1456,6 +1491,39 @@
       el.addEventListener('change', editPayroll);
     });
 
+    // ----- 폰 전용 화면: 칩 / 설정 창 / 알바생 추가 창 / 명세서 -----
+    $('workerChips').addEventListener('click', function (ev) {
+      if (ev.target.closest('#chipAdd')) { openSheet('add'); return; }
+      var c = ev.target.closest('[data-chip]');
+      if (c) selectWorker(c.getAttribute('data-chip'));
+    });
+    $('emptyAdd').addEventListener('click', function () { openSheet('add'); });
+    $('emptyGuide').addEventListener('click', function () {
+      var t = document.querySelector('.tab[data-tab="guide"]');
+      if (t) t.click();
+    });
+    $('openSet').addEventListener('click', function () { if (selWorker()) openSheet('set'); else openSheet('add'); });
+    $('setSheetDone').addEventListener('click', closeSheets);
+    $('addSheetClose').addEventListener('click', closeSheets);
+    $('sheetBackdrop').addEventListener('click', closeSheets);
+    $('btnSlipOpen').addEventListener('click', function () {
+      document.body.classList.add('slip-open');
+    });
+    $('slipClose').addEventListener('click', closeSheets);
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && /set-open|add-open|slip-open/.test(document.body.className)) closeSheets();
+    });
+    // 폰에서는 '지급월'을 설정 창 밖(맨 위)에 두고, PC에서는 원래 자리(시급 위)에 둔다
+    var phoneMq = window.matchMedia('(max-width: 560px)');
+    function placeMonthField() {
+      var mf = $('monthField'), sheet = $('setSheet');
+      if (phoneMq.matches) sheet.parentNode.insertBefore(mf, sheet);
+      else sheet.insertBefore(mf, $('fieldWage'));
+    }
+    placeMonthField();
+    if (phoneMq.addEventListener) phoneMq.addEventListener('change', placeMonthField);
+    else if (phoneMq.addListener) phoneMq.addListener(placeMonthField);
+
     // 카톡 명세서 복사
     $('copyKakao').addEventListener('click', function () {
       if (!state.payroll) return;
@@ -1502,6 +1570,7 @@
       saveWorkers();
       $('awName').value = '';
       selectWorker(w.id);
+      closeSheets();
       showToast('➕ ' + w.name + '님을 추가했습니다. 이름을 누르면 근무 기록을 입력할 수 있어요.');
     });
 
