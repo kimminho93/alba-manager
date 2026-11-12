@@ -41,24 +41,6 @@
   <main class="container">
     <!-- ======================= 탭 1: 급여 ======================= -->
     <section id="tab-payroll" class="tab-panel active" role="tabpanel">
-      <div class="card parser-bar">
-        <form id="parseForm" class="parser-form" autocomplete="off">
-          <span class="parser-icon">⚡</span>
-          <input id="parseInput" type="text" placeholder="예) 지민 평일 5시간 시급 10,500원 4시간 이상 식대 8,000원" aria-label="한 줄 입력">
-          <button type="submit" class="btn btn-primary">1초 정산</button>
-        </form>
-        <div class="parser-sub">
-          <div class="chips">
-            <span class="chips-label">예시</span>
-            <button type="button" class="chip" data-example="철수 이번 달 총 62시간, 시급 10,000원">철수 62시간 · 시급 10,000원</button>
-            <button type="button" class="chip" data-example="영희 80시간 만원">영희 80시간 만원</button>
-            <button type="button" class="chip" data-example="민수 주 14시간 시급 11,000원 주휴미포함">민수 주 14시간 · 주휴미포함</button>
-            <button type="button" class="chip" data-example="지민 평일 5시간 시급 10,500원 4시간 이상 식대 8,000원">지민 평일 5h · 식대 8,000원</button>
-          </div>
-          <div id="parseResult" class="parse-result"></div>
-        </div>
-      </div>
-
       <div class="grid">
         <form id="payForm" class="card input-card" autocomplete="off" onsubmit="return false">
           <h2 class="card-title">근무 정보</h2>
@@ -88,16 +70,6 @@
             </div>
           </div>
 
-          <div class="field">
-            <span>근무시간 입력 방식</span>
-            <div class="segmented" role="radiogroup" aria-label="근무시간 입력 방식">
-              <label><input type="radio" name="pMode" value="daily" checked><span>날짜별</span></label>
-              <label><input type="radio" name="pMode" value="weekly"><span>주차별</span></label>
-              <label><input type="radio" name="pMode" value="total"><span>월 합계</span></label>
-            </div>
-            <input id="pWeekMode" type="checkbox" hidden>
-          </div>
-
           <!-- ① 일별 모드일 때 좌측 안내 배너 -->
           <div id="dailyLeftNotice" class="daily-left-notice">
             <div class="notice-row">
@@ -109,29 +81,6 @@
               <span>🍚 식대 대상 <b id="dailyMealDays">0</b>일</span>
             </div>
             <button id="btnOpenScheduleView" type="button" class="btn btn-xs btn-primary">달력으로 이동</button>
-          </div>
-
-          <!-- ② 월 총 근무시간 입력 모드 -->
-          <div id="totalGroup" hidden>
-            <label class="field"><span>이번 달 총 근무시간 </span>
-              <div class="input-unit"><input id="pTotal" type="number" inputmode="decimal" min="0" step="0.5" value="60"><b>시간</b></div>
-            </label>
-          </div>
-
-          <!-- ③ 주차별 입력 모드 (선택한 월의 실제 주차 수 반영) -->
-          <div id="weeksGroup" hidden>
-            <div id="weeksInputsWrap" class="weeks">
-              <label class="field"><span>1주</span><input id="pW1" type="number" min="0" step="0.5" value="15"></label>
-              <label class="field"><span>2주</span><input id="pW2" type="number" min="0" step="0.5" value="15"></label>
-              <label class="field"><span>3주</span><input id="pW3" type="number" min="0" step="0.5" value="15"></label>
-              <label class="field"><span>4주</span><input id="pW4" type="number" min="0" step="0.5" value="15"></label>
-              <label id="pW5Wrap" class="field" hidden><span>5주</span><input id="pW5" type="number" min="0" step="0.5" value="0"></label>
-              <label id="pW6Wrap" class="field" hidden><span>6주</span><input id="pW6" type="number" min="0" step="0.5" value="0"></label>
-            </div>
-            <p class="muted small">합계 <b id="weeksSum">60</b>시간 · 주 15시간 이상 + 개근한 주만 주휴수당 대상</p>
-            <div class="field"><span>결근한 주가 있으면 눌러 주세요 <em class="hint">누른 주는 주휴수당 없음</em></span>
-              <div id="weekAbsentBox" class="week-absent-box"></div>
-            </div>
           </div>
 
           <div class="field"><span>세금 공제</span>
@@ -172,13 +121,6 @@
                 <div class="input-unit">
                   <input id="pMealAmount" type="number" min="0" step="500" value="8000">
                   <b>원</b>
-                </div>
-              </label>
-              <label id="mealDaysManualField" class="field" hidden>
-                <span>식대 받은 날수</span>
-                <div class="input-unit">
-                  <input id="pMealDays" type="number" min="0" max="31" step="1" value="16">
-                  <b>일</b>
                 </div>
               </label>
             </div>

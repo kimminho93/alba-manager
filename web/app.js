@@ -482,9 +482,6 @@
       loadDayIntoEditor(state.selectedDayIdx);
     }
 
-    // 주차별 입력 모드의 5주, 6주 입력칸 표시 동기화
-    $('pW5Wrap').hidden = cal.weekCount < 5;
-    $('pW6Wrap').hidden = cal.weekCount < 6;
   }
 
   function loadDayIntoEditor(dayIdx) {
@@ -719,17 +716,7 @@
   /* ==========================================================
      탭 1: 급여 폼 읽기 & 계산 & 렌더링
      ========================================================== */
-  function getSelectedMode() {
-    var checked = document.querySelector('input[name="pMode"]:checked');
-    return checked ? checked.value : 'daily';
-  }
-
-  function setSelectedMode(mode) {
-    var el = document.querySelector('input[name="pMode"][value="' + mode + '"]');
-    if (el) el.checked = true;
-    $('pWeekMode').checked = mode === 'weekly';
-    setRightView(mode === 'daily' ? 'schedule' : 'slip');
-  }
+  function getSelectedMode() { return 'daily'; } // 근무시간 입력은 날짜별(달력) 방식만 사용
 
   function getSelectedTax() {
     var checked = document.querySelector('input[name="pTax"]:checked');
@@ -742,27 +729,16 @@
   }
 
   function readPayrollForm() {
-    var mode = getSelectedMode();
     var payMonth = $('pMonth').value;
     ensureCalendarAndShifts(payMonth, false);
-
-    var cal = state.calendar;
-    var w = [
-      E.toNumber($('pW1').value, 0),
-      E.toNumber($('pW2').value, 0),
-      E.toNumber($('pW3').value, 0),
-      E.toNumber($('pW4').value, 0)
-    ];
-    if (cal.weekCount >= 5) w.push(E.toNumber($('pW5').value, 0));
-    if (cal.weekCount >= 6) w.push(E.toNumber($('pW6').value, 0));
 
     return {
       name: $('pName').value,
       payMonth: payMonth,
       hourlyWage: E.toNumber($('pWage').value, 0),
-      mode: mode,
-      totalHours: E.toNumber($('pTotal').value, 0),
-      weekHours: w,
+      mode: 'daily',
+      totalHours: 0,
+      weekHours: [],
       dailyShifts: state.dailyShifts.map(function (s) { return Object.assign({}, s); }),
       lateMinutes: 0, // 지각·조퇴 입력은 UI에서 제거됨 (항상 0)
       contractDays: state.contractDays,
@@ -772,97 +748,19 @@
       includeMeal: $('pMeal').checked,
       mealMinHours: E.toNumber($('pMealMinHours').value, 4),
       mealAmount: E.toNumber($('pMealAmount').value, 8000),
-      mealDays: mode === 'daily' ? null : E.toNumber($('pMealDays').value, 0),
+      mealDays: null,
       tax: getSelectedTax()
     };
   }
 
-  function applyParsedToForm(parsed) {
-    if (parsed.name) $('pName').value = parsed.name;
-    if (parsed.hourlyWage) $('pWage').value = parsed.hourlyWage;
-    ensureCalendarAndShifts($('pMonth').value, false);
-
-    if (parsed.mode === 'daily' && Array.isArray(parsed.dailyHours)) {
-      setSelectedMode('daily');
-      // 자연어 파서에서 넘어온 평일/주말 시간을 출퇴근 시각(09:00 ~ HH:MM)으로 변환해 전체 달력에 적용
-      var wdHours = parsed.dailyHours[0] || 0;
-      var weHours = parsed.dailyHours[5] || 0;
-      state.dailyShifts = state.calendar.days.map(function (cd) {
-        var h = cd.isWeekend ? weHours : wdHours;
-        if (h <= 0) return { off: true, start: '09:00', end: '14:00', breakMinutes: 0 };
-        return {
-          off: false,
-          start: '09:00',
-          end: E.minutesToTime(9 * 60 + Math.round(h * 60)),
-          breakMinutes: 0
-        };
-      });
-      loadDayIntoEditor(state.selectedDayIdx);
-    } else if (parsed.mode === 'weekly' && Array.isArray(parsed.weekHours)) {
-      setSelectedMode('weekly');
-      $('pW1').value = parsed.weekHours[0];
-      $('pW2').value = parsed.weekHours[1];
-      $('pW3').value = parsed.weekHours[2];
-      $('pW4').value = parsed.weekHours[3];
-      $('pW5').value = 0;
-      $('pW6').value = 0;
-      $('pTotal').value = parsed.totalHours;
-    } else if (parsed.mode === 'total' && parsed.totalHours !== null) {
-      setSelectedMode('total');
-      $('pTotal').value = parsed.totalHours;
-      var each = E.round2(parsed.totalHours / 4);
-      $('pW1').value = each;
-      $('pW2').value = each;
-      $('pW3').value = each;
-      $('pW4').value = each;
-    }
-
-    $('pWeekly').checked = parsed.includeWeekly !== false;
-    if (parsed.includeMeal !== null && parsed.includeMeal !== undefined) {
-      $('pMeal').checked = !!parsed.includeMeal;
-    }
-    if (parsed.mealMinHours) $('pMealMinHours').value = parsed.mealMinHours;
-    if (parsed.mealAmount) $('pMealAmount').value = parsed.mealAmount;
-    if (parsed.tax) setSelectedTax(parsed.tax);
-
-    var box = $('parseResult');
-    if (box) {
-      box.innerHTML = (parsed.summary || []).map(function (s) {
-        return '<span class="tag">' + escHtml(s) + '</span>';
-      }).join('');
-    }
-    recalcPayroll();
-  }
-
   function syncModeAndHighlights(r) {
-    var mode = getSelectedMode();
-    $('dailyLeftNotice').hidden = mode !== 'daily';
-    $('weeksGroup').hidden = mode !== 'weekly';
-    $('totalGroup').hidden = mode !== 'total';
-    $('mealDaysManualField').hidden = mode === 'daily';
-    $('rightViewSwitch').hidden = mode !== 'daily';
-
-    if (mode !== 'daily') {
-      $('scheduleBoard').hidden = true;
-      $('payDoc').hidden = false;
-    } else {
-      var showSched = state.rightView === 'schedule';
-      $('scheduleBoard').hidden = !showSched;
-      $('payDoc').hidden = showSched;
-    }
+    var showSched = state.rightView === 'schedule';
+    $('scheduleBoard').hidden = !showSched;
+    $('payDoc').hidden = showSched;
 
     $('weeklyBox').classList.toggle('on', $('pWeekly').checked);
     $('mealBox').classList.toggle('on', $('pMeal').checked);
     $('mealConfig').hidden = !$('pMeal').checked;
-
-    var cal = state.calendar;
-    var wSum = E.toNumber($('pW1').value, 0) +
-      E.toNumber($('pW2').value, 0) +
-      E.toNumber($('pW3').value, 0) +
-      E.toNumber($('pW4').value, 0) +
-      (cal && cal.weekCount >= 5 ? E.toNumber($('pW5').value, 0) : 0) +
-      (cal && cal.weekCount >= 6 ? E.toNumber($('pW6').value, 0) : 0);
-    $('weeksSum').textContent = E.formatNum(E.round2(wSum), 2);
 
     if (r) {
       $('dailyTotalHours').textContent = E.formatNum(r.totalHours, 2);
@@ -878,21 +776,10 @@
     }
   }
 
-  function renderWeekAbsentChips(r) {
-    var box = $('weekAbsentBox');
-    if (!box) return;
-    box.innerHTML = r.weeks.map(function (w, i) {
-      var on = !!state.weekAbsent[i];
-      return '<button type="button" class="chip week-absent-chip' + (on ? ' on' : '') + '" data-week-absent="' + i + '" aria-pressed="' + on + '">' +
-        (i + 1) + '주 ' + (on ? '결근 있음' : '개근') + '</button>';
-    }).join('');
-  }
-
   function renderPayroll(r) {
     state.payroll = r;
     $('pContractLabel').textContent = '주 ' + state.contractDays + '일';
     syncModeAndHighlights(r);
-    if (r.mode === 'weekly') renderWeekAbsentChips(r);
 
     $('bannerText').innerHTML =
       '<span class="pay-label"><b>' + escHtml(r.name) + '</b>님에게 줄 돈 (실수령액)</span>' +
@@ -1203,7 +1090,6 @@
     }
     $('monthCalBody').addEventListener('click', onWeekToggleClick);
     $('monthCalCards').addEventListener('click', onWeekToggleClick);
-    $('weekAbsentBox').addEventListener('click', onWeekToggleClick);
 
     function onCalDayClick(ev) {
       var cell = ev.target.closest('[data-day-idx]');
@@ -1338,38 +1224,6 @@
       showToast('📅 이번 달 전체를 휴무(0시간)로 초기화했습니다.');
     });
 
-    // 한 줄 자연어 파서
-    $('parseForm').addEventListener('submit', function (ev) {
-      ev.preventDefault();
-      var text = $('parseInput').value.trim();
-      if (!text) {
-        showToast('한 줄 문장을 입력하거나 아래 예시 칩을 눌러보세요.');
-        return;
-      }
-      var parsed = E.parseText(text);
-      applyParsedToForm(parsed);
-      showToast('⚡ 1초 정산 완료: ' + state.payroll.name + '님 실수령액 ' + E.formatWon(state.payroll.net) + '원');
-    });
-
-    document.querySelectorAll('.chip[data-example]').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        var ex = chip.getAttribute('data-example');
-        $('parseInput').value = ex;
-        var parsed = E.parseText(ex);
-        applyParsedToForm(parsed);
-        showToast('⚡ 예시 적용: ' + ex);
-      });
-    });
-
-    // 근무시간 모드 라디오 전환 (일별 선택 시 우측 달력 보드로 자동 전환)
-    document.querySelectorAll('input[name="pMode"]').forEach(function (el) {
-      el.addEventListener('change', function () {
-        var m = getSelectedMode();
-        setRightView(m === 'daily' ? 'schedule' : 'slip');
-        recalcPayroll();
-      });
-    });
-
     // 지급월 ◀ ▶ 버튼 (한글 "2026년 11월" 표기)
     function shiftPayMonth(delta) {
       var m = /^(\d{4})-(\d{2})$/.exec($('pMonth').value || '');
@@ -1392,10 +1246,10 @@
     });
 
     // 급여 폼 실시간 반응
-    ['pName', 'pWage', 'pTotal', 'pW1', 'pW2', 'pW3', 'pW4', 'pW5', 'pW6', 'pMealMinHours', 'pMealAmount', 'pMealDays'].forEach(function (id) {
+    ['pName', 'pWage', 'pMealMinHours', 'pMealAmount'].forEach(function (id) {
       $(id).addEventListener('input', recalcPayroll);
     });
-    ['pWeekMode', 'pWeekly', 'pMeal'].forEach(function (id) {
+    ['pWeekly', 'pMeal'].forEach(function (id) {
       $(id).addEventListener('change', recalcPayroll);
     });
     document.querySelectorAll('input[name="pTax"]').forEach(function (el) {
