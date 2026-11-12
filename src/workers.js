@@ -12,7 +12,7 @@
 (function (root, factory) {
   'use strict';
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./payroll.js'));
+    module.exports = factory(Object.assign({}, require('./i18n.js'), require('./payroll.js')));
   } else {
     root.AlbaEngine = root.AlbaEngine || {};
     Object.assign(root.AlbaEngine, factory(root.AlbaEngine));
@@ -107,7 +107,7 @@
     var worker = {
       id: newId(),
       code: newCode(),
-      name: cleanName(name) || '알바생',
+      name: cleanName(name) || P.t('알바생'),
       contractDays: cd,
       wage: isFinite(w) && String(wage) !== '' ? w : DEFAULT_SETTINGS.wage,
       months: {}
@@ -209,11 +209,11 @@
         if (today === open.date && toMin(time) < toMin(open.time)) {
           // 올림한 출근 시각(예: 09:30)보다 일찍 퇴근 → 근무 시간 0, 기록은 남기지 않고 출근만 취소
           delete worker.punch;
-          return { kind: 'out', date: open.date, start: open.time, end: open.time, note: '출근 시각(' + open.time + ') 전에 퇴근해서 근무 시간은 0시간이에요', empty: true };
+          return { kind: 'out', date: open.date, start: open.time, end: open.time, note: P.t('출근 시각({t}) 전에 퇴근해서 근무 시간은 0시간이에요', { t: open.time }), empty: true };
         }
         return clockOut(worker, open, time);
       }
-      note = '이전 출근(' + open.date + ' ' + open.time + ')은 퇴근 기록이 없어 무시하고 새로 출근 처리';
+      note = P.t('이전 출근({d})은 퇴근 기록이 없어 무시하고 새로 출근 처리', { d: open.date + ' ' + open.time });
     }
     var rounded = roundUp30(time);
     worker.punch = { date: today, time: rounded, at: time };
@@ -242,7 +242,7 @@
       });
     }
     delete worker.punch;
-    return { kind: 'out', date: open.date, start: start, end: end, note: merged ? '같은 날 앞선 근무와 합쳐 사이 시간을 휴게로 처리' : '' };
+    return { kind: 'out', date: open.date, start: start, end: end, note: merged ? P.t('같은 날 앞선 근무와 합쳐 사이 시간을 휴게로 처리') : '' };
   }
 
 

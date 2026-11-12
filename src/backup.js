@@ -5,7 +5,7 @@
 (function (root, factory) {
   'use strict';
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./payroll.js'), require('./checklist.js'), require('./workers.js'));
+    module.exports = factory(Object.assign({}, require('./i18n.js'), require('./payroll.js')), require('./checklist.js'), require('./workers.js'));
   } else {
     root.AlbaEngine = root.AlbaEngine || {};
     Object.assign(root.AlbaEngine, factory(root.AlbaEngine, root.AlbaEngine, root.AlbaEngine));
@@ -41,17 +41,17 @@
   function backupFileName(now) {
     var d = new Date(now === undefined ? Date.now() : now);
     function p(n) { return (n < 10 ? '0' : '') + n; }
-    return '사장님도우미_백업_' + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '.json';
+    return (P.getLang() === 'en' ? 'BossHelper_backup_' : '사장님도우미_백업_') + d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '.json';
   }
 
   /** 백업 파일 내용을 읽어 검사한다. → { ok, data, counts } | { ok:false, error } */
   function parseBackup(text) {
-    if (typeof text !== 'string' || !text.trim()) return { ok: false, error: '비어 있는 파일입니다.' };
-    if (text.length > MAX_BYTES) return { ok: false, error: '파일이 너무 큽니다.' };
+    if (typeof text !== 'string' || !text.trim()) return { ok: false, error: P.t('비어 있는 파일입니다.') };
+    if (text.length > MAX_BYTES) return { ok: false, error: P.t('파일이 너무 큽니다.') };
     var obj;
-    try { obj = JSON.parse(text.replace(/^﻿/, '')); } catch (e) { return { ok: false, error: '백업 파일이 아닙니다. (읽을 수 없는 파일)' }; }
-    if (!isObj(obj) || obj.app !== APP || !isObj(obj.data)) return { ok: false, error: '사장님 도우미 백업 파일이 아닙니다.' };
-    if (Number(obj.version) > VERSION) return { ok: false, error: '더 새로운 버전의 백업 파일입니다. 앱을 새로고침한 뒤 다시 시도해 주세요.' };
+    try { obj = JSON.parse(text.replace(/^﻿/, '')); } catch (e) { return { ok: false, error: P.t('백업 파일이 아닙니다. (읽을 수 없는 파일)') }; }
+    if (!isObj(obj) || obj.app !== APP || !isObj(obj.data)) return { ok: false, error: P.t('사장님 도우미 백업 파일이 아닙니다.') };
+    if (Number(obj.version) > VERSION) return { ok: false, error: P.t('더 새로운 버전의 백업 파일입니다. 앱을 새로고침한 뒤 다시 시도해 주세요.') };
 
     var d = obj.data;
     var archive = Array.isArray(d.archive) ? d.archive : [];
@@ -60,7 +60,7 @@
     // 예전(1) 형식: 정산 명단(이름+달 한 줄씩) → 알바생별 월 기록으로 바꿈
     var legacy = !Array.isArray(d.workers) && Array.isArray(d.roster);
     var rawList = Array.isArray(d.workers) ? d.workers : (legacy ? d.roster : []);
-    if (rawList.length > MAX_ROSTER || archive.length > MAX_ARCHIVE) return { ok: false, error: '기록이 너무 많은 파일입니다.' };
+    if (rawList.length > MAX_ROSTER || archive.length > MAX_ARCHIVE) return { ok: false, error: P.t('기록이 너무 많은 파일입니다.') };
 
     var workers = legacy ? W.migrateRoster(rawList) : W.normalizeWorkers(rawList);
     var okRoster = workers;

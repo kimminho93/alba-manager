@@ -6,12 +6,12 @@
 (function (root, factory) {
   'use strict';
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('./i18n.js'));
   } else {
     root.AlbaEngine = root.AlbaEngine || {};
-    Object.assign(root.AlbaEngine, factory());
+    Object.assign(root.AlbaEngine, factory(root.AlbaEngine));
   }
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (I) {
   'use strict';
 
   var XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -351,7 +351,7 @@
     rels += '</Relationships>';
     files.push({ name: 'xl/_rels/workbook.xml.rels', data: rels });
 
-    files.push({ name: 'xl/styles.xml', data: STYLES_XML });
+    files.push({ name: 'xl/styles.xml', data: I.getLang() === 'en' ? STYLES_XML.replace('#,##0&quot;원&quot;', '&quot;₩&quot;#,##0') : STYLES_XML });
     sheets.forEach(function (s, i) {
       files.push({ name: 'xl/worksheets/sheet' + (i + 1) + '.xml', data: sheetXml(s) });
     });

@@ -4,7 +4,7 @@
 (function (root, factory) {
   'use strict';
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./math_ops.js'));
+    module.exports = factory(Object.assign({}, require('./i18n.js'), require('./math_ops.js')));
   } else {
     root.AlbaEngine = root.AlbaEngine || {};
     Object.assign(root.AlbaEngine, factory(root.AlbaEngine));
@@ -78,6 +78,7 @@
     ] }
   ];
 
+  var t = M.t;
   var CHECKLIST_GROUPS = GROUP_DEFS.map(function (g) {
     return {
       key: g.key,
@@ -85,6 +86,16 @@
       items: g.items.map(function (it) { return { no: it[0], text: it[1], standard: it[2] }; })
     };
   });
+  /** 현재 언어로 번역된 점검 항목 묶음 (화면·출력용) */
+  function getChecklistGroups() {
+    return CHECKLIST_GROUPS.map(function (g) {
+      return {
+        key: g.key,
+        title: t(g.title),
+        items: g.items.map(function (it) { return { no: it.no, text: t(it.text), standard: it.standard ? t(it.standard) : '' }; })
+      };
+    });
+  }
 
   var TOTAL_ITEMS = 41;
   var FRIDGE_ITEM = 20; // 냉장·냉동 온도 항목: 체크 + 측정 온도가 기준 안이어야 적합
@@ -119,7 +130,7 @@
   }
 
   function fmtTemp(t) {
-    return t === null ? '미입력' : M.formatNum(t, 1) + '°C';
+    return t === null ? M.t('미입력') : M.formatNum(t, 1) + '°C';
   }
 
   function isFridgeOk(t) { return t !== null && t >= FRIDGE_MIN && t <= FRIDGE_MAX; }
@@ -130,16 +141,16 @@
     var inp = normalizeChecklistInput(raw);
     var fridgeOk = isFridgeOk(inp.fridgeTemp);
     var freezerOk = isFreezerOk(inp.freezerTemp);
-    var groups = CHECKLIST_GROUPS.map(function (g) {
+    var groups = getChecklistGroups().map(function (g) {
       var items = g.items.map(function (it) {
         var checked = inp.checks.indexOf(it.no) >= 0;
         var ok = checked;
-        var note = checked ? '확인 완료' : '체크 미완료';
+        var note = checked ? t('확인 완료') : t('체크 미완료');
         if (it.no === FRIDGE_ITEM) {
           ok = checked && fridgeOk && freezerOk;
-          note = '냉장 ' + fmtTemp(inp.fridgeTemp) + (fridgeOk ? '' : '(이탈)') +
-            ' · 냉동 ' + fmtTemp(inp.freezerTemp) + (freezerOk ? '' : '(이탈)') +
-            (checked ? '' : ' · 체크 미완료');
+          note = t('냉장') + ' ' + fmtTemp(inp.fridgeTemp) + (fridgeOk ? '' : t('(이탈)')) +
+            ' · ' + t('냉동') + ' ' + fmtTemp(inp.freezerTemp) + (freezerOk ? '' : t('(이탈)')) +
+            (checked ? '' : ' · ' + t('체크 미완료'));
         }
         return {
           no: it.no,
@@ -148,7 +159,7 @@
           standard: it.standard,
           checked: checked,
           ok: ok,
-          status: ok ? '적합 (O)' : '점검필요 (X)',
+          status: ok ? t('적합 (O)') : t('점검필요 (X)'),
           note: note
         };
       });
@@ -161,7 +172,7 @@
     var failCount = total - passCount;
     return {
       input: inp,
-      store: inp.store || '(매장명 미입력)',
+      store: inp.store || t('(매장명 미입력)'),
       date: inp.date,
       inspector: inp.inspector || '-',
       fridgeTemp: inp.fridgeTemp,
@@ -175,13 +186,14 @@
       failCount: failCount,
       total: total,
       allPass: failCount === 0,
-      verdict: failCount === 0 ? '전 항목 적합' : '점검필요 ' + failCount + '건'
+      verdict: failCount === 0 ? t('전 항목 적합') : t('점검필요 {n}건', { n: failCount })
     };
   }
 
   return {
     TOTAL_ITEMS: TOTAL_ITEMS,
     CHECKLIST_GROUPS: CHECKLIST_GROUPS,
+    getChecklistGroups: getChecklistGroups,
     normalizeChecklistInput: normalizeChecklistInput,
     isFridgeOk: isFridgeOk,
     isFreezerOk: isFreezerOk,

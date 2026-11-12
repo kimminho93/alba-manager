@@ -14,7 +14,7 @@
 (function (root, factory) {
   'use strict';
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(Object.assign({}, require('./math_ops.js'), require('./stats.js')));
+    module.exports = factory(Object.assign({}, require('./i18n.js'), require('./math_ops.js'), require('./stats.js')));
   } else {
     root.AlbaEngine = root.AlbaEngine || {};
     Object.assign(root.AlbaEngine, factory(root.AlbaEngine));
@@ -26,6 +26,9 @@
   var DAYS_PER_WEEK = 7;
   var TOTAL_DAYS = WEEKS * DAYS_PER_WEEK;
   var DAY_NAMES = ['월', '화', '수', '목', '금', '토', '일'];
+  var DAY_NAMES_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  var t = M.t;
+  function dayNm(i) { return M.getLang() === 'en' ? DAY_NAMES_EN[i] : DAY_NAMES[i]; }
   var WEEKLY_MIN_HOURS = 15;
   var WEEKLY_CAP_HOURS = 40;
   var WEEKLY_PAID_HOURS = 8;
@@ -120,6 +123,7 @@
   }
 
   var won = M.formatWon;
+  function W(v) { return M.getLang() === 'en' ? '₩' + won(v) : won(v) + '원'; }   // 금액 표기: 12,000원 / ₩12,000
   function fmtH(h) { return M.formatNum(h, 2); }
 
   function toBool(v, def) {
@@ -194,7 +198,7 @@
         date: d,
         dateStr: y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0'),
         dow: dow,
-        dayName: DAY_NAMES[dow],
+        dayName: dayNm(dow),
         isWeekend: dow >= 5,
         week: weekIdx + 1,
         weekIndex: weekIdx
@@ -277,7 +281,7 @@
       : Math.max(0, Math.round(M.toNumber(raw.mealDays, 0)));
 
     return {
-      name: String(raw.name === null || raw.name === undefined ? '' : raw.name).trim().slice(0, 20) || '알바생',
+      name: String(raw.name === null || raw.name === undefined ? '' : raw.name).trim().slice(0, 20) || t('알바생'),
       payMonth: payMonth,
       hourlyWage: Math.max(0, Math.round(M.toNumber(raw.hourlyWage, 0))),
       mode: mode,
@@ -313,37 +317,37 @@
     if (type === '3.3') {
       var income = M.rateTrunc10(gross, bp(R.incomeTax));
       var local = M.rateTrunc10(income, bp(R.localTax));
-      lines.push({ key: 'incomeTax', label: '소득세 (' + pct(R.incomeTax) + '%)', amount: income, formula: won(gross) + '원 × ' + pct(R.incomeTax) + '% → 10원 미만 절사' });
-      lines.push({ key: 'localTax', label: '지방소득세 (소득세의 ' + pct(R.localTax) + '%)', amount: local, formula: won(income) + '원 × ' + pct(R.localTax) + '% → 10원 미만 절사' });
+      lines.push({ key: 'incomeTax', label: t('소득세 ({p}%)', { p: pct(R.incomeTax) }), amount: income, formula: t('{a} × {p}% → 10원 미만 절사', { a: W(gross), p: pct(R.incomeTax) }) });
+      lines.push({ key: 'localTax', label: t('지방소득세 (소득세의 {p}%)', { p: pct(R.localTax) }), amount: local, formula: t('{a} × {p}% → 10원 미만 절사', { a: W(income), p: pct(R.localTax) }) });
     } else if (type === '4ins') {
       var pension = M.rateTrunc10(gross, bp(R.pension));
       var health = M.rateTrunc10(gross, bp(R.health));
       var care = M.rateTrunc10(health, bp(R.care));
       var employ = M.rateTrunc10(gross, bp(R.employment));
-      lines.push({ key: 'pension', label: '국민연금 (' + pct(R.pension) + '%)', amount: pension, formula: won(gross) + '원 × ' + pct(R.pension) + '% → 10원 미만 절사' });
-      lines.push({ key: 'health', label: '건강보험 (' + pct(R.health) + '%)', amount: health, formula: won(gross) + '원 × ' + pct(R.health) + '% → 10원 미만 절사' });
-      lines.push({ key: 'care', label: '장기요양보험 (건보의 ' + pct(R.care) + '%)', amount: care, formula: won(health) + '원 × ' + pct(R.care) + '% → 10원 미만 절사' });
-      lines.push({ key: 'employment', label: '고용보험 (' + pct(R.employment) + '%)', amount: employ, formula: won(gross) + '원 × ' + pct(R.employment) + '% → 10원 미만 절사' });
+      lines.push({ key: 'pension', label: t('국민연금 ({p}%)', { p: pct(R.pension) }), amount: pension, formula: t('{a} × {p}% → 10원 미만 절사', { a: W(gross), p: pct(R.pension) }) });
+      lines.push({ key: 'health', label: t('건강보험 ({p}%)', { p: pct(R.health) }), amount: health, formula: t('{a} × {p}% → 10원 미만 절사', { a: W(gross), p: pct(R.health) }) });
+      lines.push({ key: 'care', label: t('장기요양보험 (건보의 {p}%)', { p: pct(R.care) }), amount: care, formula: t('{a} × {p}% → 10원 미만 절사', { a: W(health), p: pct(R.care) }) });
+      lines.push({ key: 'employment', label: t('고용보험 ({p}%)', { p: pct(R.employment) }), amount: employ, formula: t('{a} × {p}% → 10원 미만 절사', { a: W(gross), p: pct(R.employment) }) });
     } else {
-      lines.push({ key: 'none', label: '세금 공제', amount: 0, formula: '세금 미적용 (0%) → 0원' });
+      lines.push({ key: 'none', label: t('세금 공제'), amount: 0, formula: t('세금 미적용 (0%) → 0원') });
     }
     var total = lines.reduce(function (s, l) { return s + l.amount; }, 0);
-    var label = type === '3.3' ? pct(Math.round(R.incomeTax * (1 + R.localTax / 100) * 1000) / 1000) + '% (사업소득세)' : TAX_TYPES[type];
+    var label = type === '3.3' ? t('{p}% (사업소득세)', { p: pct(Math.round(R.incomeTax * (1 + R.localTax / 100) * 1000) / 1000) }) : t(TAX_TYPES[type]);
     return { type: type, label: label, lines: lines, total: total };
   }
 
   function payMonthLabel(pm) {
     if (!pm) return '-';
     var p = pm.split('-');
-    return p[0] + '년 ' + Number(p[1]) + '월';
+    return t('{y}년 {m}월', { y: p[0], m: Number(p[1]) });
   }
 
   function buildRows(r) {
     var rows = [];
     rows.push({
-      kind: 'pay', section: '지급', label: '기본급', amount: r.basePay, sign: 1,
-      formula: fmtH(r.totalHours) + '시간 × ' + won(r.hourlyWage) + '원' +
-        (r.mode === 'daily' ? ' (총 ' + r.workDays + '일 출근 · ' + r.weeks.length + '개 주차)' : '')
+      kind: 'pay', section: t('지급'), label: t('기본급'), amount: r.basePay, sign: 1,
+      formula: t('{h}시간 × {w}', { h: fmtH(r.totalHours), w: W(r.hourlyWage) }) +
+        (r.mode === 'daily' ? t(' (총 {d}일 출근 · {n}개 주차)', { d: r.workDays, n: r.weeks.length }) : '')
     });
 
     var weeklyDetail = '';
@@ -351,80 +355,80 @@
       var elig = r.weeks.filter(function (w) { return w.eligible; });
       weeklyDetail = elig.length
         ? r.weeks.map(function (w) {
-            return w.week + '주 ' + fmtH(w.hours) + 'h' + (w.eligible
-              ? ' → ' + won(w.allowance) + '원' + (w.excused ? ' (결근 있으나 지급)' : '')
-              : (!w.hoursOk ? ' (15h 미만 제외)' : ' (결근 제외' + (w.workDays !== null ? ': ' + w.workDays + '/' + w.contractDays + '일 출근' : '') + ')'));
+            var head = t('{n}주 {h}h', { n: w.week, h: fmtH(w.hours) });
+            if (w.eligible) return head + ' → ' + W(w.allowance) + (w.excused ? t(' (결근 있으나 지급)') : '');
+            if (!w.hoursOk) return head + t(' (15h 미만 제외)');
+            return head + (w.workDays !== null ? t(' (결근 제외: {d}/{c}일 출근)', { d: w.workDays, c: w.contractDays }) : t(' (결근 제외)'));
           }).join(' / ')
-        : '주 15시간 이상 개근한 주가 없어 0원';
+        : t('주 15시간 이상 개근한 주가 없어 0원');
     }
     rows.push({
-      kind: 'pay', section: '지급', label: '주휴수당', amount: r.weeklyAllowance, sign: 1,
-      badge: r.includeWeekly ? '포함' : '미포함',
+      kind: 'pay', section: t('지급'), label: t('주휴수당'), amount: r.weeklyAllowance, sign: 1,
+      badge: r.includeWeekly ? t('포함') : t('미포함'),
       formula: r.includeWeekly
-        ? '주 15h 이상 + 약속한 출근일 개근한 주: (min(주시간, 40) ÷ 40) × 8시간 × ' + won(r.hourlyWage) + '원'
-        : '주휴수당 미포함으로 정산 → 0원',
+        ? t('주 15h 이상 + 약속한 출근일 개근한 주: (min(주시간, 40) ÷ 40) × 8시간 × {w}', { w: W(r.hourlyWage) })
+        : t('주휴수당 미포함으로 정산 → 0원'),
       detail: weeklyDetail
     });
 
     var mealFormula = r.includeMeal
-      ? '점심·저녁 식사 ' + r.mealDays + '회 × ' + won(r.mealAmount) + '원'
-      : '식대 미포함으로 정산 → 0원';
+      ? t('점심·저녁 식사 {n}회 × {a}', { n: r.mealDays, a: W(r.mealAmount) })
+      : t('식대 미포함으로 정산 → 0원');
     var mealDetail = '';
     if (r.includeMeal && r.mode === 'daily') {
       mealDetail = r.weeks.map(function (w) {
-        return w.week + '주 ' + w.mealDays + '회';
-      }).join(' / ') + ' (총 ' + r.mealDays + '회 지급)';
+        return t('{n}주 {m}회', { n: w.week, m: w.mealDays });
+      }).join(' / ') + t(' (총 {m}회 지급)', { m: r.mealDays });
     }
     rows.push({
-      kind: 'pay', section: '지급', label: '식대 (식비)', amount: r.mealAllowance, sign: 1,
-      badge: r.includeMeal ? (r.mealDays + '회 지급') : '미포함',
+      kind: 'pay', section: t('지급'), label: t('식대 (식비)'), amount: r.mealAllowance, sign: 1,
+      badge: r.includeMeal ? t('{n}회 지급', { n: r.mealDays }) : t('미포함'),
       formula: mealFormula,
       detail: mealDetail
     });
 
     rows.push({
-      kind: 'deduct', section: '근태', label: '지각·조퇴 차감', amount: r.lateDeduction, sign: -1,
-      formula: '(' + r.lateMinutes + '분 ÷ 60) × ' + won(r.hourlyWage) + '원 → 원 단위 반올림'
+      kind: 'deduct', section: t('근태'), label: t('지각·조퇴 차감'), amount: r.lateDeduction, sign: -1,
+      formula: t('({m}분 ÷ 60) × {w} → 원 단위 반올림', { m: r.lateMinutes, w: W(r.hourlyWage) })
     });
     rows.push({
-      kind: 'subtotal', section: '합계', label: '세전 지급총액', amount: r.gross, sign: 1,
-      formula: '기본급 ' + won(r.basePay) + ' − 지각차감 ' + won(r.lateDeduction) +
-        ' + 주휴수당 ' + won(r.weeklyAllowance) +
-        (r.mealAllowance > 0 || r.includeMeal ? ' + 식대 ' + won(r.mealAllowance) : '')
+      kind: 'subtotal', section: t('합계'), label: t('세전 지급총액'), amount: r.gross, sign: 1,
+      formula: t('기본급 {a} − 지각차감 {b} + 주휴수당 {c}', { a: won(r.basePay), b: won(r.lateDeduction), c: won(r.weeklyAllowance) }) +
+        (r.mealAllowance > 0 || r.includeMeal ? t(' + 식대 {m}', { m: won(r.mealAllowance) }) : '')
     });
     r.tax.lines.forEach(function (l) {
-      rows.push({ kind: 'deduct', section: '공제', label: l.label, amount: l.amount, sign: -1, formula: l.formula });
+      rows.push({ kind: 'deduct', section: t('공제'), label: l.label, amount: l.amount, sign: -1, formula: l.formula });
     });
     rows.push({
-      kind: 'subtotal', section: '공제', label: '공제 합계 (' + r.tax.label + ')', amount: r.tax.total, sign: -1,
-      formula: r.tax.type === 'none' ? '공제 없음' : r.tax.lines.map(function (l) { return won(l.amount); }).join(' + ') +
-        (r.mealAllowance > 0 ? '  ※ 식대(실비) ' + won(r.mealAllowance) + '원은 제외한 ' + won(r.taxBase) + '원 기준' : '')
+      kind: 'subtotal', section: t('공제'), label: t('공제 합계 ({l})', { l: r.tax.label }), amount: r.tax.total, sign: -1,
+      formula: r.tax.type === 'none' ? t('공제 없음') : r.tax.lines.map(function (l) { return won(l.amount); }).join(' + ') +
+        (r.mealAllowance > 0 ? t('  ※ 식대(실비) {a}은 제외한 {b} 기준', { a: W(r.mealAllowance), b: W(r.taxBase) }) : '')
     });
     rows.push({
-      kind: 'total', section: '실지급', label: '실수령액 (차인지급액)', amount: r.net, sign: 1,
-      formula: '세전 지급총액 ' + won(r.gross) + ' − 공제 합계 ' + won(r.tax.total)
+      kind: 'total', section: t('실지급'), label: t('실수령액 (차인지급액)'), amount: r.net, sign: 1,
+      formula: t('세전 지급총액 {a} − 공제 합계 {b}', { a: won(r.gross), b: won(r.tax.total) })
     });
     return rows;
   }
 
   function buildKakaoText(r) {
     var L = [];
-    L.push('[급여명세서] ' + r.name + '님' + (r.payMonth ? ' · ' + r.payMonthLabel : ''));
+    L.push(t('[급여명세서] {n}님', { n: r.name }) + (r.payMonth ? ' · ' + r.payMonthLabel : ''));
     L.push('━━━━━━━━━━━━━━');
-    L.push('▪ 근무시간: ' + fmtH(r.totalHours) + '시간 × 시급 ' + won(r.hourlyWage) + '원');
-    L.push('▪ 기본급: ' + won(r.basePay) + '원');
-    L.push('▪ 주휴수당: ' + won(r.weeklyAllowance) + '원 (' + (r.includeWeekly ? '포함' : '미포함') + ')');
+    L.push(t('▪ 근무시간: {h}시간 × 시급 {w}', { h: fmtH(r.totalHours), w: W(r.hourlyWage) }));
+    L.push(t('▪ 기본급: {a}', { a: W(r.basePay) }));
+    L.push(t('▪ 주휴수당: {a} ({s})', { a: W(r.weeklyAllowance), s: r.includeWeekly ? t('포함') : t('미포함') }));
     if (r.includeMeal || r.mealAllowance > 0) {
-      L.push('▪ 식대(실비): ' + won(r.mealAllowance) + '원 (' + r.mealDays + '회 × ' + won(r.mealAmount) + '원)');
+      L.push(t('▪ 식대(실비): {a} ({n}회 × {m})', { a: W(r.mealAllowance), n: r.mealDays, m: W(r.mealAmount) }));
     }
-    if (r.lateMinutes > 0) L.push('▪ 지각·조퇴 차감: -' + won(r.lateDeduction) + '원 (' + r.lateMinutes + '분)');
-    L.push('▪ 세전 지급총액: ' + won(r.gross) + '원');
-    L.push('▪ 공제 [' + r.tax.label + ']: -' + won(r.tax.total) + '원' + (r.tax.type !== 'none' && r.mealAllowance > 0 ? ' (식대 제외 ' + won(r.taxBase) + '원 기준)' : ''));
+    if (r.lateMinutes > 0) L.push(t('▪ 지각·조퇴 차감: -{a} ({m}분)', { a: W(r.lateDeduction), m: r.lateMinutes }));
+    L.push(t('▪ 세전 지급총액: {a}', { a: W(r.gross) }));
+    L.push(t('▪ 공제 [{l}]: -{a}', { l: r.tax.label, a: W(r.tax.total) }) + (r.tax.type !== 'none' && r.mealAllowance > 0 ? t(' (식대 제외 {b} 기준)', { b: W(r.taxBase) }) : ''));
     if (r.tax.type !== 'none') {
-      r.tax.lines.forEach(function (l) { L.push('   · ' + l.label + ' ' + won(l.amount) + '원'); });
+      r.tax.lines.forEach(function (l) { L.push('   · ' + l.label + ' ' + W(l.amount)); });
     }
     L.push('━━━━━━━━━━━━━━');
-    L.push('💰 실수령액: ' + won(r.net) + '원');
+    L.push(t('💰 실수령액: {a}', { a: W(r.net) }));
     L.push(r.message);
     return L.join('\n');
   }
@@ -509,7 +513,7 @@
             week: w2 + 1,
             weekIndex: w2,
             dayIndex: d2,
-            dayName: DAY_NAMES[d2],
+            dayName: dayNm(d2),
             isWeekend: d2 >= 5,
             off: h2 <= 0,
             start: '09:00',
@@ -616,7 +620,7 @@
       tax: tax,
       net: net
     };
-    r.message = r.name + '님 계좌로 ' + won(net) + '원 입금하시면 됩니다.';
+    r.message = t('{n}님 계좌로 {a} 입금하시면 됩니다.', { n: r.name, a: W(net) });
     r.rows = buildRows(r);
     r.kakaoText = buildKakaoText(r);
     return r;
@@ -624,6 +628,7 @@
 
   return {
     DAY_NAMES: DAY_NAMES,
+    dayName: dayNm,
     TAX_TYPES: TAX_TYPES,
     parseTimeMinutes: parseTimeMinutes,
     minutesToTime: minutesToTime,

@@ -7,6 +7,8 @@
 
 module.exports = Object.assign(
   {},
+  require('../src/i18n.js'),
+  require('../src/lang_en.js'),
   require('../src/math_ops.js'),
   require('../src/stats.js'),
   require('../src/parser.js'),
