@@ -84,9 +84,9 @@
           <div class="field">
             <span>근무시간 입력 방식</span>
             <div class="segmented" role="radiogroup" aria-label="근무시간 입력 방식">
-              <label><input type="radio" name="pMode" value="daily" checked><span>📅 일별(출퇴근)</span></label>
-              <label><input type="radio" name="pMode" value="weekly"><span>📆 주차별</span></label>
-              <label><input type="radio" name="pMode" value="total"><span>⏱ 월 총 시간</span></label>
+              <label><input type="radio" name="pMode" value="daily" checked><span>날짜별</span></label>
+              <label><input type="radio" name="pMode" value="weekly"><span>주차별</span></label>
+              <label><input type="radio" name="pMode" value="total"><span>월 합계</span></label>
             </div>
             <input id="pWeekMode" type="checkbox" hidden>
           </div>
@@ -94,14 +94,14 @@
           <!-- ① 일별 모드일 때 좌측 안내 배너 -->
           <div id="dailyLeftNotice" class="daily-left-notice">
             <div class="notice-row">
-              <span>📅 <b>우측 큰 달력 화면</b>에서 날짜별 출근~퇴근 시각을 클릭·슬라이드로 선택하세요!</span>
+              <span><b>달력</b>에서 날짜를 눌러 출근·퇴근 시각을 고르세요.</span>
             </div>
             <div class="notice-stats">
               <span>총 <b id="dailyTotalHours">0</b>시간 (<b id="dailyWorkDays">0</b>일)</span>
               <span>·</span>
               <span>🍚 식대 대상 <b id="dailyMealDays">0</b>일</span>
             </div>
-            <button id="btnOpenScheduleView" type="button" class="btn btn-xs btn-primary">👉 우측 달력 시간표 크게 열기</button>
+            <button id="btnOpenScheduleView" type="button" class="btn btn-xs btn-primary">달력으로 이동</button>
           </div>
 
           <!-- ② 월 총 근무시간 입력 모드 -->
@@ -185,10 +185,10 @@
           <!-- 우측 상단 뷰 전환 바 (일별 출퇴근 시간표 크게 입력 <-> 급여명세서 미리보기) -->
           <div id="rightViewSwitch" class="right-view-switch">
             <button id="btnViewSchedule" type="button" class="view-tab active">
-              📅 일별 출퇴근 시간표 크게 입력 <span id="calMonthBadge" class="view-badge">11월 · 5주차</span>
+              출퇴근 시간표 <span id="calMonthBadge" class="view-badge">11월 · 5주차</span>
             </button>
             <button id="btnViewSlip" type="button" class="view-tab">
-              🧾 표준 급여명세서 보기
+              급여명세서 보기
             </button>
           </div>
 
@@ -199,7 +199,7 @@
               <div class="time-editor-head">
                 <div class="selected-day-title">
                   <span class="sel-badge" id="selDayBadge">날짜 선택</span>
-                  <strong id="selDayTitle">날짜를 클릭하거나 일괄 적용하세요</strong>
+                  <strong id="selDayTitle">날짜를 눌러 선택하세요</strong>
                 </div>
                 <div class="editor-calc-pill" id="editorCalcPill">
                   09:00 ~ 14:00 · <b>5시간</b> 근무
@@ -240,8 +240,8 @@
                 <!-- 출근 시각 드롭다운 스크롤 피커 -->
                 <div class="time-picker-box">
                   <div class="tp-header">
-                    <span>🌅 출근 시각</span>
-                    <span class="tp-sub">클릭 후 마우스 휠로 스크롤 선택</span>
+                    <span>출근 시각</span>
+                    <span class="tp-sub">눌러서 선택</span>
                   </div>
                   <div class="tp-dropdown-row">
                     <div class="scroll-select" id="startHourDropdown">
@@ -265,8 +265,8 @@
                 <!-- 퇴근 시각 드롭다운 스크롤 피커 -->
                 <div class="time-picker-box">
                   <div class="tp-header">
-                    <span>🌇 퇴근 시각</span>
-                    <span class="tp-sub">클릭 후 마우스 휠로 스크롤 선택</span>
+                    <span>퇴근 시각</span>
+                    <span class="tp-sub">눌러서 선택</span>
                   </div>
                   <div class="tp-dropdown-row">
                     <div class="scroll-select" id="endHourDropdown">
@@ -315,7 +315,7 @@
             <div class="month-cal-wrap">
               <div class="month-cal-head">
                 <h4 id="calBoardTitle">2026년 11월 출퇴근 달력 (총 5개 주차)</h4>
-                <span class="muted small">날짜 칸을 클릭하면 위 시간 선택기로 바로 수정됩니다 · 초록 배지(🍚) = 식대 지급일</span>
+                <span class="muted small">날짜를 누르면 위에서 시간을 고칠 수 있어요 · 🍚 = 식대 지급일</span>
               </div>
               <div class="table-wrap cal-table-view">
                 <table class="month-cal-table" aria-label="월별 출퇴근 달력">

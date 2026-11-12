@@ -7,8 +7,8 @@ html[data-theme="light"] {
   --card: #ffffff;
   --card-2: #f8f9fc;
   --text: #1c2333;
-  --muted: #6b7489;
-  --line: #e2e6ef;
+  --muted: #4f586c;
+  --line: #d3d9e6;
   --primary: #3563f0;
   --primary-ink: #ffffff;
   --primary-weak: #e9efff;
@@ -28,7 +28,7 @@ html[data-theme="dark"] {
   --card: #171d2b;
   --card-2: #1d2433;
   --text: #e6e9f1;
-  --muted: #98a1b5;
+  --muted: #b4bccd;
   --line: #2a3246;
   --primary: #6d8dff;
   --primary-ink: #0d1220;
@@ -1731,3 +1731,6 @@ html[data-fs="large"] .pay-banner .money { font-size: 48px; }
   .chk-cards-view { display: none !important; }
   .chk-table-view { display: block !important; }
 }
+
+/* 입력칸 예시(placeholder) 글씨도 또렷하게 */
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: .75; }
