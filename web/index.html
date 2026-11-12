@@ -3,7 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="1초 알바 급여·주휴수당·식대 정산 & 표준 급여명세서, 위생 점검표 ">
+  <meta name="description" content="사장님 도우미 — 알바 급여·주휴수당·식대 자동 계산, 급여명세서, 매장 위생 점검표(41개 항목)를 휴대폰·PC에서 바로. 회원가입 없이 무료.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="사장님 도우미 · 알바 급여 &amp; 매장 위생 점검">
+  <meta property="og:description" content="알바 급여·주휴수당·식대 자동 계산과 매장 위생 점검표. 회원가입 없이 무료.">
+  <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
   <script>
@@ -37,6 +41,7 @@
   <nav class="tabs" role="tablist">
     <button class="tab active" type="button" role="tab" data-tab="payroll" aria-selected="true">💰 급여 계산</button>
     <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false">🧼 위생 점검</button>
+    <button class="tab" type="button" role="tab" data-tab="guide" aria-selected="false">📖 사용 방법</button>
   </nav>
 
   <main class="container">
@@ -426,6 +431,162 @@
             <tbody id="archiveBody"></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- ======================= 탭 3: 사용 방법 ======================= -->
+    <section id="tab-guide" class="tab-panel" role="tabpanel">
+      <div class="card guide">
+        <h2 class="guide-title">📖 사용 방법</h2>
+        <p class="guide-lead">궁금한 항목을 눌러 펼쳐 보세요. 처음이시라면 <b>1번부터 순서대로</b> 읽으시면 됩니다.</p>
+
+        <details class="guide-item" open>
+          <summary><span class="guide-no">1</span>처음 시작하기</summary>
+          <div class="guide-body">
+            <ol>
+              <li>회원가입이나 로그인 없이 바로 쓸 수 있습니다.</li>
+              <li>글씨가 작으면 오른쪽 위 <b>[가+]</b> 버튼을 누르세요. 글자가 더 크게 보입니다.</li>
+              <li>화면이 눈부시면 <b>[🌙]</b> 버튼으로 어두운 화면으로 바꿀 수 있습니다.</li>
+              <li>자주 쓰신다면 <b>휴대폰 홈 화면에 추가</b>해 두세요. 앱처럼 한 번에 열립니다.
+                <ul>
+                  <li>아이폰(Safari): 아래 <b>공유 버튼</b> → <b>홈 화면에 추가</b></li>
+                  <li>안드로이드(Chrome): 오른쪽 위 <b>⋮ 메뉴</b> → <b>홈 화면에 추가</b></li>
+                </ul>
+              </li>
+            </ol>
+            <p class="guide-tip">💡 입력한 내용은 이 기기에 저장됩니다. 구글 시트에 저장하는 방법은 <b>6번</b>을 보세요.</p>
+          </div>
+        </details>
+
+        <details class="guide-item">
+          <summary><span class="guide-no">2</span>알바 급여 계산하기</summary>
+          <div class="guide-body">
+            <p class="guide-step-title">① 기본 정보 입력 <small>(💰 급여 계산 탭)</small></p>
+            <ol>
+              <li><b>알바생 이름</b>을 적습니다.</li>
+              <li><b>지급월</b>은 ◀ ▶ 버튼으로 맞춥니다. 그 달의 달력이 자동으로 나옵니다.</li>
+              <li><b>시급</b>을 적습니다. (2026년 최저시급은 10,320원)</li>
+              <li><b>주 근무 약속일수</b>는 일주일에 며칠 나오기로 했는지 − ＋ 로 맞춥니다.</li>
+            </ol>
+            <p class="guide-step-title">② 출근·퇴근 시간 고르기</p>
+            <ol>
+              <li>화면의 <b>달력</b>에서 날짜를 누릅니다.</li>
+              <li>위의 <b>빠른 시간대</b>(예: 오전 09:00~14:00)를 누르면 시간이 한 번에 들어갑니다. 쉬는 날은 <b>[휴무]</b>를 누르세요.</li>
+              <li>직접 고르려면 출근·퇴근 <b>시/분</b>을 고르고 <b>[✓ 선택한 날짜 적용]</b>을 누릅니다.</li>
+              <li>매일 같으면 <b>[평일(월~금) 일괄 적용]</b>, <b>[주말(토·일) 일괄 적용]</b>이 편합니다.</li>
+              <li>자주 쓰는 근무시간은 <b>[+ 시간대 추가]</b>로 직접 만들 수 있습니다. (최대 20개)</li>
+            </ol>
+            <p class="guide-step-title">③ 결과 확인</p>
+            <ol>
+              <li>위쪽 파란 칸에 <b>"○○님에게 줄 돈"</b>(실수령액)이 크게 나옵니다.</li>
+              <li><b>[급여명세서 보기]</b>를 누르면 항목별 계산 내용을 볼 수 있습니다.</li>
+              <li>세금은 <b>3.3% / 4대보험 / 미적용</b> 중에서 고르세요.</li>
+              <li><b>[💬 카톡 명세서 복사]</b> 후 카카오톡에 붙여넣으면 알바생에게 바로 보낼 수 있습니다.</li>
+              <li><b>[🖨️ PDF 출력/저장]</b>, <b>[📊 엑셀 다운로드]</b>로 파일도 만들 수 있습니다.</li>
+            </ol>
+          </div>
+        </details>
+
+        <details class="guide-item">
+          <summary><span class="guide-no">3</span>주휴수당과 식대는 어떻게 계산되나요?</summary>
+          <div class="guide-body">
+            <p class="guide-step-title">주휴수당</p>
+            <ul>
+              <li>그 주에 <b>15시간 이상</b> 일했고, <b>약속한 날수를 다 나온 주</b>에만 줍니다.</li>
+              <li>예) 주 5일 약속인데 4일만 나왔다면 그 주는 주휴수당이 없습니다.</li>
+              <li>공휴일 등 사정이 있어 그 주도 주고 싶다면, 달력의 주차 칸(휴대폰은 주차 카드)의 <b>[이 주는 주휴 지급]</b> 버튼을 누르세요. (다시 빼려면 [다시 제외하기])</li>
+              <li>달의 처음·끝에 걸친 주(그 달 날짜가 7일 미만)는 출근일수를 따지지 않습니다.</li>
+              <li>주휴수당을 안 주는 곳이면 <b>[주휴수당 포함하여 정산하기]</b> 체크를 끄세요.</li>
+            </ul>
+            <p class="guide-step-title">식대</p>
+            <ul>
+              <li>하루에 <b>기준 시간(기본 4시간) 이상</b> 일한 날마다 <b>하루에 한 번</b> 식대가 붙습니다.</li>
+              <li>기준 시간과 1일 식대 금액은 직접 바꿀 수 있고, 안 주시면 체크를 끄세요.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="guide-item">
+          <summary><span class="guide-no">4</span>여러 명 한꺼번에 정산하기</summary>
+          <div class="guide-body">
+            <ol>
+              <li>한 명 계산이 끝나면 <b>[➕ 아래 정산 명단에 추가]</b>를 누릅니다.</li>
+              <li>이름을 바꿔 다음 알바생을 계산하고 또 추가합니다.</li>
+              <li>화면 아래 <b>정산 명단</b>에서 모두의 급여 합계를 볼 수 있습니다.</li>
+              <li><b>[📊 명단 전체 엑셀 다운로드]</b>를 누르면 한 파일로 받습니다. (월별 탭으로 나뉘고, 사람이 많아도 탭 수는 그대로입니다)</li>
+              <li>같은 이름·같은 달을 다시 추가하면 기존 내용이 새 내용으로 바뀝니다.</li>
+            </ol>
+          </div>
+        </details>
+
+        <details class="guide-item">
+          <summary><span class="guide-no">5</span>위생 점검하기</summary>
+          <div class="guide-body">
+            <ol>
+              <li>위쪽 <b>[🧼 위생 점검]</b> 탭을 누릅니다.</li>
+              <li>매장명, 점검일자, 점검자를 적고 냉장·냉동 온도를 입력합니다.</li>
+              <li>점검 항목 <b>41개</b> 중 <b>문제없는 항목만 눌러서 체크</b>하세요. 체크하지 않은 항목은 <b>"점검필요"</b>로 표시됩니다.</li>
+              <li>전부 괜찮다면 <b>[✅ 전체 적합으로 체크]</b>를 누르면 됩니다.</li>
+              <li>특이사항이 있으면 메모에 적습니다.</li>
+              <li><b>[🗂️ 보관함에 저장]</b>을 누르면 그날 점검표가 저장됩니다. 매일 저장해 두면 기록이 쌓입니다.</li>
+              <li><b>[🖨️ 점검표 PDF 출력/저장]</b>, <b>[📊 엑셀 다운로드]</b>로 점검표를 파일로 만들 수 있습니다.</li>
+            </ol>
+            <p class="guide-tip">💡 20번 항목(냉장·냉동고 온도)은 체크해도, 입력한 온도가 기준(냉장 0~5°C, 냉동 -18°C 이하)을 벗어나면 점검필요로 나옵니다.</p>
+          </div>
+        </details>
+
+        <details class="guide-item">
+          <summary><span class="guide-no">6</span>구글 시트에 자동 저장하기 <small>(선택)</small></summary>
+          <div class="guide-body">
+            <p>휴대폰을 바꾸거나 다른 컴퓨터에서 열어도 <b>같은 기록</b>을 보고 싶을 때 쓰세요. 내 구글 드라이브에 자동으로 저장됩니다.</p>
+            <p class="guide-step-title">연동하기</p>
+            <ol>
+              <li>화면 위쪽 <b>[☁️ 구글 저장]</b> 버튼을 누릅니다.</li>
+              <li><b>[구글 계정으로 연동하기]</b>를 누릅니다.</li>
+              <li>구글 로그인 창에서 <b>내 구글 계정</b>을 고르고, 허용을 눌러 주세요.</li>
+              <li>끝입니다. 위쪽 버튼이 <b>"☁️ 저장됨"</b>으로 바뀌면 연동된 것입니다.</li>
+            </ol>
+            <p class="guide-step-title">그 다음부터</p>
+            <ul>
+              <li>알바 명단이나 점검 기록을 바꾸면 <b>몇 초 뒤 자동으로 저장</b>됩니다.</li>
+              <li>내 구글 드라이브에 <b>"사장님 도우미 데이터"</b> 파일이 생깁니다. <b>[구글 시트 열어보기]</b>로 볼 수 있습니다. ("데이터" 탭은 앱이 쓰는 곳이니 고치지 마세요)</li>
+              <li>다른 기기에서도 같은 구글 계정으로 연동하면 같은 기록이 나옵니다.</li>
+              <li>이 앱은 <b>이 앱이 만든 파일만</b> 볼 수 있고, 저장된 내용은 개발자도 볼 수 없습니다.</li>
+            </ul>
+            <p class="guide-step-title">버튼이 "⚠️ 다시 연결"로 바뀌었어요</p>
+            <ul>
+              <li>구글 로그인은 일정 시간이 지나면 풀립니다. 그 버튼을 누르고 <b>[다시 연결하고 저장하기]</b>를 누르세요. 그동안 바꾼 내용은 이 기기에 남아 있다가 저장됩니다.</li>
+            </ul>
+            <p class="guide-tip">💡 두 기기에서 동시에 고치면 <b>마지막에 저장한 내용</b>이 남습니다. 한 번에 한 기기에서 작업하는 것이 안전합니다.</p>
+          </div>
+        </details>
+
+        <details class="guide-item">
+          <summary><span class="guide-no">7</span>다른 구글 계정·새 휴대폰으로 옮기기 (백업 파일)</summary>
+          <div class="guide-body">
+            <ol>
+              <li>옮기기 전, <b>[☁️ 구글 저장]</b> 창 아래의 <b>[⬇️ 백업 파일 내려받기]</b>를 누릅니다. 기록 전체가 파일 하나로 저장됩니다.</li>
+              <li>새 기기(또는 새 계정)에서 이 사이트를 열고 같은 창의 <b>[⬆️ 백업 파일 불러오기]</b>를 누른 뒤 그 파일을 고릅니다.</li>
+              <li>확인 창에서 <b>[확인]</b>을 누르면 기록이 그대로 복원됩니다.</li>
+              <li>구글 연동 중이면 복원한 내용이 구글 시트에도 자동 저장됩니다.</li>
+            </ol>
+            <p class="guide-tip">💡 구글 연동을 쓰지 않더라도 가끔 백업 파일을 받아 두면 안심입니다.</p>
+          </div>
+        </details>
+
+        <details class="guide-item">
+          <summary><span class="guide-no">8</span>자주 묻는 질문</summary>
+          <div class="guide-body">
+            <p class="guide-q">기록이 사라졌어요.</p>
+            <p>기록은 사용 중인 브라우저에 저장됩니다. 브라우저의 "인터넷 사용 기록/사이트 데이터 삭제"를 하면 같이 지워집니다. 구글 연동이나 백업 파일이 있다면 [☁️ 구글 저장] 창에서 불러오세요.</p>
+            <p class="guide-q">가게 공용 컴퓨터에서 써도 되나요?</p>
+            <p>쓰고 난 뒤 정산 명단과 점검 보관함의 <b>[비우기]</b>를 눌러 주세요. 다음 사람이 같은 브라우저에서 알바 이름과 시급을 볼 수 있습니다.</p>
+            <p class="guide-q">내가 입력한 급여 정보가 어디로 전송되나요?</p>
+            <p>기본적으로 어디로도 전송되지 않고 이 기기에서만 계산됩니다. 구글 연동을 켠 경우에만 내 구글 드라이브로 저장됩니다.</p>
+            <p class="guide-q">계산 결과를 그대로 신고해도 되나요?</p>
+            <p>결과는 참고용입니다. 실제 신고·납부는 세무 전문가나 관할 기관의 기준을 확인하세요.</p>
+          </div>
+        </details>
       </div>
     </section>
   </main>

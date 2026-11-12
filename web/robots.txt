@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kimminho93.github.io/alba-manager/sitemap.xml
