@@ -642,7 +642,6 @@
     for (var wi = 0; wi < cal.weekCount; wi++) {
       var wkObj = r.weeks[wi] || { week: wi + 1, hours: 0, eligible: false, allowance: 0, mealDays: 0 };
       rowsHtml += '<tr>';
-      rowsHtml += '<td class="cal-wk-cell">' + (wi + 1) + '주차</td>';
 
       for (var di = 0; di < 7; di++) {
         var day = grid[wi][di];
@@ -657,72 +656,55 @@
           (isMeal ? ' meal-ok' : '') +
           (day.off ? ' off-day' : '');
         var dateColor = di === 5 ? ' sat' : (di === 6 ? ' sun' : '');
+        var isOff = day.off || day.hours <= 0;
 
         rowsHtml += '<td class="' + cls + '" data-day-idx="' + day.index + '">' +
-          '<div class="cal-day-top">' +
-            '<span class="cal-date-num' + dateColor + '">' + day.date + '일</span>' +
-            (isMeal ? '<span class="cal-meal-icon" title="식대: ' + mealWords(day.meals) + '">🍚' + mealShort(day.meals) + '</span>' : '') +
-          '</div>';
-
-        if (day.off || day.hours <= 0) {
-          rowsHtml += '<div class="cal-off-badge">휴무</div>';
-        } else {
-          rowsHtml +=
-            '<div class="cal-shift-range">' + escHtml(day.start + '~' + day.end) + '</div>' +
-            '<span class="cal-shift-hours">' + E.formatNum(day.hours, 1) + '시간' +
-              (day.breakMinutes ? ' (-' + day.breakMinutes + 'm)' : '') +
-            '</span>';
-        }
-        rowsHtml += '</td>';
+          '<div class="cal-date-num' + dateColor + '">' + day.date + '</div>' +
+          (isOff
+            ? '<div class="cal-off-badge">휴무</div>'
+            : '<div class="cal-shift-range">' + shiftRangeHtml(day.start, day.end) + '</div>') +
+          (isMeal ? '<div class="cal-meal-icon" title="식대: ' + mealWords(day.meals) + '">🍚' + mealShort(day.meals) + '</div>' : '') +
+          '</td>';
       }
-
-      var st = weekStatus(wkObj, r, wi);
-      var mealSub = r.includeMeal ? ('🍚 식대 ' + wkObj.mealDays + '회') : '';
-
-      rowsHtml += '<td class="cal-sum-cell' + (wkObj.eligible && r.includeWeekly ? ' eligible' : '') + (st.cls === 'bad' ? ' absent' : '') + '">' +
-        '<b>' + E.formatNum(wkObj.hours, 1) + '시간</b>' +
-        '<span class="cal-sum-sub">' + st.text + '</span>' +
-        (st.btn ? '<span class="cal-sum-sub">' + st.btn + '</span>' : '') +
-        (mealSub ? '<span class="cal-sum-sub">' + mealSub + '</span>' : '') +
-        '</td>';
-
       rowsHtml += '</tr>';
+
+      // 주간 합계: 한 줄 요약
+      var st = weekStatus(wkObj, r, wi);
+      var mealSub = r.includeMeal ? (' · 🍚 식대 ' + wkObj.mealDays + '회') : '';
+      rowsHtml += '<tr class="cal-week-sum"><td colspan="7"><div class="wk-line ' + st.cls + '">' +
+        '<b>' + (wi + 1) + '주차 ' + E.formatNum(wkObj.hours, 1) + '시간</b>' +
+        '<span class="wk-line-text">' + st.text + mealSub + '</span>' +
+        (st.btn || '') + '</div></td></tr>';
     }
 
     $('monthCalBody').innerHTML = rowsHtml;
-    renderMonthCards(r, cal, grid);
   }
 
-  // 휴대폰용 주 단위 카드: 요일을 세로로 한 줄씩 보여줌 (CSS가 화면 폭에 따라 표/카드 중 하나만 표시)
-  function renderMonthCards(r, cal, grid) {
-    var box = $('monthCalCards');
-    if (!box) return;
-    var DOW = ['월', '화', '수', '목', '금', '토', '일'];
-    var html = '';
-    for (var wi = 0; wi < cal.weekCount; wi++) {
-      var wk = r.weeks[wi] || { hours: 0, eligible: false, allowance: 0, mealDays: 0 };
-      var st = weekStatus(wk, r, wi);
-      var mealSub = r.includeMeal ? (' · 🍚 식대 ' + wk.mealDays + '회') : '';
-      html += '<section class="wk-card">' +
-        '<div class="wk-card-head"><b>' + (wi + 1) + '주차</b>' +
-        '<span class="wk-card-sum' + (wk.eligible && r.includeWeekly ? ' eligible' : '') + '">' + E.formatNum(wk.hours, 1) + '시간</span></div>';
-      for (var di = 0; di < 7; di++) {
-        var day = grid[wi][di];
-        if (!day) continue;
-        var isSel = day.index === state.selectedDayIdx;
-        var isMeal = r.includeMeal && day.mealEligible;
-        var off = day.off || day.hours <= 0;
-        html += '<button type="button" class="wk-day' + (isSel ? ' selected' : '') + (isMeal ? ' meal-ok' : '') + (off ? ' off-day' : '') +
-          '" data-day-idx="' + day.index + '">' +
-          '<span class="wk-day-date' + (di === 5 ? ' sat' : (di === 6 ? ' sun' : '')) + '">' +
-            cal.month + '/' + day.date + ' (' + DOW[di] + ')</span>' +
-          '<span class="wk-day-main">' + (off ? '휴무' : escHtml(day.start + '~' + day.end)) + '</span>' +
-          '<span class="wk-day-hours">' + (off ? '' : E.formatNum(day.hours, 1) + '시간') + (isMeal ? ' 🍚' + mealShort(day.meals) : '') + '</span>' +
-          '</button>';
-      }
-      html += '<div class="wk-card-foot ' + st.cls + '"><span>' + st.text + mealSub + '</span>' + st.btn + '</div></section>';
-    }
-    box.innerHTML = html;
+  function shiftRangeHtml(a, b) {
+    var x = shortTime(a), y = shortTime(b);
+    if (x.indexOf(':') < 0 && y.indexOf(':') < 0) return escHtml(x + '-' + y);
+    return '<span>' + escHtml(x) + '</span><span>' + escHtml(y) + '</span>';
+  }
+
+  // 달력 칸용 짧은 시각: 09:00 -> 9, 09:30 -> 9:30
+  function shortTime(t) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(t || '');
+    if (!m) return t || '';
+    return String(Number(m[1])) + (m[2] === '00' ? '' : ':' + m[2]);
+  }
+
+  /* ---------- 날짜 팝업 열기/닫기 ---------- */
+  function openDayModal() {
+    $('dayModal').hidden = false;
+    document.body.classList.add('modal-open');
+    var d = $('dayModal').querySelector('details.bulk-details');
+    if (d) d.open = false;
+  }
+  function closeDayModal() {
+    if ($('dayModal').hidden) return;
+    $('dayModal').hidden = true;
+    document.body.classList.remove('modal-open');
+    closeAllScrollDropdowns(null);
   }
 
   /* ==========================================================
@@ -1192,9 +1174,6 @@
     // 우측 상단 뷰 전환 탭 (일별 출퇴근 시간표 크게 입력 <-> 표준 급여명세서 보기)
     $('btnViewSchedule').addEventListener('click', function () { setRightView('schedule'); });
     $('btnViewSlip').addEventListener('click', function () { setRightView('slip'); });
-    $('btnOpenScheduleView').addEventListener('click', function () {
-      setRightView('schedule');
-    });
 
     // 달력 날짜 클릭 -> 해당 날짜 선택
     // 주 근무 약속일수 − / +
@@ -1222,7 +1201,6 @@
       }
     }
     $('monthCalBody').addEventListener('click', onWeekToggleClick);
-    $('monthCalCards').addEventListener('click', onWeekToggleClick);
 
     function onCalDayClick(ev) {
       var cell = ev.target.closest('[data-day-idx]');
@@ -1230,9 +1208,14 @@
       var idx = Number(cell.getAttribute('data-day-idx'));
       loadDayIntoEditor(idx);
       recalcPayroll();
+      openDayModal();
     }
     $('monthCalBody').addEventListener('click', onCalDayClick);
-    $('monthCalCards').addEventListener('click', onCalDayClick);
+    $('dayClose').addEventListener('click', closeDayModal);
+    $('dayModalBackdrop').addEventListener('click', closeDayModal);
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') closeDayModal();
+    });
 
     // 드롭다운 스크롤 피커 열기/닫기 및 옵션 선택
     [
@@ -1318,8 +1301,7 @@
     // 적용 범위 버튼들
     $('btnApplySelectedDay').addEventListener('click', function () {
       applyEditorToSelectedDay();
-      var cd = state.calendar.days[state.selectedDayIdx];
-      showToast('✓ ' + cd.date + '일(' + cd.dayName + ')에 적용되었습니다.');
+      closeDayModal();
     });
 
     $('btnApplyWeekday').addEventListener('click', function () {
@@ -1330,6 +1312,7 @@
         }
       });
       editPayroll();
+      closeDayModal();
       showToast('📅 평일(월~금) 전체에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
     });
 
@@ -1341,6 +1324,7 @@
         }
       });
       editPayroll();
+      closeDayModal();
       showToast('📅 주말(토·일) 전체에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
     });
 
@@ -1354,6 +1338,7 @@
         }
       });
       editPayroll();
+      closeDayModal();
       showToast('📅 이번 달 모든 ' + dayName + '요일에 ' + (sh.off ? '휴무' : (sh.start + '~' + sh.end)) + ' 일괄 적용!');
     });
 
@@ -1361,6 +1346,7 @@
       state.editor.off = true;
       applyEditorToSelectedDay();
       var cd = state.calendar.days[state.selectedDayIdx];
+      closeDayModal();
       showToast('🚫 ' + cd.date + '일(' + cd.dayName + ') 휴무 처리');
     });
 

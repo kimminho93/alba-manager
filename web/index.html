@@ -91,14 +91,13 @@
           <!-- ① 일별 모드일 때 좌측 안내 배너 -->
           <div id="dailyLeftNotice" class="daily-left-notice">
             <div class="notice-row">
-              <span><b>달력</b>에서 날짜를 눌러 출근·퇴근 시각을 고르세요.</span>
+              <span><b>달력</b>에서 날짜를 누르면 근무시간·식대를 정하는 창이 열립니다.</span>
             </div>
             <div class="notice-stats">
               <span>총 <b id="dailyTotalHours">0</b>시간 (<b id="dailyWorkDays">0</b>일)</span>
               <span>·</span>
               <span>🍚 식대 <b id="dailyMealDays">0</b>회</span>
             </div>
-            <button id="btnOpenScheduleView" type="button" class="btn btn-xs btn-primary">달력으로 이동</button>
           </div>
 
           <div class="field"><span>세금 공제</span>
@@ -164,152 +163,24 @@
 
           <!-- [우측 뷰 A] 월별 실제 달력 & 출퇴근 시각(몇 시 ~ 몇 시) 슬라이더·클릭 선택 보드 -->
           <div id="scheduleBoard" class="schedule-board">
-            <!-- 출퇴근 시각 선택 컨트롤러 (슬라이더 + 시/분 클릭 피커) -->
-            <div class="time-editor-card">
-              <div class="time-editor-head">
-                <div class="selected-day-title">
-                  <span class="sel-badge" id="selDayBadge">날짜 선택</span>
-                  <strong id="selDayTitle">날짜를 눌러 선택하세요</strong>
-                </div>
-                <div class="editor-calc-pill" id="editorCalcPill">
-                  09:00 ~ 14:00 · <b>5시간</b> 근무
-                </div>
-              </div>
-
-              <!-- 원클릭 시간대 프리셋 -->
-              <div class="preset-bar">
-                <div class="preset-head">
-                  <span class="preset-label">빠른 시간대 <small id="presetCount" class="preset-count">0/20</small></span>
-                  <div class="preset-actions">
-                    <button type="button" class="chip preset-add" id="presetAddBtn" title="시간대 추가 (최대 20개)">＋ 시간대 추가</button>
-                    <button type="button" class="chip preset-edit-toggle" id="presetEditToggle" title="시간대 수정/삭제 모드">✏️ 편집</button>
-                  </div>
-                </div>
-                <div class="preset-list" id="presetList"></div>
-
-                <!-- 시간대 추가/수정 폼 -->
-                <form class="preset-form" id="presetForm" hidden autocomplete="off">
-                  <input type="text" id="presetName" maxlength="8" placeholder="이름 (예: 마감)" aria-label="시간대 이름">
-                  <input type="time" id="presetStart" value="09:00" aria-label="출근 시각">
-                  <span class="preset-tilde">~</span>
-                  <input type="time" id="presetEnd" value="14:00" aria-label="퇴근 시각">
-                  <select id="presetBreak" aria-label="휴게시간">
-                    <option value="0">휴게 없음</option>
-                    <option value="30">휴게 30분</option>
-                    <option value="60">휴게 1시간</option>
-                    <option value="90">휴게 1시간 30분</option>
-                    <option value="120">휴게 2시간</option>
-                  </select>
-                  <button type="submit" class="btn btn-primary btn-sm" id="presetSaveBtn">저장</button>
-                  <button type="button" class="btn btn-sm" id="presetCancelBtn">취소</button>
-                </form>
-              </div>
-
-              <!-- 출근 / 퇴근 클릭 시 아래로 스크롤바가 열리는 드롭다운 타임피커 -->
-              <div class="time-pickers-grid">
-                <!-- 출근 시각 드롭다운 스크롤 피커 -->
-                <div class="time-picker-box">
-                  <div class="tp-header">
-                    <span>출근 시각</span>
-                    <span class="tp-sub">눌러서 선택</span>
-                  </div>
-                  <div class="tp-dropdown-row">
-                    <div class="scroll-select" id="startHourDropdown">
-                      <button type="button" class="scroll-select-btn" id="startHourBtn" aria-expanded="false">
-                        <span id="startHourText">09시</span>
-                        <span class="caret">▾</span>
-                      </button>
-                      <div class="scroll-menu" id="startHourMenu" role="listbox" aria-label="출근 시 선택"></div>
-                    </div>
-                    <span class="tp-colon">:</span>
-                    <div class="scroll-select" id="startMinDropdown">
-                      <button type="button" class="scroll-select-btn" id="startMinBtn" aria-expanded="false">
-                        <span id="startMinText">00분</span>
-                        <span class="caret">▾</span>
-                      </button>
-                      <div class="scroll-menu" id="startMinMenu" role="listbox" aria-label="출근 분 선택"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 퇴근 시각 드롭다운 스크롤 피커 -->
-                <div class="time-picker-box">
-                  <div class="tp-header">
-                    <span>퇴근 시각</span>
-                    <span class="tp-sub">눌러서 선택</span>
-                  </div>
-                  <div class="tp-dropdown-row">
-                    <div class="scroll-select" id="endHourDropdown">
-                      <button type="button" class="scroll-select-btn" id="endHourBtn" aria-expanded="false">
-                        <span id="endHourText">14시</span>
-                        <span class="caret">▾</span>
-                      </button>
-                      <div class="scroll-menu" id="endHourMenu" role="listbox" aria-label="퇴근 시 선택"></div>
-                    </div>
-                    <span class="tp-colon">:</span>
-                    <div class="scroll-select" id="endMinDropdown">
-                      <button type="button" class="scroll-select-btn" id="endMinBtn" aria-expanded="false">
-                        <span id="endMinText">00분</span>
-                        <span class="caret">▾</span>
-                      </button>
-                      <div class="scroll-menu" id="endMinMenu" role="listbox" aria-label="퇴근 분 선택"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 식대: 점심/저녁 (근무 시간으로 자동 체크, 필요하면 빼기) -->
-              <div id="mealPick" class="meal-pick" hidden>
-                <span class="meal-pick-title">🍚 식대</span>
-                <label class="meal-check"><input id="mealLunch" type="checkbox"><span>점심</span></label>
-                <label class="meal-check"><input id="mealDinner" type="checkbox"><span>저녁</span></label>
-                <small id="mealPickNote" class="meal-pick-note">자동</small>
-              </div>
-
-              <!-- 휴게시간 & 일괄 적용 버튼 바 -->
-              <div class="editor-footer-bar">
-                <div class="break-selector">
-                  <span>☕ 휴게시간 차감</span>
-                  <div id="breakBtns" class="break-btns">
-                    <button type="button" class="chip active" data-break-val="0">없음</button>
-                    <button type="button" class="chip" data-break-val="30">30분</button>
-                    <button type="button" class="chip" data-break-val="60">1시간</button>
-                    <button type="button" class="chip" data-break-val="90">1시간 30분</button>
-                  </div>
-                </div>
-
-                <div class="apply-buttons">
-                  <button id="btnApplySelectedDay" type="button" class="btn btn-xs btn-primary">✓ 선택한 날짜 적용</button>
-                  <button id="btnApplyWeekday" type="button" class="btn btn-xs">평일(월~금) 일괄 적용</button>
-                  <button id="btnApplyWeekend" type="button" class="btn btn-xs">주말(토·일) 일괄 적용</button>
-                  <button id="btnApplySameDow" type="button" class="btn btn-xs">같은 요일 전체 적용</button>
-                  <button id="btnSetDayOff" type="button" class="btn btn-xs btn-ghost">선택일 휴무</button>
-                  <button id="btnClearAllDays" type="button" class="btn btn-xs btn-ghost">전체 휴무 초기화</button>
-                </div>
-              </div>
-            </div>
-
             <!-- 월별 실제 달력 (1주차 ~ N주차 × 월~일) -->
             <div class="month-cal-wrap">
               <div class="month-cal-head">
                 <h4 id="calBoardTitle">2026년 11월 출퇴근 달력 (총 5개 주차)</h4>
-                <span class="muted small">날짜를 누르면 위에서 시간을 고칠 수 있어요 · 🍚 = 식대 지급일</span>
+                <span class="muted small">날짜를 누르면 근무시간·식대를 정할 수 있어요 · 🍚 = 식대</span>
               </div>
               <div class="table-wrap cal-table-view">
                 <table class="month-cal-table" aria-label="월별 출퇴근 달력">
                   <thead>
                     <tr>
-                      <th class="wk-col">주차</th>
                       <th>월</th><th>화</th><th>수</th><th>목</th><th>금</th>
                       <th class="sat">토</th><th class="sun">일</th>
-                      <th class="sum-col">주 합계 / 주휴·식대</th>
                     </tr>
                   </thead>
                   <tbody id="monthCalBody"></tbody>
                 </table>
               </div>
-              <!-- 휴대폰용: 주 단위 카드 목록 (화면 폭 640px 이하에서만 표시) -->
-              <div id="monthCalCards" class="cal-cards-view" aria-label="주별 출퇴근 목록"></div>
+              <div class="cal-foot"><button id="btnClearAllDays" type="button" class="btn btn-xs btn-ghost">전체 휴무 초기화</button></div>
             </div>
           </div>
 
@@ -544,10 +415,10 @@
             </ol>
             <p class="guide-step-title">② 출근·퇴근 시간 고르기</p>
             <ol>
-              <li>화면의 <b>달력</b>에서 날짜를 누릅니다.</li>
+              <li>화면의 <b>달력</b>에서 날짜를 누르면 설정 창이 뜹니다.</li>
               <li>위의 <b>빠른 시간대</b>(예: 오전 09:00~14:00)를 누르면 시간이 한 번에 들어갑니다. 쉬는 날은 <b>[휴무]</b>를 누르세요.</li>
-              <li>직접 고르려면 출근·퇴근 <b>시/분</b>을 고르고 <b>[✓ 선택한 날짜 적용]</b>을 누릅니다.</li>
-              <li>매일 같으면 <b>[평일(월~금) 일괄 적용]</b>, <b>[주말(토·일) 일괄 적용]</b>이 편합니다.</li>
+              <li>직접 고르려면 출근·퇴근 <b>시/분</b>을 고릅니다. 식대는 <b>점심·저녁 체크</b>로 고치고, 끝나면 <b>[✓ 완료]</b>를 누릅니다.</li>
+              <li>매일 같으면 창 아래 <b>[여러 날 한꺼번에 적용하기]</b>에서 평일·주말·같은 요일에 한 번에 넣을 수 있습니다.</li>
               <li>자주 쓰는 근무시간은 <b>[+ 시간대 추가]</b>로 직접 만들 수 있습니다. (최대 20개)</li>
             </ol>
             <p class="guide-step-title">③ 결과 확인</p>
@@ -682,6 +553,144 @@
       <h2 id="cloudTitle" class="modal-title">☁️ 구글 시트에 자동 저장</h2>
       <div id="cloudBody"></div>
       <input id="backupFile" type="file" accept=".json,application/json" hidden>
+    </div>
+  </div>
+
+  <!-- 날짜를 누르면 뜨는 근무시간·식대 팝업 (폰: 아래에서 올라오는 시트 / PC: 가운데 창) -->
+  <div id="dayModal" class="day-modal" hidden>
+    <div class="day-modal-backdrop" id="dayModalBackdrop"></div>
+    <div class="day-sheet" role="dialog" aria-modal="true" aria-label="날짜별 근무시간 설정">
+      <button type="button" class="day-close" id="dayClose" aria-label="닫기">✕</button>
+            <!-- 출퇴근 시각 선택 컨트롤러 (슬라이더 + 시/분 클릭 피커) -->
+            <div class="time-editor-card">
+              <div class="time-editor-head">
+                <div class="selected-day-title">
+                  <span class="sel-badge" id="selDayBadge">날짜 선택</span>
+                  <strong id="selDayTitle">날짜를 눌러 선택하세요</strong>
+                </div>
+                <div class="editor-calc-pill" id="editorCalcPill">
+                  09:00 ~ 14:00 · <b>5시간</b> 근무
+                </div>
+              </div>
+
+              <!-- 원클릭 시간대 프리셋 -->
+              <div class="preset-bar">
+                <div class="preset-head">
+                  <span class="preset-label">빠른 시간대 <small id="presetCount" class="preset-count">0/20</small></span>
+                  <div class="preset-actions">
+                    <button type="button" class="chip preset-add" id="presetAddBtn" title="시간대 추가 (최대 20개)">＋ 시간대 추가</button>
+                    <button type="button" class="chip preset-edit-toggle" id="presetEditToggle" title="시간대 수정/삭제 모드">✏️ 편집</button>
+                  </div>
+                </div>
+                <div class="preset-list" id="presetList"></div>
+
+                <!-- 시간대 추가/수정 폼 -->
+                <form class="preset-form" id="presetForm" hidden autocomplete="off">
+                  <input type="text" id="presetName" maxlength="8" placeholder="이름 (예: 마감)" aria-label="시간대 이름">
+                  <input type="time" id="presetStart" value="09:00" aria-label="출근 시각">
+                  <span class="preset-tilde">~</span>
+                  <input type="time" id="presetEnd" value="14:00" aria-label="퇴근 시각">
+                  <select id="presetBreak" aria-label="휴게시간">
+                    <option value="0">휴게 없음</option>
+                    <option value="30">휴게 30분</option>
+                    <option value="60">휴게 1시간</option>
+                    <option value="90">휴게 1시간 30분</option>
+                    <option value="120">휴게 2시간</option>
+                  </select>
+                  <button type="submit" class="btn btn-primary btn-sm" id="presetSaveBtn">저장</button>
+                  <button type="button" class="btn btn-sm" id="presetCancelBtn">취소</button>
+                </form>
+              </div>
+
+              <!-- 출근 / 퇴근 클릭 시 아래로 스크롤바가 열리는 드롭다운 타임피커 -->
+              <div class="time-pickers-grid">
+                <!-- 출근 시각 드롭다운 스크롤 피커 -->
+                <div class="time-picker-box">
+                  <div class="tp-header">
+                    <span>출근 시각</span>
+                    <span class="tp-sub">눌러서 선택</span>
+                  </div>
+                  <div class="tp-dropdown-row">
+                    <div class="scroll-select" id="startHourDropdown">
+                      <button type="button" class="scroll-select-btn" id="startHourBtn" aria-expanded="false">
+                        <span id="startHourText">09시</span>
+                        <span class="caret">▾</span>
+                      </button>
+                      <div class="scroll-menu" id="startHourMenu" role="listbox" aria-label="출근 시 선택"></div>
+                    </div>
+                    <span class="tp-colon">:</span>
+                    <div class="scroll-select" id="startMinDropdown">
+                      <button type="button" class="scroll-select-btn" id="startMinBtn" aria-expanded="false">
+                        <span id="startMinText">00분</span>
+                        <span class="caret">▾</span>
+                      </button>
+                      <div class="scroll-menu" id="startMinMenu" role="listbox" aria-label="출근 분 선택"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 퇴근 시각 드롭다운 스크롤 피커 -->
+                <div class="time-picker-box">
+                  <div class="tp-header">
+                    <span>퇴근 시각</span>
+                    <span class="tp-sub">눌러서 선택</span>
+                  </div>
+                  <div class="tp-dropdown-row">
+                    <div class="scroll-select" id="endHourDropdown">
+                      <button type="button" class="scroll-select-btn" id="endHourBtn" aria-expanded="false">
+                        <span id="endHourText">14시</span>
+                        <span class="caret">▾</span>
+                      </button>
+                      <div class="scroll-menu" id="endHourMenu" role="listbox" aria-label="퇴근 시 선택"></div>
+                    </div>
+                    <span class="tp-colon">:</span>
+                    <div class="scroll-select" id="endMinDropdown">
+                      <button type="button" class="scroll-select-btn" id="endMinBtn" aria-expanded="false">
+                        <span id="endMinText">00분</span>
+                        <span class="caret">▾</span>
+                      </button>
+                      <div class="scroll-menu" id="endMinMenu" role="listbox" aria-label="퇴근 분 선택"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 식대: 점심/저녁 (근무 시간으로 자동 체크, 필요하면 빼기) -->
+              <div id="mealPick" class="meal-pick" hidden>
+                <span class="meal-pick-title">🍚 식대</span>
+                <label class="meal-check"><input id="mealLunch" type="checkbox"><span>점심</span></label>
+                <label class="meal-check"><input id="mealDinner" type="checkbox"><span>저녁</span></label>
+                <small id="mealPickNote" class="meal-pick-note">자동</small>
+              </div>
+
+              <!-- 휴게시간 & 일괄 적용 버튼 바 -->
+              <div class="editor-footer-bar">
+                <div class="break-selector">
+                  <span>☕ 휴게시간 차감</span>
+                  <div id="breakBtns" class="break-btns">
+                    <button type="button" class="chip active" data-break-val="0">없음</button>
+                    <button type="button" class="chip" data-break-val="30">30분</button>
+                    <button type="button" class="chip" data-break-val="60">1시간</button>
+                    <button type="button" class="chip" data-break-val="90">1시간 30분</button>
+                  </div>
+                </div>
+
+              </div>
+              <details class="bulk-details">
+                <summary>여러 날 한꺼번에 적용하기</summary>
+                <p class="muted small">위에서 정한 시간을 한 번에 넣습니다.</p>
+                <div class="apply-buttons">
+                  <button id="btnApplyWeekday" type="button" class="btn btn-xs">평일(월~금) 전체</button>
+                  <button id="btnApplyWeekend" type="button" class="btn btn-xs">주말(토·일) 전체</button>
+                  <button id="btnApplySameDow" type="button" class="btn btn-xs">같은 요일 전체</button>
+                </div>
+              </details>
+            </div>
+
+      <div class="day-actions">
+        <button id="btnSetDayOff" type="button" class="btn btn-ghost">🚫 이 날 휴무</button>
+        <button id="btnApplySelectedDay" type="button" class="btn btn-primary">✓ 완료</button>
+      </div>
     </div>
   </div>
 
