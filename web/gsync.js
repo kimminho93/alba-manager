@@ -344,6 +344,12 @@
     meta.dirty = false;
     meta.lastSaved = deps.now();
     writeMeta();
+    // 저장 이후에 찍힌 출퇴근은 '출퇴근기록' 장부로 다시 맞춘다 (실패해도 불러오기는 그대로 성공)
+    if (!host.replayPunchLog || !meta.sheetId) return Promise.resolve();
+    var rng = encodeURIComponent(SHEET_PUNCH + '!A2:G5000');
+    return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + rng, undefined, 'silent').then(function (res) {
+      host.replayPunchLog((res && res.values) || [], Date.parse(r.stamp) || 0);
+    }).catch(function () {});
   }
 
   /* 시트가 사라졌을 때(사용자가 삭제) 새로 연결 */
@@ -375,10 +381,10 @@
         var same = JSON.stringify(remote.data) === JSON.stringify(local);
         if (!same && hasContent(local)) {
           var useRemote = host.confirm('이 구글 계정에 저장된 기록이 이미 있습니다.\n\n[확인] 구글 시트에 저장된 기록을 불러옵니다 (이 기기의 기록은 대체됩니다)\n[취소] 이 기기의 기록을 구글 시트에 저장합니다 (시트의 기존 기록은 대체됩니다)');
-          if (useRemote) applyRemote(remote);
+          if (useRemote) return applyRemote(remote);
           else return push('user');
         } else if (!same) {
-          applyRemote(remote);
+          return applyRemote(remote);
         } else {
           lastJson = JSON.stringify(local);
           meta.stamp = remote.stamp;
@@ -408,7 +414,7 @@
       return withSheetRetry(function () { return pull('silent'); }, 'silent');
     }).then(function (remote) {
       if (meta.dirty) return push('silent');          // 이 기기에 저장 안 된 변경이 있으면 우선
-      if (remote && remote.stamp > (meta.stamp || '')) applyRemote(remote);
+      if (remote && remote.stamp > (meta.stamp || '')) return applyRemote(remote);
       else lastJson = JSON.stringify(host.getData());
     }).then(function () {
       setStatus('saved', '');
@@ -492,9 +498,7 @@
       return withSheetRetry(function () { return pull('user'); }, 'user');
     }).then(function (remote) {
       if (!remote) { setStatus('saved', ''); return 'empty'; }
-      applyRemote(remote);
-      setStatus('saved', '');
-      return 'ok';
+      return applyRemote(remote).then(function () { setStatus('saved', ''); return 'ok'; });
     }).catch(function (e) {
       setStatus('error', friendly(e));
       return 'error';

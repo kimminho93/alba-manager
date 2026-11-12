@@ -92,6 +92,8 @@ function makeGoogle() {
       }
       const hm = /^\/values\/(.+)!A1:Z1$/.exec(rest);
       if (hm) { const t = tab(hm[1]); return res(200, t && t.rows[0] ? { values: [t.rows[0]] } : {}); }
+      const lm = /^\/values\/(.+)!A2:G5000$/.exec(decodeURIComponent(rest));
+      if (lm) { const t = tab(lm[1]); return res(200, { values: t ? t.rows.slice(1) : [] }); }
       const vm = /^\/values\/(.+)!A1:A300$/.exec(rest);
       if (vm) { const t = tab(vm[1]); return res(200, { values: t ? t.rows : [] }); }
     }
@@ -152,6 +154,7 @@ function makeDevice(google, opts) {
     getData: () => JSON.parse(JSON.stringify(dev.data)),
     getTables: () => tablesFor(dev.data),
     applyData: d => { dev.data = JSON.parse(JSON.stringify(d)); },
+    replayPunchLog: (rows, afterMs) => { dev.replayed = { rows, afterMs }; },
     confirm: () => dev.confirmAnswer,
     onStatus: s => { dev.statuses.push(s.kind); dev.lastStatus = s; }
   });
@@ -505,6 +508,25 @@ function makeDevice(google, opts) {
     const before = g.calls.length;
     assert.strictEqual(await a.cloud.saveNow(), false);
     assert.strictEqual(g.calls.length, before);
+  });
+
+  await test('다시 로그인(불러오기) 때 출퇴근기록 장부를 읽어 저장 이후 기록을 복구하도록 넘김', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', { '2026-11': { net: 2 } })];
+    await a.cloud.connect();
+    const stamp = Date.parse(JSON.parse(a.store['alba.cloud.v1']).stamp);
+    await a.cloud.appendPunch([['2026-11-12 12:00:00', 'C1', '철수', '출근', '이름+비밀번호', '정상', '']]);
+    const b = makeDevice(g);                       // 새 기기(저장소 비어 있음)로 로그인
+    b.confirmAnswer = true;
+    await b.cloud.connect();
+    assert.ok(b.replayed, '장부 재생이 호출되어야 함');
+    assert.strictEqual(b.replayed.rows.length, 1);
+    assert.strictEqual(b.replayed.rows[0][3], '출근');
+    assert.strictEqual(b.replayed.afterMs, stamp);
+    b.replayed = null;
+    assert.strictEqual(await b.cloud.loadFromSheet(), 'ok');   // [시트에서 불러오기]도 마찬가지
+    assert.ok(b.replayed);
   });
 
   console.log('\n총 ' + passed + '개 구글 연동 테스트 통과!');

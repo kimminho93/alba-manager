@@ -1946,6 +1946,7 @@
       getData: cloudData,
       getTables: cloudTables,
       applyData: cloudApply,
+      replayPunchLog: replayPunchLog,
       confirm: function (m) { return window.confirm(m); },
       getAdminPin: function () { return getPin(); },
       onStatus: function (st) { renderCloudUi(st); if (st && st.kind === 'saved') flushPunchQueue(); }
@@ -2065,6 +2066,28 @@
     }).catch(function () { /* 다음 저장 때 다시 시도 */ }).then(function () { queueBusy = false; });
   }
 
+  /* 시트 '출퇴근기록' 장부로 출근/퇴근 상태 복구 (다시 로그인·불러오기 뒤) */
+  function replayPunchLog(rows, afterMs) {
+    var n = E.replayPunchLog(state.workers, rows, afterMs);
+    if (n) {
+      saveWorkers();
+      loadSelected(); recalcPayroll(); renderRoster();
+      showToast('출퇴근 기록 ' + n + '건을 시트 기록에서 복구했습니다');
+    }
+  }
+
+  /* 자정까지 퇴근을 안 찍은 사람은 00:00 퇴근으로 처리 */
+  function runAutoClose() {
+    var done = E.autoCloseOpen(state.workers, new Date());
+    if (!done.length) return;
+    saveWorkers();
+    loadSelected(); recalcPayroll(); renderRoster();
+    done.forEach(function (d) {
+      enqueuePunch([tsOf(d.ts), d.worker.code, d.worker.name, '퇴근', '자동(자정)', '정상(자동)', '자정까지 퇴근을 찍지 않아 00:00 퇴근으로 처리 (출근 ' + d.date + ' ' + d.start + ')']);
+    });
+    showToast('🌙 자정이 지나 ' + done.map(function (d) { return d.worker.name; }).join(', ') + '님을 자동 퇴근 처리했습니다');
+  }
+
   /* ---------- 출퇴근 화면 ---------- */
   function renderPunch() {
     var box = $('punchList');
@@ -2134,6 +2157,7 @@
       return;
     }
     punchState.fails = 0;
+    runAutoClose();   // 어제 퇴근 안 찍은 사람이 있으면 먼저 자정 퇴근으로 정리
     var r = E.applyPunch(w, now);
     closePunchPw();
     if (r.kind === 'too_soon') { showToast('방금 찍었어요. 잠시 뒤에 다시 눌러 주세요.'); return; }
@@ -2292,8 +2316,9 @@
 
   function initPunch() {
     initSoundSettings();
+    runAutoClose();
     tickClock();
-    setInterval(function () { tickClock(); renderPunch(); }, 15000);
+    setInterval(function () { tickClock(); runAutoClose(); renderPunch(); }, 15000);
 
     $('punchList').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-punch]');

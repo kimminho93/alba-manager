@@ -1529,6 +1529,54 @@
     return { kind: 'out', date: open.date, start: start, end: end, note: merged ? '같은 날 앞선 근무와 합쳐 사이 시간을 휴게로 처리' : '' };
   }
 
+
+  /**
+   * 자정까지 퇴근을 안 찍은 사람은 모두 그 날 24:00(=00:00)에 퇴근한 것으로 처리.
+   * 앱을 켜 둔 동안은 자정이 지나면, 꺼져 있었다면 다음에 열 때 처리한다.
+   * 반환: 자동 퇴근 처리된 사람 목록 [{worker, date, start, end, ts(자정 시각)}]
+   */
+  function autoCloseOpen(workers, now) {
+    var today = ymdOf(now), out = [];
+    (workers || []).forEach(function (w) {
+      var open = cleanPunch(w.punch);
+      if (!open || open.date >= today) return;
+      var y = Number(open.date.slice(0, 4)), m = Number(open.date.slice(5, 7)), d = Number(open.date.slice(8, 10));
+      var r = clockOut(w, open, '00:00');
+      out.push({ worker: w, date: r.date, start: r.start, end: '00:00', ts: new Date(y, m - 1, d + 1, 0, 0, 0) });
+    });
+    return out;
+  }
+
+  function parseLogTs(str) {
+    var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(String(str || '').trim());
+    return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
+  }
+
+  /**
+   * 시트 '출퇴근기록' 장부로 상태 복구: 불러온 데이터(afterMs 시각 저장분)보다 나중에 찍힌 출근/퇴근 기록을
+   * 시간순으로 다시 적용한다. rows 한 줄 = [기록시각, 고유코드, 이름, 구분, 입력방식, 처리결과, 메모]
+   * 반환: 적용한 줄 수
+   */
+  function replayPunchLog(workers, rows, afterMs) {
+    var n = 0;
+    (rows || []).forEach(function (row) {
+      if (!row || row.length < 4) return;
+      var ts = parseLogTs(row[0]);
+      if (!ts || ts.getTime() <= afterMs) return;
+      var kind = String(row[3] || '').trim();
+      if (kind !== '출근' && kind !== '퇴근') return;
+      if (String(row[5] || '').indexOf('정상') !== 0) return;
+      var auto = String(row[4] || '').indexOf('자동') === 0;
+      if (auto) { n += autoCloseOpen(workers, ts).length ? 1 : 0; return; }
+      var code = String(row[1] || '').trim();
+      var w = (workers || []).filter(function (x) { return x.code === code; })[0];
+      if (!w) return;
+      var r = applyPunch(w, ts);
+      if (r.kind === 'in' || r.kind === 'out') n++;
+    });
+    return n;
+  }
+
   /** 지금 찍으면 어떤 처리가 되는지: 'in'(출근) | 'out'(퇴근) */
   function punchNext(worker, now) {
     var open = cleanPunch(worker && worker.punch);
@@ -1686,6 +1734,8 @@
     punchIsOpen: punchIsOpen,
     applyPunch: applyPunch,
     punchNext: punchNext,
+    autoCloseOpen: autoCloseOpen,
+    replayPunchLog: replayPunchLog,
     monthSummary: monthSummary,
     normalizeWorkers: normalizeWorkers,
     migrateRoster: migrateRoster,
