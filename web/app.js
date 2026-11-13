@@ -424,14 +424,14 @@
     var shHtml = '';
     for (var h = 0; h <= 23; h++) {
       shHtml += '<button type="button" class="scroll-option" role="option" data-sh="' + h + '">' +
-        '<span>' + tr('{n}시', { n: pad2(h) }) + '</span><small class="muted">' + (h < 12 ? tr('오전') : tr('오후')) + '</small></button>';
+        '<span>' + tr('{n}시', { n: pad2(h) }) + '</span><small class="muted">' + (E.getLang() === 'en' ? '' : (h < 12 ? tr('오전') : tr('오후'))) + '</small></button>';
     }
     $('startHourMenu').innerHTML = shHtml;
 
     var ehHtml = '';
     for (var eh = 0; eh <= 24; eh++) {
       ehHtml += '<button type="button" class="scroll-option" role="option" data-eh="' + eh + '">' +
-        '<span>' + tr('{n}시', { n: pad2(eh) }) + '</span><small class="muted">' + (eh === 24 ? tr('자정') : (eh < 12 ? tr('오전') : tr('오후'))) + '</small></button>';
+        '<span>' + tr('{n}시', { n: pad2(eh) }) + '</span><small class="muted">' + (eh === 24 ? tr('자정') : (E.getLang() === 'en' ? '' : (eh < 12 ? tr('오전') : tr('오후')))) + '</small></button>';
     }
     $('endHourMenu').innerHTML = ehHtml;
 
