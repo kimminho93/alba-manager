@@ -850,15 +850,52 @@
     fillPunchUnit();
   }
 
-  function punchUnit() { return state.settings.punchUnit || 30; }
+  function punchOpts() { return E.punchOptions(state.settings); }
+  function punchUnit() { return punchOpts().unit; }
+  function graceLabel(g) { return g === 0 ? tr('없음 (0분)') : tr('{n}분', { n: g }); }
   function fillPunchUnit() {
     var sel = $('sPunchUnit');
     if (!sel) return;
-    sel.value = String(punchUnit());
-    var u = punchUnit();
-    $('punchUnitNote').textContent = u === 1
-      ? tr('찍은 시각 그대로 기록해요. (출근·퇴근 모두 분 단위 그대로)')
-      : tr('출근은 올림, 퇴근은 내림이에요. 예) {u}분 단위: 출근 {a} → {b}, 퇴근 {c} → {d}', { u: u, a: '08:59', b: E.roundUpUnit('08:59', u), c: '09:59', d: E.roundDownUnit('09:59', u) });
+    var o = punchOpts();
+    sel.value = String(o.unit);
+    $('sInMode').value = o.inMode;
+    $('sOutMode').value = o.outMode;
+    // 유예는 단위의 절반까지, 0·5·10·15분 중에서
+    [['sGraceIn', o.graceIn, o.inMode], ['sGraceOut', o.graceOut, o.outMode]].forEach(function (x) {
+      var g = $(x[0]);
+      g.innerHTML = E.graceChoices(o.unit).map(function (v) { return '<option value="' + v + '">' + graceLabel(v) + '</option>'; }).join('');
+      g.value = String(x[1]);
+      g.disabled = x[2] === 'exact' || o.unit <= 5;
+    });
+    // 예시 문구: 지금 설정으로 실제 계산해서 보여 줌
+    function hm(x) { return pad2(Math.floor(x / 60)) + ':' + pad2(x % 60); }
+    var lines = [];
+    if (o.inMode === 'exact') lines.push(tr('출근: 찍은 시각 그대로 기록해요. (예: 09:03 → 09:03)'));
+    else {
+      var t1 = 9 * 60 - 1, t2 = 9 * 60 + o.graceIn, t3 = 9 * 60 + o.graceIn + 1;
+      lines.push(tr('출근: {a} → {x}, {b} → {y}, {c} → {z}', { a: hm(t1), x: E.roundUpUnit(hm(t1), o.unit, o.graceIn), b: hm(t2), y: E.roundUpUnit(hm(t2), o.unit, o.graceIn), c: hm(t3), z: E.roundUpUnit(hm(t3), o.unit, o.graceIn) }));
+    }
+    if (o.outMode === 'exact') lines.push(tr('퇴근: 찍은 시각 그대로 기록해요. (예: 17:48 → 17:48)'));
+    else {
+      var u1 = 18 * 60 - o.graceOut - 1, u2 = 18 * 60 - o.graceOut, u3 = 18 * 60 + 1;
+      lines.push(tr('퇴근: {a} → {x}, {b} → {y}, {c} → {z}', { a: hm(u1), x: E.roundDownUnit(hm(u1), o.unit, o.graceOut), b: hm(u2), y: E.roundDownUnit(hm(u2), o.unit, o.graceOut), c: hm(u3), z: E.roundDownUnit(hm(u3), o.unit, o.graceOut) }));
+    }
+    var maxMin = (o.inMode === 'round' ? o.graceIn : 0) + (o.outMode === 'round' ? o.graceOut : 0);
+    if (maxMin > 0) {
+      var wage = Number(state.settings.minWage) || 0;
+      lines.push(tr('봐주는 시간은 하루 최대 {m}분이에요. (최저시급 {w} 기준 하루 최대 약 {c})', { m: maxMin, w: E.moneyText(wage), c: E.moneyText(Math.round(wage * maxMin / 60 / 10) * 10) }));
+    }
+    $('punchUnitNote').innerHTML = lines.map(function (l) { return '<div>' + escHtml(l) + '</div>'; }).join('');
+  }
+  function readPunchSettings() {
+    return {
+      punchUnit: $('sPunchUnit').value, punchInMode: $('sInMode').value, punchOutMode: $('sOutMode').value,
+      punchGraceIn: $('sGraceIn').value, punchGraceOut: $('sGraceOut').value
+    };
+  }
+  function punchRaw() {
+    var st = state.settings;
+    return { punchUnit: st.punchUnit, punchInMode: st.punchInMode, punchOutMode: st.punchOutMode, punchGraceIn: st.punchGraceIn, punchGraceOut: st.punchGraceOut };
   }
 
   /* 설정을 계산·화면에 반영 */
@@ -878,7 +915,7 @@
   }
 
   function onSettingsInput() {
-    var raw = { minWage: $('sMinWage').value, rates: {}, mealTimes: {}, punchUnit: state.settings.punchUnit };
+    var raw = Object.assign({ minWage: $('sMinWage').value, rates: {}, mealTimes: {} }, punchRaw());
     RATE_KEYS.forEach(function (k) { raw.rates[k] = $('sRate_' + k).value; });
     MEAL_TIME_KEYS.forEach(function (k) { raw.mealTimes[k] = $('sMeal_' + k).value; });
     state.settings = E.sanitizeSettings(raw);
@@ -1617,15 +1654,17 @@
       $(id).addEventListener('change', onSettingsInput);
       $(id).addEventListener('blur', fillSettingsForm);   // 비우거나 잘못 넣었으면 적용된 값으로 되돌려 보여줌
     });
-    $('sPunchUnit').addEventListener('change', function () {
-      state.settings = E.sanitizeSettings({ minWage: state.settings.minWage, rates: state.settings.rates, mealTimes: state.settings.mealTimes, punchUnit: $('sPunchUnit').value });
-      saveJson(KEYS.settings, state.settings);
-      fillPunchUnit();
-      showToast(tr('출퇴근 시간을 {u}으로 끊어요.', { u: punchUnit() === 1 ? tr('찍은 그대로') : tr('{n}분 단위', { n: punchUnit() }) }));
+    ['sPunchUnit', 'sInMode', 'sGraceIn', 'sOutMode', 'sGraceOut'].forEach(function (id) {
+      $(id).addEventListener('change', function () {
+        state.settings = E.sanitizeSettings(Object.assign({ minWage: state.settings.minWage, rates: state.settings.rates, mealTimes: state.settings.mealTimes }, readPunchSettings()));
+        saveJson(KEYS.settings, state.settings);
+        fillPunchUnit();
+        showToast(tr('출퇴근 시간 기준을 바꿨어요. 지금부터 찍는 시각에 적용돼요.'));
+      });
     });
     $('btnSettingsReset').addEventListener('click', function () {
       if (!window.confirm(tr('세금·보험료 비율과 최저시급을 처음 값으로 되돌릴까요?'))) return;
-      state.settings = E.sanitizeSettings({ punchUnit: state.settings.punchUnit });   // 출퇴근 끊는 단위는 그대로 둠
+      state.settings = E.sanitizeSettings(punchRaw());   // 출퇴근 끊는 기준은 그대로 둠
       saveJson(KEYS.settings, state.settings);
       applySettings();
       showToast(tr('처음 값으로 되돌렸습니다.'));
@@ -2162,7 +2201,7 @@
   /* 시트 '출퇴근기록' 장부로 출근/퇴근 상태 복구 (다시 로그인·불러오기 뒤) */
   function replayPunchLog(rows, afterMs) {
     // 너무 오래된 줄은 건너뜀: 지운 기록의 옛 장부가 되살아나는 것을 막는다 (최근 48시간만)
-    var n = E.replayPunchLog(state.workers, rows, Math.max(afterMs, Date.now() - 48 * 3600 * 1000), punchUnit());
+    var n = E.replayPunchLog(state.workers, rows, Math.max(afterMs, Date.now() - 48 * 3600 * 1000), punchOpts());
     if (n) {
       saveWorkers();
       loadSelected(); recalcPayroll(); renderRoster();
@@ -2316,7 +2355,7 @@
     }
     punchState.fails = 0;
     runAutoClose();   // 어제 퇴근 안 찍은 사람이 있으면 먼저 자정 퇴근으로 정리
-    var r = E.applyPunch(w, now, punchUnit());
+    var r = E.applyPunch(w, now, punchOpts());
     closePunchPw();
     if (r.kind === 'too_soon') { showToast(tr('방금 찍었어요. 잠시 뒤에 다시 눌러 주세요.')); return; }
     saveWorkers();
@@ -2414,7 +2453,7 @@
     if (!on.length) { showToast(tr('지금 근무 중인 사람이 없어요.')); renderPunch(); return; }
     var go = function () {
       var names = on.map(function (w) { return w.name; }).join(', ');
-      if (!window.confirm(tr('근무 중인 {n}명({names})을 지금 한꺼번에 퇴근 처리할까요?\n퇴근 시각은 {t} 기준으로 {u} 기록돼요.', { n: on.length, names: names, t: hmText(pad2(now.getHours()) + ':' + pad2(now.getMinutes())), u: punchUnit() === 1 ? tr('그대로') : tr('{n}분 단위로 내려서', { n: punchUnit() }) }))) return;
+      if (!window.confirm(tr('근무 중인 {n}명({names})을 지금 한꺼번에 퇴근 처리할까요?\n퇴근 시각은 {t} 기준으로 {u} 기록돼요.', { n: on.length, names: names, t: hmText(pad2(now.getHours()) + ':' + pad2(now.getMinutes())), u: punchOpts().outMode === 'exact' ? tr('그대로') : tr('{n}분 단위로 내려서', { n: punchUnit() }) }))) return;
       doBulkOut();
     };
     if (getPin()) { punchState.afterPin = go; openAdminPin(); }   // 관리자 비밀번호가 있으면 사장님만
@@ -2422,7 +2461,7 @@
   }
   function doBulkOut() {
     var now = new Date();
-    var done = E.applyPunchAll(state.workers, now, punchUnit());
+    var done = E.applyPunchAll(state.workers, now, punchOpts());
     if (!done.length) { showToast(tr('지금 근무 중인 사람이 없어요.')); renderPunch(); return; }
     saveWorkers();
     loadSelected(); recalcPayroll(); renderRoster();

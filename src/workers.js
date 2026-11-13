@@ -187,20 +187,52 @@
   }
   function hmFromMin(r) { return ('0' + Math.floor(r / 60)).slice(-2) + ':' + ('0' + (r % 60)).slice(-2); }
 
-  /** 출근 시각은 단위로 올림: 30분 단위면 09:00 → 09:00, 09:01 → 09:30, 08:59 → 09:00 (자정을 넘기면 23:59로 제한) */
-  function roundUpUnit(hm, unit) {
+  /** 출근 시각: 단위로 올림. 유예(grace)가 있으면 정각 뒤 grace분까지는 정시로 봐줌.
+   *  30분 단위: 08:59→09:00, 09:03→09:30 (유예 5분이면 09:00), 09:11→09:30 (자정을 넘기면 23:59로 제한) */
+  function roundUpUnit(hm, unit, grace) {
     unit = cleanUnit(unit);
+    grace = cleanGrace(grace, unit);
     var m = Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3));
-    var r = Math.ceil(m / unit) * unit;
+    var r = Math.max(0, Math.ceil((m - grace) / unit) * unit);
     if (r >= 1440) return '23:59';
     return hmFromMin(r);
   }
-  /** 퇴근 시각은 단위로 내림: 30분 단위면 10:00 이후 → 10:00, 09:59 → 09:30 */
-  function roundDownUnit(hm, unit) {
+  /** 퇴근 시각: 단위로 내림. 유예가 있으면 정각 grace분 전부터는 정시로 봐줌.
+   *  30분 단위: 09:59→09:30 (유예 5분이면 10:00), 10:00 이후→10:00 */
+  function roundDownUnit(hm, unit, grace) {
     unit = cleanUnit(unit);
+    grace = cleanGrace(grace, unit);
     var m = Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3));
-    return hmFromMin(Math.floor(m / unit) * unit);
+    var r = Math.floor((m + grace) / unit) * unit;
+    if (r >= 1440) return '23:59';
+    return hmFromMin(r);
   }
+  /** 유예는 0·5·10·15분, 그리고 단위의 절반 이하만 (30분 단위면 15분까지, 10분 단위면 5분까지) */
+  var GRACE_CHOICES = [0, 5, 10, 15];
+  function graceChoices(unit) {
+    unit = cleanUnit(unit);
+    return GRACE_CHOICES.filter(function (g) { return g <= Math.floor(unit / 2); });
+  }
+  function cleanGrace(g, unit) {
+    g = Number(g);
+    var ok = graceChoices(unit), best = 0;
+    ok.forEach(function (x) { if (x <= g) best = x; });
+    return best;
+  }
+  /** 출퇴근 규칙 옵션 정리. 숫자만 주면(예전 방식) 그 단위로 올림·내림, 1이면 찍은 그대로 */
+  function punchOpts(x) {
+    if (x === undefined || x === null) x = {};
+    if (typeof x !== 'object') x = { unit: x };
+    var unit = cleanUnit(x.unit === undefined ? DEFAULT_PUNCH_UNIT : x.unit);
+    var inMode = x.inMode === 'exact' ? 'exact' : 'round';
+    var outMode = x.outMode === 'exact' ? 'exact' : 'round';
+    if (unit === 1) { unit = 1; inMode = 'exact'; outMode = 'exact'; }
+    return { unit: unit, inMode: inMode, outMode: outMode, graceIn: cleanGrace(x.graceIn, unit), graceOut: cleanGrace(x.graceOut, unit) };
+  }
+  /** 규칙에 따라 출근/퇴근 시각을 계산 */
+  function ruleIn(hm, o) { return o.inMode === 'exact' ? hm : roundUpUnit(hm, o.unit, o.graceIn); }
+  function ruleOut(hm, o) { return o.outMode === 'exact' ? hm : roundDownUnit(hm, o.unit, o.graceOut); }
+
   function roundUp30(hm) { return roundUpUnit(hm, 30); }
 
   function punchIsOpen(worker) { return !!(worker && cleanPunch(worker.punch)); }
@@ -213,8 +245,8 @@
    * 같은 날 두 번 일하면 한 칸에 합치고 사이 시간은 휴게시간으로 뺀다.
    * 반환: { kind:'in'|'out'|'too_soon', date, start, end, note }
    */
-  function applyPunch(worker, now, unit) {
-    unit = cleanUnit(unit === undefined ? DEFAULT_PUNCH_UNIT : unit);
+  function applyPunch(worker, now, opts) {
+    var o = punchOpts(opts);
     var open = cleanPunch(worker.punch);
     var today = ymdOf(now), time = hmOf(now);
     var note = '';
@@ -223,7 +255,7 @@
       var elapsed = (now.getTime() - inMs) / 60000;
       if (elapsed >= 0 && elapsed <= PUNCH_MAX_MIN) {
         if (elapsed < 1) return { kind: 'too_soon', date: open.date, start: open.time, end: time, note: '' };
-        var endT = roundDownUnit(time, unit);   // 퇴근은 내림
+        var endT = ruleOut(time, o);   // 퇴근: 내림(+유예) 또는 찍은 그대로
         if (today === open.date && toMin(endT) <= toMin(open.time)) {
           // 올림한 출근 시각(예: 09:30)보다 일찍, 또는 같은 시각으로 끊기면 근무 시간 0 → 기록은 남기지 않고 출근만 취소
           delete worker.punch;
@@ -233,7 +265,7 @@
       }
       note = P.t('이전 출근({d})은 퇴근 기록이 없어 무시하고 새로 출근 처리', { d: open.date + ' ' + open.time });
     }
-    var rounded = roundUpUnit(time, unit);
+    var rounded = ruleIn(time, o);   // 출근: 올림(+유예) 또는 찍은 그대로
     worker.punch = { date: today, time: rounded, at: time };
     return { kind: 'in', date: today, start: rounded, end: '', note: note };
   }
@@ -292,7 +324,7 @@
    * 시간순으로 다시 적용한다. rows 한 줄 = [기록시각, 고유코드, 이름, 구분, 입력방식, 처리결과, 메모]
    * 반환: 적용한 줄 수
    */
-  function replayPunchLog(workers, rows, afterMs, unit) {
+  function replayPunchLog(workers, rows, afterMs, opts) {
     var n = 0;
     (rows || []).forEach(function (row) {
       if (!row || row.length < 4) return;
@@ -305,18 +337,18 @@
       var code = String(row[1] || '').trim();
       var w = (workers || []).filter(function (x) { return x.code === code; })[0];
       if (!w) return;
-      var r = applyPunch(w, ts, unit);
+      var r = applyPunch(w, ts, opts);
       if (r.kind === 'in' || r.kind === 'out') n++;
     });
     return n;
   }
 
   /** 근무 중인 사람 모두 한꺼번에 퇴근 처리. 반환: [{worker, result}] (방금 출근해 too_soon 인 사람은 빠짐) */
-  function applyPunchAll(workers, now, unit) {
+  function applyPunchAll(workers, now, opts) {
     var out = [];
     (workers || []).forEach(function (w) {
       if (punchNext(w, now) !== 'out') return;
-      var r = applyPunch(w, now, unit);
+      var r = applyPunch(w, now, opts);
       if (r.kind === 'out') out.push({ worker: w, result: r });
     });
     return out;
@@ -458,13 +490,28 @@
   /** 설정(세율·보험료율·최저시급) 검사: 이상한 값은 기본값으로 */
   var DEFAULT_MIN_WAGE = 10320;
   function sanitizeSettings(raw) {
+    var pu = (function () {
+      var r = raw || {};
+      var legacyExact = Number(r.punchUnit) === 1;   // 예전 '끊지 않음' → 단위 30분 + 출근·퇴근 '찍은 그대로'
+      return punchOpts({
+        unit: legacyExact ? DEFAULT_PUNCH_UNIT : r.punchUnit,
+        inMode: legacyExact ? 'exact' : r.punchInMode,
+        outMode: legacyExact ? 'exact' : r.punchOutMode,
+        graceIn: r.punchGraceIn,
+        graceOut: r.punchGraceOut
+      });
+    })();
     raw = isObj(raw) ? raw : {};
     var mw = Math.round(Number(raw.minWage));
     return {
       minWage: isFinite(mw) && mw > 0 && mw < 1000000 ? mw : DEFAULT_MIN_WAGE,
       rates: P.sanitizeRates(raw.rates),
       mealTimes: P.sanitizeMealTimes(raw.mealTimes),
-      punchUnit: cleanUnit(raw.punchUnit)
+      punchUnit: pu.unit,
+      punchInMode: pu.inMode,
+      punchOutMode: pu.outMode,
+      punchGraceIn: pu.graceIn,
+      punchGraceOut: pu.graceOut
     };
   }
 
@@ -482,6 +529,9 @@
     applyPunchAll: applyPunchAll,
     PUNCH_UNITS: PUNCH_UNITS,
     DEFAULT_PUNCH_UNIT: DEFAULT_PUNCH_UNIT,
+    punchOpts: punchOpts,
+    punchOptions: function (st) { st = st || {}; return punchOpts({ unit: st.punchUnit, inMode: st.punchInMode, outMode: st.punchOutMode, graceIn: st.punchGraceIn, graceOut: st.punchGraceOut }); },
+    graceChoices: graceChoices,
     roundUpUnit: roundUpUnit,
     roundDownUnit: roundDownUnit,
     punchNext: punchNext,

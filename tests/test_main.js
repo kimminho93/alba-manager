@@ -633,6 +633,77 @@ test('출퇴근 끊기: 출근 올림(08:59→09:00, 09:01→09:30), 퇴근 내�
   assert.deepStrictEqual(E.monthSummary(w, '2026-11'), { workDays: 0, totalHours: 0 });
 });
 
+test('출퇴근 유예: 출근은 (찍은 시각 − 유예)를 올림, 퇴근은 (찍은 시각 + 유예)를 내림, 달력엔 항상 단위 배수', () => {
+  const at = (h, m) => new Date(2026, 10, 12, h, m, 0);
+  const O = (o) => Object.assign({ unit: 30, inMode: 'round', outMode: 'round', graceIn: 0, graceOut: 0 }, o);
+  const inT = (h, m, o) => { const w = E.createWorker('가', 5, 10320); return E.applyPunch(w, at(h, m), O(o)).start; };
+  const outT = (h, m, o) => { const w = E.createWorker('가', 5, 10320); E.applyPunch(w, at(8, 0), O(o)); return E.applyPunch(w, at(h, m), O(o)).end; };
+  // 출근 유예 0 / 5 / 10 / 15
+  [[ '08:59', '09:00', '09:00', '09:00', '09:00' ], [ '09:00', '09:00', '09:00', '09:00', '09:00' ], [ '09:03', '09:30', '09:00', '09:00', '09:00' ],
+   [ '09:08', '09:30', '09:30', '09:00', '09:00' ], [ '09:11', '09:30', '09:30', '09:30', '09:00' ], [ '09:16', '09:30', '09:30', '09:30', '09:30' ], [ '09:31', '10:00', '09:30', '09:30', '09:30' ]].forEach(r => {
+    const [h, m] = r[0].split(':').map(Number);
+    [0, 5, 10, 15].forEach((g, k) => assert.strictEqual(inT(h, m, { graceIn: g }), r[k + 1], '출근 ' + r[0] + ' 유예 ' + g));
+  });
+  // 퇴근 유예 0 / 5 / 10 / 15
+  [[ '17:44', '17:30', '17:30', '17:30', '17:30' ], [ '17:46', '17:30', '17:30', '17:30', '18:00' ], [ '17:52', '17:30', '17:30', '18:00', '18:00' ], [ '17:57', '17:30', '18:00', '18:00', '18:00' ],
+   [ '18:00', '18:00', '18:00', '18:00', '18:00' ], [ '18:10', '18:00', '18:00', '18:00', '18:00' ], [ '18:25', '18:00', '18:30', '18:30', '18:30' ], [ '18:31', '18:30', '18:30', '18:30', '18:30' ]].forEach(r => {
+    const [h, m] = r[0].split(':').map(Number);
+    [0, 5, 10, 15].forEach((g, k) => assert.strictEqual(outT(h, m, { graceOut: g }), r[k + 1], '퇴근 ' + r[0] + ' 유예 ' + g));
+  });
+  // 찍은 그대로 모드: 유예 무시
+  assert.strictEqual(inT(9, 13, { inMode: 'exact', graceIn: 10 }), '09:13');
+  assert.strictEqual(outT(17, 48, { outMode: 'exact', graceOut: 10 }), '17:48');
+  // 출근만 그대로, 퇴근은 내림
+  assert.strictEqual(outT(17, 48, { inMode: 'exact' }), '17:30');
+  // 모든 시각(00:00~23:59)·모든 단위·모든 유예에서 성질 확인
+  const m2h = x => ('0' + Math.floor(x / 60)).slice(-2) + ':' + ('0' + (x % 60)).slice(-2);
+  [5, 10, 15, 20, 30, 60].forEach(U => E.graceChoices(U).forEach(G => {
+    let prevIn = -1, prevOut = -1;
+    for (let t = 0; t < 1440; t++) {
+      const hm = m2h(t);
+      const a = E.roundUpUnit(hm, U, G), b = E.roundDownUnit(hm, U, G);
+      const am = Number(a.slice(0, 2)) * 60 + Number(a.slice(3)), bm = Number(b.slice(0, 2)) * 60 + Number(b.slice(3));
+      const edge = am === 1439 || bm === 1439;
+      if (!edge) {
+        assert.strictEqual(am % U, 0, '출근은 단위 배수 ' + hm + ' U' + U + ' G' + G);
+        assert.strictEqual(bm % U, 0, '퇴근은 단위 배수 ' + hm + ' U' + U + ' G' + G);
+        assert.ok(am >= t - G && am < t - G + U, '출근 범위 ' + hm);
+        assert.ok(bm <= t + G && bm > t + G - U, '퇴근 범위 ' + hm);
+      }
+      assert.ok(am >= prevIn && bm >= prevOut, '시각이 늦어지면 결과도 늦어짐(역전 없음) ' + hm);
+      prevIn = am; prevOut = bm;
+    }
+  }));
+  // 유예 선택지는 단위의 절반 이하만
+  assert.deepStrictEqual(E.graceChoices(30), [0, 5, 10, 15]);
+  assert.deepStrictEqual(E.graceChoices(60), [0, 5, 10, 15]);
+  assert.deepStrictEqual(E.graceChoices(20), [0, 5, 10]);
+  assert.deepStrictEqual(E.graceChoices(15), [0, 5]);
+  assert.deepStrictEqual(E.graceChoices(10), [0, 5]);
+  assert.deepStrictEqual(E.graceChoices(5), [0]);
+  assert.strictEqual(E.sanitizeSettings({ punchUnit: 15, punchGraceIn: 15, punchGraceOut: 10 }).punchGraceIn, 5);   // 15분 단위는 5분까지
+  assert.strictEqual(E.sanitizeSettings({ punchUnit: 30, punchGraceOut: 12 }).punchGraceOut, 10);   // 허용 값으로 내림
+  // 설정 저장·예전 설정 이어받기
+  const st = E.sanitizeSettings({ punchUnit: 30, punchInMode: 'exact', punchOutMode: 'round', punchGraceOut: 5 });
+  assert.deepStrictEqual(E.punchOptions(st), { unit: 30, inMode: 'exact', outMode: 'round', graceIn: 0, graceOut: 5 });
+  const old = E.sanitizeSettings({ punchUnit: 1 });   // 예전 '끊지 않음'
+  assert.deepStrictEqual([old.punchUnit, old.punchInMode, old.punchOutMode], [30, 'exact', 'exact']);
+  assert.deepStrictEqual(E.punchOptions(E.sanitizeSettings({})), { unit: 30, inMode: 'round', outMode: 'round', graceIn: 0, graceOut: 0 });
+  // 조기 퇴근을 봐줘서 18:00으로 기록돼도, 출근과 같은 시각으로 끊기면 근무 0시간 처리는 그대로
+  const w = E.createWorker('나', 5, 10320);
+  E.applyPunch(w, at(9, 5), O({ graceIn: 5 }));   // 09:00
+  const r = E.applyPunch(w, at(9, 25), O({ graceOut: 5 }));   // 09:30 → 출근(09:00)보다 늦음: 정상 기록
+  assert.strictEqual(r.end, '09:30'); assert.strictEqual(r.empty, undefined);
+  // 일괄 퇴근·시트 복구 재생에도 같은 규칙
+  const a = E.createWorker('가', 5, 10320); E.applyPunch(a, at(9, 3), O({ graceIn: 5 }));
+  const done = E.applyPunchAll([a], at(17, 56), O({ graceOut: 5 }));
+  assert.strictEqual(done[0].result.start, '09:00'); assert.strictEqual(done[0].result.end, '18:00');
+  const a2 = E.createWorker('가', 5, 10320); a2.code = a.code;
+  const ts = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':00';
+  E.replayPunchLog([a2], [[ts(at(9, 3)), a.code, '가', '출근', '이름+비밀번호', '정상', ''], [ts(at(17, 56)), a.code, '가', '퇴근', '이름+비밀번호', '정상', '']], 0, O({ graceIn: 5, graceOut: 5 }));
+  assert.deepStrictEqual([E.workerShifts(a2, '2026-11')[11].start, E.workerShifts(a2, '2026-11')[11].end], ['09:00', '18:00']);
+});
+
 test('일괄 퇴근: 근무 중인 사람만 한꺼번에 퇴근, 출근 안 한 사람은 그대로, 시트 기록 재생도 같은 결과', () => {
   const at = (h, m) => new Date(2026, 10, 12, h, m, 0);
   const a = E.createWorker('가', 5, 10320), b = E.createWorker('나', 5, 10320), c = E.createWorker('다', 5, 10320);
