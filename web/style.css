@@ -2375,3 +2375,13 @@ body.on-punch .app-footer, body.locked .app-footer { display: none; }
 .egg-text { margin-top: 10px; font-size: 20px; font-weight: 800; line-height: 1.4; }
 .egg-sub { margin-top: 8px; font-size: 22px; }
 @keyframes eggIn { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: scale(1); } }
+
+/* 출근 중(파란불) 표시: 출퇴근 탭에서 출근을 찍은 사람 */
+.wdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 3px rgba(53,99,240,.22); margin-right: 7px; vertical-align: middle; flex: none; }
+.work-now { margin: 8px 0 12px; }
+.work-now[hidden] { display: none; }
+.work-now-row { display: flex; align-items: center; padding: 11px 14px; border-radius: 14px; background: rgba(53,99,240,.10); border: 1px solid rgba(53,99,240,.35); color: var(--primary); font-weight: 700; font-size: 16px; }
+.work-now-row + .work-now-row { margin-top: 6px; }
+.pill-work { background: rgba(53,99,240,.12); color: var(--primary); border: 1px solid rgba(53,99,240,.35); margin-left: 6px; font-weight: 700; }
+.wchip .wdot { margin-right: 6px; }
+@media print { .work-now { display: none !important; } }

@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611131230">
+  <link rel="stylesheet" href="./style.css?v=202611131400">
 </head>
 <body>
   <header class="app-header">
@@ -66,6 +66,8 @@
     <section id="tab-payroll" class="tab-panel active" role="tabpanel">
       <!-- 폰 전용: 맨 위 알바생 칩 (PC에서는 숨김) -->
       <div id="workerChips" class="worker-chips" role="tablist" aria-label="알바생 선택"></div>
+      <!-- 출퇴근 탭에서 출근 중인 사람 표시 -->
+      <div id="workNow" class="work-now" hidden role="status"></div>
       <!-- 폰 전용: 알바생이 없을 때 안내 -->
       <div id="emptyCard" class="empty-card">
         <div class="empty-plus" aria-hidden="true">＋</div>
@@ -897,10 +899,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611131230"></script>
-  <script src="./lang_web.js?v=202611131230"></script>
-  <script src="./i18n.js?v=202611131230"></script>
-  <script src="./gsync.js?v=202611131230"></script>
-  <script src="./app.js?v=202611131230"></script>
+  <script src="./engine.js?v=202611131400"></script>
+  <script src="./lang_web.js?v=202611131400"></script>
+  <script src="./i18n.js?v=202611131400"></script>
+  <script src="./gsync.js?v=202611131400"></script>
+  <script src="./app.js?v=202611131400"></script>
 </body>
 </html>

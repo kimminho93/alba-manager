@@ -638,7 +638,9 @@
     '삐삐삐 (아주 또렷함)': 'Triple beep (very clear)',
     '팡파르': 'Fanfare',
     '부드러운 소리': 'Soft tone',
-    '소리 없음': 'No sound'
+    '소리 없음': 'No sound',
+    '{n}님 근무 중 · {t} 출근': '{n} is working · clocked in at {t}',
+    '⚠️ 구글 로그인이 안 되어 있어요 · 지금은 이 기기에만 저장돼요. 사장님이 구글 연동을 해 주세요': '⚠️ Not signed in to Google · saving on this device only. The owner should connect Google.'
   });
   E.addPatterns([
     [/^([\d,]+)원$/, '₩$1'],

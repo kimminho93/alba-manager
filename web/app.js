@@ -962,7 +962,7 @@
     document.body.classList.toggle('no-workers', !state.workers.length);
     var html = '<button type="button" class="wchip wchip-add" id="chipAdd" aria-label="' + tr('알바생 추가') + '">＋</button>' +
       state.workers.map(function (w) {
-        return '<button type="button" class="wchip' + (w.id === state.selId ? ' on' : '') + '" data-chip="' + escHtml(w.id) + '">' + escHtml(w.name) + '</button>';
+        return '<button type="button" class="wchip' + (w.id === state.selId ? ' on' : '') + '" data-chip="' + escHtml(w.id) + '">' + (E.punchNext(w, new Date()) === 'out' ? '<i class="wdot" aria-hidden="true"></i>' : '') + escHtml(w.name) + '</button>';
       }).join('');
     var keep = box.scrollLeft;
     box.innerHTML = html;
@@ -985,6 +985,24 @@
     $('sheetBackdrop').hidden = true;
   }
 
+  /* 출퇴근 탭에서 출근을 찍고 아직 퇴근 전이면 급여 화면에도 파란 표시 */
+  function workingBadge(w) {
+    if (E.punchNext(w, new Date()) !== 'out') return '';
+    return ' <span class="pill pill-work">' + tr('근무 중 · {t} 출근', { t: escHtml(w.punch.time) }) + '</span>';
+  }
+  function renderWorkNow() {
+    var box = $('workNow');
+    if (!box) return;
+    var now = new Date();
+    var on = state.workers.filter(function (w) { return E.punchNext(w, now) === 'out'; });
+    if (!on.length) { box.hidden = true; box.innerHTML = ''; return; }
+    box.innerHTML = on.map(function (w) {
+      return '<div class="work-now-row"><i class="wdot" aria-hidden="true"></i>' +
+        tr('{n}님 근무 중 · {t} 출근', { n: escHtml(w.name), t: escHtml(w.punch.time) }) + '</div>';
+    }).join('');
+    box.hidden = false;
+  }
+
   function renderRoster() {
     var pm = $('pMonth').value;
     var results = monthResults();
@@ -993,6 +1011,7 @@
     $('rosterTotal').textContent = E.moneyText(sum.totalNet);
     $('rosterMonthLabel').textContent = tr('{y}년 {m}월', { y: pm.slice(0, 4), m: Number(pm.slice(5)) });
     renderChips();
+    renderWorkNow();
     renderPunch();
 
     $('rosterCards').innerHTML = results.map(function (r, idx) {
@@ -1001,7 +1020,7 @@
       var sel = w.id === state.selId;
       return '<div class="rcard' + (sel ? ' on' : '') + '">' +
         '<button type="button" class="rcard-main" data-pick-worker="' + escHtml(w.id) + '">' +
-          '<span class="rcard-name">' + escHtml(r.name) + (sel ? ' <em>' + tr('보는 중') + '</em>' : '') + '</span>' +
+          '<span class="rcard-name">' + escHtml(r.name) + (sel ? ' <em>' + tr('보는 중') + '</em>' : '') + workingBadge(w) + '</span>' +
           '<span class="rcard-sub">' + (hasRec ? tr('{h}시간 · 식대 {m}', { h: E.formatNum(r.totalHours, 2), m: r.includeMeal ? tr('{n}회', { n: r.mealDays }) : tr('없음') }) : tr('기록 없음')) + '</span>' +
         '</button>' +
         '<b class="rcard-amt m-amt">' + E.moneyText(r.net) + '</b>' +
@@ -1022,7 +1041,7 @@
       return '<tr class="roster-row' + (sel ? ' selected' : '') + '" data-wid="' + escHtml(w.id) + '">' +
         '<td>' + (idx + 1) + '</td>' +
         '<td><button type="button" class="worker-link" data-pick-worker="' + escHtml(w.id) + '"><b>' + escHtml(r.name) + '</b></button>' +
-          (sel ? ' <span class="pill pill-ok">' + tr('보는 중') + '</span>' : '') + '</td>' +
+          (sel ? ' <span class="pill pill-ok">' + tr('보는 중') + '</span>' : '') + workingBadge(w) + '</td>' +
         '<td>' + escHtml(r.payMonthLabel) + '</td>' +
         '<td class="num">' + (hasRec ? E.formatNum(r.totalHours, 2) + 'h' : '<small class="muted">' + tr('기록 없음') + '</small>') + '</td>' +
         '<td class="num">' + E.moneyText(r.hourlyWage) + '</td>' +
@@ -1863,7 +1882,7 @@
     var el = $('punchCloud');
     if (!el) return;
     var cls = 'punch-cloud', txt;
-    if (!connected) { cls += ' off'; txt = tr('☁️ 구글 저장 꺼짐 · 이 기기에만 저장 중'); }
+    if (!connected) { cls += ' bad'; txt = tr('⚠️ 구글 로그인이 안 되어 있어요 · 지금은 이 기기에만 저장돼요. 사장님이 구글 연동을 해 주세요'); }
     else if (kind === 'needLogin' || kind === 'error') { cls += ' bad'; txt = tr('⚠️ 구글 로그인이 풀렸어요 · 사장님이 다시 연결해 주세요 (출퇴근은 이 기기에 저장돼요)'); }
     else if (kind === 'saving') { txt = tr('⏳ 구글 시트에 저장 중…'); }
     else { cls += ' ok'; txt = tr('✅ 구글 시트 연결됨') + (clock ? tr(' · 마지막 저장 {c}', { c: clock }) : ''); }
@@ -2417,7 +2436,7 @@
     initSaver();
     runAutoClose();
     tickClock();
-    setInterval(function () { tickClock(); runAutoClose(); renderPunch(); }, 15000);
+    setInterval(function () { tickClock(); runAutoClose(); renderPunch(); renderChips(); renderWorkNow(); }, 15000);
 
     $('punchList').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-punch]');
