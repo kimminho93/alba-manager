@@ -2085,7 +2085,7 @@
       onStatus: function (st) { renderCloudUi(st); if (st && st.kind === 'saved') { flushPunchQueue(); retryPurges(); } }
     });
     // 화면을 누르는 순간(사용자 동작)에 구글 로그인을 조용히 갱신: 타이머 갱신은 브라우저가 막아서 1시간쯤 뒤 풀리는 문제 대응
-    document.addEventListener('click', function () { if (C.renewOnGesture) C.renewOnGesture(); }, true);
+    document.addEventListener('click', function (ev) { if (ev && ev.isTrusted && C.renewOnGesture) C.renewOnGesture(); }, true);   // 실제 손가락·마우스 클릭만 (코드가 누른 클릭은 팝업이 막혀 시도만 낭비)
 
     function openModal() { renderCloudUi(C.getStatus()); $('cloudModal').hidden = false; }
     function closeModal() { $('cloudModal').hidden = true; }
