@@ -351,7 +351,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var ENGINE_VERSION = '1.3.0';
+  var ENGINE_VERSION = '1.3.1';
 
   /** "10,000원", " 62 " 같은 값을 숫자로 변환. 실패 시 def 반환 */
   function toNumber(v, def) {
@@ -1914,10 +1914,17 @@
     var shifts = workerShifts(worker, pm);
     var cur = shifts[idx];
     var start = open.time, breakMin = 0, merged = false;
-    if (cur && !cur.off && toMin(cur.end) > toMin(cur.start) && toMin(end) > toMin(start) && toMin(start) >= toMin(cur.end)) {
-      // 같은 날 앞선 근무가 있으면 한 칸으로 합치고 사이 시간은 휴게로
-      breakMin = (cur.breakMinutes || 0) + (toMin(start) - toMin(cur.end));
-      start = cur.start;
+    if (cur && !cur.off && toMin(cur.end) > toMin(cur.start) && toMin(end) > toMin(start)) {
+      if (toMin(start) >= toMin(cur.end)) {
+        // 같은 날 앞선 근무가 있으면 한 칸으로 합치고 사이 시간은 휴게로
+        breakMin = (cur.breakMinutes || 0) + (toMin(start) - toMin(cur.end));
+        start = cur.start;
+      } else {
+        // 유예·올림으로 새 출근이 앞선 근무 끝보다 앞당겨져 겹치면, 앞선 근무를 지우지 않고 둘을 이어 붙임 (겹친 시간은 한 번만)
+        breakMin = cur.breakMinutes || 0;
+        if (toMin(cur.start) < toMin(start)) start = cur.start;
+        if (toMin(cur.end) > toMin(end)) end = cur.end;
+      }
       merged = true;
     }
     if (idx >= 0 && idx < shifts.length) {
@@ -3237,4 +3244,4 @@
 });
 
 /* ===== 버전 (package.json 의 version) ===== */
-;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.3.0';
+;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.3.1';

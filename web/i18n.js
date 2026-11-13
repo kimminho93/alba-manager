@@ -83,7 +83,8 @@
   function translateAll() {
     tEl(document.body);
     var m = document.querySelector('meta[name="description"]');
-    document.title = look(document.title);
+    var t0 = document.title, t1 = look(t0);
+    if (t1 !== t0) { saved.push({ title: t0 }); document.title = t1; }   // 한국어로 돌아올 때 탭 제목도 되돌림
     if (m) tAttrsMeta(m);
     document.querySelectorAll('meta[property="og:title"],meta[property="og:description"]').forEach(tAttrsMeta);
   }
@@ -95,7 +96,8 @@
   function restoreAll() {
     for (var i = saved.length - 1; i >= 0; i--) {
       var s = saved[i];
-      if (s.attr) s.el.setAttribute(s.attr, s.ko);
+      if (s.title) document.title = s.title;
+      else if (s.attr) s.el.setAttribute(s.attr, s.ko);
       else if (s.node) s.node.nodeValue = s.ko;
       else if (s.el) s.el.innerHTML = s.html;
     }

@@ -2062,7 +2062,7 @@
       replayPunchLog: replayPunchLog,
       confirm: function (m) { return window.confirm(m); },
       getAdminPin: function () { return getPin(); },
-      onStatus: function (st) { renderCloudUi(st); if (st && st.kind === 'saved') flushPunchQueue(); }
+      onStatus: function (st) { renderCloudUi(st); if (st && st.kind === 'saved') { flushPunchQueue(); retryPurges(); } }
     });
 
     function openModal() { renderCloudUi(C.getStatus()); $('cloudModal').hidden = false; }
@@ -2194,8 +2194,30 @@
   function purgePunchRows(codes) {
     var q = loadQueue().filter(function (r) { return codes && codes.indexOf(String(r[1])) < 0; });
     try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch (e) {}
+    // 시트에서 지우는 일은 로그인이 풀려 있거나 실패하면 보관했다가, 다음에 저장이 성공할 때 다시 시도
+    var p = loadPurges();
+    p.push({ codes: codes, before: tsOf(new Date()) });
+    savePurges(p);
+    retryPurges();
+  }
+  var PURGE_KEY = 'alba.punchPurge', purgeBusy = false;
+  function loadPurges() { try { var v = JSON.parse(localStorage.getItem(PURGE_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+  function savePurges(p) { try { if (p.length) localStorage.setItem(PURGE_KEY, JSON.stringify(p.slice(-50))); else localStorage.removeItem(PURGE_KEY); } catch (e) {} }
+  function retryPurges() {
     var C = window.AlbaCloud;
-    if (C && C.isConnected() && C.purgePunchLog) C.purgePunchLog(codes);
+    if (purgeBusy || !C || !C.isConnected() || !C.purgePunchLog) return;
+    var p = loadPurges();
+    if (!p.length) return;
+    purgeBusy = true;
+    var job = p[0];
+    C.purgePunchLog(job.codes, job.before).then(function (ok) {
+      purgeBusy = false;
+      if (!ok) return;
+      var rest = loadPurges();
+      if (rest.length && JSON.stringify(rest[0]) === JSON.stringify(job)) rest.shift();
+      savePurges(rest);
+      if (rest.length) retryPurges();
+    }, function () { purgeBusy = false; });
   }
 
   /* 시트 '출퇴근기록' 장부로 출근/퇴근 상태 복구 (다시 로그인·불러오기 뒤) */

@@ -567,6 +567,12 @@ function makeDevice(google, opts) {
     assert.ok(rows[0][0].indexOf('기록시각') === 0);        // 머리글은 그대로
     await a.cloud.purgePunchLog(null);
     assert.strictEqual(g.rows('sheet1', '출퇴근기록').length, 1);
+    // 나중에 다시 시도하는 삭제(기준 시각 있음)는 그 뒤에 새로 찍힌 줄을 지우지 않음
+    await a.cloud.appendPunch([['2026-11-12 09:00:00', 'C1', '철수', '출근', '이름+비밀번호', '정상', ''], ['2026-11-12 11:00:00', 'C1', '철수', '출근', '이름+비밀번호', '정상', ''], ['2026-11-12 11:30:00', 'C2', '영희', '출근', '이름+비밀번호', '정상', '']]);
+    assert.strictEqual(await a.cloud.purgePunchLog(['C1'], '2026-11-12 10:00:00'), true);
+    assert.deepStrictEqual(g.rows('sheet1', '출퇴근기록').slice(1).map(r => r[0] + r[1]), ['2026-11-12 11:00:00C1', '2026-11-12 11:30:00C2']);
+    assert.strictEqual(await a.cloud.purgePunchLog(null, '2026-11-12 11:15:00'), true);
+    assert.deepStrictEqual(g.rows('sheet1', '출퇴근기록').slice(1).map(r => r[1]), ['C2']);
   });
 
   await test('구글 토큰은 새로고침해도 유효한 동안 재사용(다시 로그인 안 함), 연동을 끊으면 지움', async () => {

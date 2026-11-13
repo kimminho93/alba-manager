@@ -507,12 +507,16 @@
   }
 
   /* 앱에서 알바생/기록을 지우면 시트 '출퇴근기록' 장부에서도 그 사람(codes) 줄을 지운다. codes가 비면 전부 지운다 */
-  function purgePunchLog(codes) {
+  function purgePunchLog(codes, beforeTs) {
     if (!meta.connected || !meta.sheetId) return Promise.resolve(false);
     var rng = SHEET_PUNCH + '!A2:G5000';
     return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(rng), undefined, 'silent').then(function (res) {
       var rows = (res && res.values) || [];
-      var keep = codes && codes.length ? rows.filter(function (r) { return codes.indexOf(String(r[1] || '').trim()) < 0; }) : [];
+      // beforeTs 가 있으면 그 시각 이전 줄만 지움 (나중에 다시 시도할 때, 그 사이 새로 찍힌 기록은 지키기 위해)
+      var keep = rows.filter(function (r) {
+        if (beforeTs && String(r[0] || '') >= beforeTs) return true;
+        return codes && codes.length ? codes.indexOf(String(r[1] || '').trim()) < 0 : false;
+      });
       if (keep.length === rows.length) return true;
       return api('POST', SHEETS + '/' + meta.sheetId + '/values:batchClear', { ranges: [rng] }, 'silent').then(function () {
         if (!keep.length) return true;

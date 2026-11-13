@@ -704,6 +704,26 @@ test('출퇴근 유예: 출근은 (찍은 시각 − 유예)를 올림, 퇴근�
   assert.deepStrictEqual([E.workerShifts(a2, '2026-11')[11].start, E.workerShifts(a2, '2026-11')[11].end], ['09:00', '18:00']);
 });
 
+test('출퇴근: 유예로 새 출근이 앞선 근무 끝보다 앞당겨져도 앞선 근무를 지우지 않고 이어 붙임', () => {
+  const at = (h, m) => new Date(2026, 10, 12, h, m, 0);
+  const w = E.createWorker('가', 5, 10320);
+  const exactOut = { unit: 30, inMode: 'round', outMode: 'exact', graceIn: 15, graceOut: 0 };
+  E.applyPunch(w, at(9, 0), exactOut);   // 09:00
+  E.applyPunch(w, at(14, 5), exactOut);   // 14:05 (찍은 그대로)
+  E.applyPunch(w, at(14, 12), exactOut);   // 유예 15 → 14:00 (앞선 근무 끝 14:05 보다 이름)
+  const r = E.applyPunch(w, at(18, 0), exactOut);
+  const sh = E.workerShifts(w, '2026-11')[11];
+  assert.deepStrictEqual([sh.start, sh.end, sh.breakMinutes], ['09:00', '18:00', 0]);
+  assert.ok(r.note);
+  // 새 근무가 앞선 근무 안에 다 들어가도 앞선 근무가 줄어들지 않음
+  const w2 = E.createWorker('나', 5, 10320);
+  E.applyPunch(w2, at(9, 0), exactOut); E.applyPunch(w2, at(18, 0), exactOut);
+  E.applyPunch(w2, at(18, 10), exactOut);   // → 18:00
+  E.applyPunch(w2, at(18, 20), exactOut);
+  const s2 = E.workerShifts(w2, '2026-11')[11];
+  assert.deepStrictEqual([s2.start, s2.end], ['09:00', '18:20']);
+});
+
 test('일괄 퇴근: 근무 중인 사람만 한꺼번에 퇴근, 출근 안 한 사람은 그대로, 시트 기록 재생도 같은 결과', () => {
   const at = (h, m) => new Date(2026, 10, 12, h, m, 0);
   const a = E.createWorker('가', 5, 10320), b = E.createWorker('나', 5, 10320), c = E.createWorker('다', 5, 10320);
