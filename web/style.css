@@ -2434,3 +2434,12 @@ html[data-theme="dark"] .pending-head, .dark .pending-head { color: #ffb050; }
 .guide-flash { animation: guideFlash 1.2s ease; }
 @keyframes guideFlash { 0% { box-shadow: 0 0 0 4px rgba(53,99,240,.45); } 100% { box-shadow: 0 0 0 0 rgba(53,99,240,0); } }
 @media print { .guide-tools, .guide-nav { display: none; } .guide-item { break-inside: avoid; } }
+
+/* 앱 공유 QR */
+.share-box { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 10px 0 6px; padding: 12px; border-radius: 14px; background: var(--card-2); }
+.share-qr { width: 140px; height: 140px; padding: 8px; background: #fff; border-radius: 12px; border: 1px solid var(--line); flex: none; }
+.share-text { flex: 1; min-width: 170px; }
+.share-text p { margin: 4px 0; font-size: 14px; color: var(--muted); }
+.share-url { font-weight: 700; color: var(--text) !important; word-break: break-all; }
+.share-btns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.share-btns [hidden] { display: none; }

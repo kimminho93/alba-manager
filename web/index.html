@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611140110">
+  <link rel="stylesheet" href="./style.css?v=202611140200">
 </head>
 <body>
   <header class="app-header">
@@ -436,7 +436,19 @@
         <div class="set-note">처음에는 휴대폰·브라우저 언어를 따라갑니다. 영어로 바꾸면 화면, 사용 방법, 점검표, 카톡 명세서·엑셀 파일도 영어로 나옵니다.</div>
 
         <h3 class="set-title">앱 정보</h3>
-        <div class="set-note">사장님 도우미 <b class="ver-text">v1.4.0</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
+        <div class="set-note">사장님 도우미 <b class="ver-text">v1.4.1</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
+        <div class="share-box">
+          <img class="share-qr" src="./img/share-qr.svg" alt="사장님 도우미 주소 QR 코드" width="160" height="160">
+          <div class="share-text">
+            <b>이 앱 공유하기</b>
+            <p>상대방이 휴대폰 카메라로 QR을 찍으면 바로 열려요.</p>
+            <p class="share-url" data-no-i18n>kimminho93.github.io/alba-manager</p>
+            <div class="share-btns">
+              <button type="button" id="btnShareCopy" class="btn">🔗 주소 복사</button>
+              <button type="button" id="btnShare" class="btn btn-primary" hidden>📤 공유</button>
+            </div>
+          </div>
+        </div>
 
         <h3 class="set-title">최저시급</h3>
         <label class="field set-field"><span>올해 최저시급 (원) <em class="hint">새 알바생을 추가할 때 기본 시급으로 들어갑니다</em></span>
@@ -752,7 +764,7 @@
 
   <footer class="app-footer">
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
-    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.4.0</span></div>
+    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.4.1</span></div>
   </footer>
 
   <!-- 출퇴근: 비밀번호 입력 -->
@@ -980,10 +992,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611140110"></script>
-  <script src="./lang_web.js?v=202611140110"></script>
-  <script src="./i18n.js?v=202611140110"></script>
-  <script src="./gsync.js?v=202611140110"></script>
-  <script src="./app.js?v=202611140110"></script>
+  <script src="./engine.js?v=202611140200"></script>
+  <script src="./lang_web.js?v=202611140200"></script>
+  <script src="./i18n.js?v=202611140200"></script>
+  <script src="./gsync.js?v=202611140200"></script>
+  <script src="./app.js?v=202611140200"></script>
 </body>
 </html>

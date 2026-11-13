@@ -2266,6 +2266,82 @@
     showToast(tr('🌙 퇴근을 안 찍은 {n}님은 자동 퇴근 처리했어요. 급여 화면 [퇴근 확인 필요]에서 퇴근 시각을 넣어 주세요.', { n: done.map(function (d) { return d.worker.name; }).join(', ') }));
   }
 
+  /* ---------- 앱 공유 (QR · 주소 복사 · 공유) ---------- */
+  var SHARE_URL = 'https://kimminho93.github.io/alba-manager/';
+  function initShare() {
+    var copy = $('btnShareCopy'), share = $('btnShare');
+    if (!copy) return;
+    copy.addEventListener('click', function () {
+      var done = function () { showToast(tr('주소를 복사했어요. 카톡 등에 붙여넣으세요.')); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(SHARE_URL).then(done, function () { fallbackCopy(); done(); });
+      } else { fallbackCopy(); done(); }
+    });
+    function fallbackCopy() {
+      var t = document.createElement('textarea');
+      t.value = SHARE_URL; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(t);
+    }
+    if (navigator.share) {
+      share.hidden = false;
+      share.addEventListener('click', function () {
+        navigator.share({ title: tr('사장님 도우미'), text: tr('알바 출퇴근 · 급여 정산 · 위생 점검'), url: SHARE_URL }).catch(function () {});
+      });
+    }
+  }
+
+  /* ---------- 새 버전 자동 적용 ----------
+     매장 기기는 며칠씩 켜 두므로, 새 버전이 올라오면 아무도 쓰지 않는 안전한 순간에 스스로 새로고침한다.
+     (기록은 모두 이 기기 저장소와 구글 시트에 있어 새로고침해도 사라지지 않음) */
+  var update = { cur: '', next: '', checking: false };
+  function curBuild() {
+    var s = document.querySelector('script[src*="app.js?v="]');
+    var m = s && /app\.js\?v=(\d+)/.exec(s.getAttribute('src'));
+    return m ? m[1] : '';
+  }
+  function checkUpdate() {
+    if (update.checking || !update.cur || !window.fetch || location.protocol === 'file:') return;
+    update.checking = true;
+    fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+      var m = /app\.js\?v=(\d+)/.exec(t || '');
+      if (m && m[1] > update.cur) update.next = m[1];
+    }).catch(function () {}).then(function () { update.checking = false; });
+  }
+  function updateSafeNow() {
+    if (!update.next) return false;
+    var openIds = ['punchPw', 'punchResult', 'adminPin', 'cloudModal', 'sheetBackdrop'];
+    for (var i = 0; i < openIds.length; i++) { var el = $(openIds[i]); if (el && !el.hidden) return false; }
+    var a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
+    if (Date.now() - saverState.last < 60000) return false;   // 1분 동안 아무도 안 만졌을 때만
+    var C = window.AlbaCloud, st = C && C.getStatus ? C.getStatus() : null;
+    if (st && st.kind === 'saving') return false;
+    if (queueBusy || purgeBusy) return false;
+    try {   // 같은 버전으로 계속 새로고침하는 일 방지 (10분에 한 번만 시도)
+      var tried = JSON.parse(sessionStorage.getItem('alba.updTried') || 'null');
+      if (tried && tried.v === update.next && Date.now() - tried.t < 600000) return false;
+      sessionStorage.setItem('alba.updTried', JSON.stringify({ v: update.next, t: Date.now() }));
+      sessionStorage.setItem('alba.updFrom', update.cur);
+    } catch (e) {}
+    return true;
+  }
+  function initUpdate() {
+    update.cur = curBuild();
+    try {
+      var from = sessionStorage.getItem('alba.updFrom');
+      if (from && update.cur && update.cur !== from) {
+        sessionStorage.removeItem('alba.updFrom');
+        setTimeout(function () { showToast(tr('새 버전으로 바뀌었어요 · v{v}', { v: window.ALBA_VERSION || '' })); }, 800);
+      }
+    } catch (e) {}
+    setTimeout(checkUpdate, 60000);
+    setInterval(checkUpdate, 10 * 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) checkUpdate(); });
+    setInterval(function () { if (updateSafeNow()) location.reload(); }, 15000);
+  }
+
   /* ---------- 사용 방법: 바로가기 · 검색 · 모두 펼치기 ---------- */
   function initGuide() {
     var list = $('guideList');
@@ -2716,6 +2792,8 @@
       openPunchPw(w);
     });
     initGuide();
+    initShare();
+    initUpdate();
     $('punchAllOut').addEventListener('click', askBulkOut);
     $('pendingBox').addEventListener('click', onPendingClick);
     $('punchPwForm').addEventListener('submit', function (ev) { ev.preventDefault(); punchSubmit(); });
