@@ -973,7 +973,8 @@
     var box = $('workerChips');
     document.body.classList.toggle('no-workers', !state.workers.length);
     var html = '<button type="button" class="wchip wchip-add" id="chipAdd" aria-label="' + tr('알바생 추가') + '">＋</button>' +
-      state.workers.map(function (w) {
+      workingFirstOrder().map(function (i) {
+        var w = state.workers[i];
         return '<button type="button" class="wchip' + (w.id === state.selId ? ' on' : '') + '" data-chip="' + escHtml(w.id) + '">' + (E.punchNext(w, new Date()) === 'out' ? '<i class="wdot" aria-hidden="true"></i>' : '') + escHtml(w.name) + '</button>';
       }).join('');
     var keep = box.scrollLeft;
@@ -995,6 +996,18 @@
   function closeSheets() {
     document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open');
     $('sheetBackdrop').hidden = true;
+  }
+
+  /* 근무 중인 사람을 위로 (출근한 순서), 나머지는 등록 순서. state.workers 의 인덱스 배열을 돌려줌 */
+  function workingFirstOrder() {
+    var now = new Date();
+    var arr = state.workers.map(function (w, i) { return { w: w, i: i, on: E.punchNext(w, now) === 'out' }; });
+    arr.sort(function (a, b) {
+      if (a.on !== b.on) return a.on ? -1 : 1;
+      if (a.on) { var ka = a.w.punch.date + a.w.punch.at, kb = b.w.punch.date + b.w.punch.at; if (ka !== kb) return ka < kb ? -1 : 1; }
+      return a.i - b.i;
+    });
+    return arr.map(function (o) { return o.i; });
   }
 
   /* 출퇴근 탭에서 출근을 찍고 아직 퇴근 전이면 급여 화면에도 파란 표시 */
@@ -1026,7 +1039,9 @@
     renderWorkNow();
     renderPunch();
 
-    $('rosterCards').innerHTML = results.map(function (r, idx) {
+    var ord = workingFirstOrder();
+    $('rosterCards').innerHTML = ord.map(function (idx) {
+      var r = results[idx];
       var w = state.workers[idx];
       var hasRec = !!(w.months && w.months[pm]);
       var sel = w.id === state.selId;
@@ -1046,12 +1061,13 @@
       return;
     }
 
-    $('rosterBody').innerHTML = results.map(function (r, idx) {
+    $('rosterBody').innerHTML = ord.map(function (idx, pos) {
+      var r = results[idx];
       var w = state.workers[idx];
       var hasRec = !!(w.months && w.months[pm]);
       var sel = w.id === state.selId;
       return '<tr class="roster-row' + (sel ? ' selected' : '') + '" data-wid="' + escHtml(w.id) + '">' +
-        '<td>' + (idx + 1) + '</td>' +
+        '<td>' + (pos + 1) + '</td>' +
         '<td><button type="button" class="worker-link" data-pick-worker="' + escHtml(w.id) + '"><b>' + escHtml(r.name) + '</b></button>' +
           (sel ? ' <span class="pill pill-ok">' + tr('보는 중') + '</span>' : '') + workingBadge(w) + '</td>' +
         '<td>' + escHtml(r.payMonthLabel) + '</td>' +
@@ -2232,12 +2248,7 @@
       return;
     }
     // 근무 중인 사람을 맨 위로 (출근한 순서대로), 나머지는 등록한 순서 그대로
-    var order = state.workers.map(function (w, i) { return { w: w, i: i, on: E.punchNext(w, now) === 'out' }; });
-    order.sort(function (a, b) {
-      if (a.on !== b.on) return a.on ? -1 : 1;
-      if (a.on) { var ka = a.w.punch.date + a.w.punch.at, kb = b.w.punch.date + b.w.punch.at; if (ka !== kb) return ka < kb ? -1 : 1; }
-      return a.i - b.i;
-    });
+    var order = workingFirstOrder().map(function (i) { var w = state.workers[i]; return { w: w, on: E.punchNext(w, now) === 'out' }; });
     box.innerHTML = order.map(function (o) {
       var w = o.w;
       var working = o.on;
