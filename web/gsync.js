@@ -408,7 +408,7 @@
       // (이 기기에 저장 안 된 변경이 있으면 이 기기 우선 → 시트에 저장 / 다른 기기가 더 최근에 저장했으면 시트 내용 / 아니면 이 기기 내용 유지)
       if (meta.connected && meta.sheetId && remote && hasContent(remote.data)) {
         if (meta.dirty) return push('user');
-        if (remote.stamp > (meta.stamp || '')) return applyRemote(remote);
+        if (remote.stamp !== (meta.stamp || '')) return applyRemote(remote);   // 저장 때마다 시각이 달라지므로 '다르면 다른 기기가 저장한 것' (기기 시계가 어긋나도 안전)
         if (JSON.stringify(remote.data) !== JSON.stringify(local)) return push('user');
         lastJson = JSON.stringify(local);
         return null;
@@ -450,7 +450,7 @@
       return withSheetRetry(function () { return pull('silent'); }, 'silent');
     }).then(function (remote) {
       if (meta.dirty) return push('silent');          // 이 기기에 저장 안 된 변경이 있으면 우선
-      if (remote && remote.stamp > (meta.stamp || '')) return applyRemote(remote);
+      if (remote && remote.stamp !== (meta.stamp || '')) return applyRemote(remote);   // 시계 순서가 아니라 '내가 마지막으로 저장한 것과 다른가'로 판단
       else lastJson = JSON.stringify(host.getData());
     }).then(function () {
       setStatus('saved', '');

@@ -351,7 +351,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var ENGINE_VERSION = '1.2.0';
+  var ENGINE_VERSION = '1.2.1';
 
   /** "10,000원", " 62 " 같은 값을 숫자로 변환. 실패 시 def 반환 */
   function toNumber(v, def) {
@@ -3187,4 +3187,4 @@
 });
 
 /* ===== 버전 (package.json 의 version) ===== */
-;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.2.0';
+;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.2.1';

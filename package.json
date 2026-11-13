@@ -1,13 +1,14 @@
 {
   "name": "alba-manager",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "1초 알바 급여 & 표준 급여명세서 + 매장 위생 점검표 (서버 없이 100% 브라우저 동작)",
   "private": true,
   "scripts": {
     "build": "node tools/build.js",
     "start": "node server/app.js",
     "web": "node server/app.js --static",
-    "test": "node tests/test_main.js && node tests/test_cloud.js && node tests/test_server.js",
+    "test": "node tests/test_main.js && node tests/test_cloud.js && node tests/test_server.js && node tests/test_stress.js 3",
+    "stress": "node tests/test_stress.js 30",
     "clean": "node tools/build.js --clean"
   }
 }
