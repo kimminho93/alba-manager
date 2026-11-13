@@ -2231,8 +2231,16 @@
       box.innerHTML = '<p class="punch-empty">' + tr('등록된 알바생이 없습니다.<br>사장님께 알려 주세요.') + '</p>';
       return;
     }
-    box.innerHTML = state.workers.map(function (w) {
-      var working = E.punchNext(w, now) === 'out';
+    // 근무 중인 사람을 맨 위로 (출근한 순서대로), 나머지는 등록한 순서 그대로
+    var order = state.workers.map(function (w, i) { return { w: w, i: i, on: E.punchNext(w, now) === 'out' }; });
+    order.sort(function (a, b) {
+      if (a.on !== b.on) return a.on ? -1 : 1;
+      if (a.on) { var ka = a.w.punch.date + a.w.punch.at, kb = b.w.punch.date + b.w.punch.at; if (ka !== kb) return ka < kb ? -1 : 1; }
+      return a.i - b.i;
+    });
+    box.innerHTML = order.map(function (o) {
+      var w = o.w;
+      var working = o.on;
       var chip = working
         ? '<span class="punch-chip on">' + tr('근무 중 · {t} 출근', { t: escHtml(w.punch.time) }) + '</span>'
         : '<span class="punch-chip">' + tr('퇴근 상태') + '</span>';
