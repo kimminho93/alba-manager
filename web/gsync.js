@@ -542,6 +542,27 @@
       .catch(function () { return doSave('silent'); });   // 탭이 아직 없으면 다음 저장이 만들면서 현재 비밀번호를 적음
   }
 
+  /* 화면을 누를 때마다(사용자 동작 안에서) 토큰이 곧 만료되거나 이미 풀렸으면 조용히 갱신.
+     타이머로 갱신하면 브라우저가 구글 창을 팝업 차단해서 실패하므로, 알바생·사장님이 누르는 순간을 이용한다. */
+  var lastGesture = 0;
+  function renewOnGesture() {
+    if (!meta.connected || !meta.sheetId || !deps.available()) return Promise.resolve(false);
+    var now = deps.now();
+    var lost = status.kind === 'needLogin';
+    var soon = !token || tokenExp - now < 10 * 60000;
+    if (!lost && !soon) return Promise.resolve(false);
+    if (now - lastGesture < 20000) return Promise.resolve(false);   // 너무 자주 시도하지 않음
+    lastGesture = now;
+    return fetchToken('silent').then(function () {
+      if (lost || meta.dirty) return resume().then(function () { return true; });
+      setStatus('saved', '');
+      return true;
+    }, function () {
+      if (lost || !token || tokenExp <= deps.now()) setStatus('needLogin', tr('구글 로그인이 필요합니다.'));
+      return false;
+    });
+  }
+
   function saveNow() {
     if (saveTimer) { clearT(saveTimer); saveTimer = null; }
     return doSave('user');
@@ -581,6 +602,7 @@
     resume: resume,
     markDirty: markDirty,
     saveNow: saveNow,
+    renewOnGesture: renewOnGesture,
     appendPunch: appendPunch,
     purgePunchLog: purgePunchLog,
     readAdminPin: readAdminPin,

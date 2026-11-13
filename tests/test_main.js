@@ -787,7 +787,7 @@ test('출퇴근: 출근 중 상태(punch)는 저장·불러오기 정리에서�
   assert.strictEqual(bad.punch, undefined);
 });
 
-console.log('\n총 ' + passed + '개 단위 테스트 통과!\n');
+console.log('\n(앞부분 ' + passed + '개 통과, 이어서 출퇴근 테스트)\n');
 
 test('식대는 실비: 세금·보험료 계산에서 제외하고 실수령액에는 더한다', () => {
   const base = { name: '가', hourlyWage: 10000, contractDays: 5, mode: 'weekly', weeklyHours: [10], tax: '3.3', includeWeekly: false };
@@ -814,6 +814,110 @@ test('자정 무효 처리: 자정까지 퇴근을 안 찍은 사람은 그날 �
   assert.ok(Math.abs(E.monthSummary(b, '2026-11').totalHours - 3) < 0.01);
   assert.strictEqual(E.monthSummary(c, '2026-11').workDays, 1);
   assert.strictEqual(E.autoCloseOpen([a, b, c], new Date(2026, 10, 13, 9, 0, 0)).length, 0);
+});
+
+test('자동 퇴근 시각: 기본 자정, 설정한 시각에 퇴근 처리하고 기록 대신 확인 필요로 남김, 사장님이 퇴근 시각 넣으면 기록', () => {
+  const D = (d, h, m) => new Date(2026, 10, d, h, m, 0);
+  assert.strictEqual(E.sanitizeSettings({}).autoOutTime, '00:00');
+  assert.strictEqual(E.sanitizeSettings({ autoOutTime: '02:00' }).autoOutTime, '02:00');
+  assert.strictEqual(E.sanitizeSettings({ autoOutTime: '02:30' }).autoOutTime, '00:00');   // 없는 값은 기본
+  // 마감 시각 계산
+  const dl = (date, at, cut) => { const x = E.autoOutDeadline({ date, time: at, at }, cut); return x.getDate() + ' ' + x.getHours() + ':' + x.getMinutes(); };
+  assert.strictEqual(dl('2026-11-12', '18:00', '00:00'), '13 0:0');
+  assert.strictEqual(dl('2026-11-12', '18:00', '02:00'), '13 2:0');
+  assert.strictEqual(dl('2026-11-12', '18:00', '23:00'), '12 23:0');
+  assert.strictEqual(dl('2026-11-12', '23:10', '23:00'), '13 23:0');
+  assert.strictEqual(dl('2026-11-13', '00:06', '00:00'), '14 0:0');
+  assert.strictEqual(dl('2026-11-13', '00:00', '00:00'), '14 0:0');
+  // 02:00 마감: 01:00 퇴근은 정상 야간 근무
+  const a = E.createWorker('가', 5, 10320);
+  E.applyPunch(a, D(12, 18, 0), { autoOut: '02:00' });
+  assert.strictEqual(E.autoCloseOpen([a], D(13, 0, 30), '02:00').length, 0);
+  const r = E.applyPunch(a, D(13, 1, 0), { autoOut: '02:00' });
+  assert.strictEqual(r.kind, 'out');
+  const sh = E.workerShifts(a, '2026-11')[11];
+  assert.deepStrictEqual([sh.start, sh.end], ['18:00', '01:00']);
+  assert.ok(Math.abs(E.calcShiftHours(sh.start, sh.end, sh.breakMinutes) - 7) < 0.01);
+  // 마감까지 퇴근 안 찍음 → 퇴근 처리, 기록 없음, 확인 필요
+  const b = E.createWorker('나', 5, 10320);
+  E.applyPunch(b, D(12, 9, 0)); E.applyPunch(b, D(12, 12, 0));        // 오전 근무
+  E.applyPunch(b, D(12, 17, 40));                                        // 18:00 출근(올림), 퇴근 안 찍음
+  const done = E.autoCloseOpen([b], D(13, 0, 0), '00:00');
+  assert.strictEqual(done.length, 1);
+  assert.strictEqual(E.punchIsOpen(b), false);
+  assert.deepStrictEqual(b.pending, [{ date: '2026-11-12', start: '18:00', at: '17:40', cut: '2026-11-13 00:00' }]);
+  assert.ok(Math.abs(E.monthSummary(b, '2026-11').totalHours - 3) < 0.01);   // 오전 근무만
+  // 저장·불러오기 정리에서도 유지
+  assert.deepStrictEqual(E.normalizeWorkers([JSON.parse(JSON.stringify(b))])[0].pending, b.pending);
+  // 사장님이 퇴근 시각 입력 → 앞선 오전 근무와 합쳐 기록, 확인 필요에서 빠짐
+  assert.strictEqual(E.resolvePending(b, 0, '18:00').ok, false);   // 출근과 같은 시각
+  assert.strictEqual(E.resolvePending(b, 0, '9시').ok, false);
+  E.applyPunch(b, D(13, 9, 0));   // 다음 날 출근 중이어도
+  const rr = E.resolvePending(b, 0, '22:00');
+  assert.strictEqual(rr.ok, true);
+  const s2 = E.workerShifts(b, '2026-11')[11];
+  assert.deepStrictEqual([s2.start, s2.end, s2.breakMinutes], ['09:00', '22:00', 360]);
+  assert.strictEqual(b.pending, undefined);
+  assert.strictEqual(E.punchIsOpen(b), true);   // 근무 중 상태 유지
+  // 근무 없음으로 정리
+  const c = E.createWorker('다', 5, 10320);
+  E.applyPunch(c, D(12, 20, 0)); E.autoCloseOpen([c], D(13, 0, 1));
+  assert.strictEqual(E.dismissPending(c, 0), true);
+  assert.strictEqual(c.pending, undefined);
+  assert.strictEqual(E.monthSummary(c, '2026-11').workDays, 0);
+  // 밤을 넘긴 퇴근 시각 입력(02:00)도 그 날 칸에 야간으로
+  const d = E.createWorker('라', 5, 10320);
+  E.applyPunch(d, D(12, 20, 0)); E.autoCloseOpen([d], D(13, 0, 1));
+  E.resolvePending(d, 0, '02:00');
+  assert.ok(Math.abs(E.monthSummary(d, '2026-11').totalHours - 6) < 0.01);
+  // 앱이 꺼져 있다 마감 뒤에 찍으면: 먼저 확인 필요로 남기고 새 출근
+  const e = E.createWorker('마', 5, 10320);
+  E.applyPunch(e, D(12, 18, 0), { autoOut: '00:00' });
+  const r2 = E.applyPunch(e, D(13, 9, 0), { autoOut: '00:00' });
+  assert.strictEqual(r2.kind, 'in');
+  assert.strictEqual(e.pending.length, 1);
+  // 같은 사람 같은 근무가 두 번 확인 필요로 들어가도 하나만
+  e.pending.push({ date: '2026-11-12', start: '18:00' });
+  assert.strictEqual(E.normalizeWorkers([e])[0].pending.length, 1);
+});
+
+test('밤을 넘긴 퇴근도 그 날 앞선 근무를 지우지 않고 합침', () => {
+  const D = (d, h, m) => new Date(2026, 10, d, h, m, 0);
+  const w = E.createWorker('가', 5, 10320);
+  const o = { autoOut: '03:00' };
+  E.applyPunch(w, D(12, 9, 0), o); E.applyPunch(w, D(12, 12, 0), o);
+  E.applyPunch(w, D(12, 18, 0), o); E.applyPunch(w, D(13, 1, 0), o);
+  const sh = E.workerShifts(w, '2026-11')[11];
+  assert.deepStrictEqual([sh.start, sh.end, sh.breakMinutes], ['09:00', '01:00', 360]);
+  assert.ok(Math.abs(E.monthSummary(w, '2026-11').totalHours - 10) < 0.01);
+});
+
+test('장부 재생: 자동 퇴근 줄·지난 마감 시각은 확인 필요로 복구 (예전 자정 무효 줄도)', () => {
+  const saved = new Date(2026, 10, 12, 8, 0, 0).getTime();
+  const mk = () => E.createWorker('가', 5, 10320);
+  const w = mk();
+  E.replayPunchLog([w], [
+    ['2026-11-12 18:00:00', w.code, '가', '출근', '이름+비밀번호', '정상', ''],
+    ['2026-11-13 02:00:00', w.code, '가', '퇴근누락(확인필요)', '자동(마감)', '정상(자동)', '']
+  ], saved, { autoOut: '02:00' });
+  assert.strictEqual(E.punchIsOpen(w), false);
+  assert.strictEqual(w.pending.length, 1);
+  // 자동 줄이 없어도 다음 줄 시각이 마감을 지났으면 확인 필요로
+  const v = mk();
+  E.replayPunchLog([v], [
+    ['2026-11-12 18:00:00', v.code, '가', '출근', '이름+비밀번호', '정상', ''],
+    ['2026-11-13 09:00:00', v.code, '가', '출근', '이름+비밀번호', '정상', '']
+  ], saved, { autoOut: '00:00' });
+  assert.strictEqual(v.pending.length, 1);
+  assert.strictEqual(v.punch.date, '2026-11-13');
+  // 예전 형식(자동(자정)) 줄
+  const u = mk();
+  E.replayPunchLog([u], [
+    ['2026-11-12 18:00:00', u.code, '가', '출근', '이름+비밀번호', '정상', ''],
+    ['2026-11-13 00:00:00', u.code, '가', '퇴근누락(무효)', '자동(자정)', '정상(자동)', '']
+  ], saved);
+  assert.strictEqual(E.punchIsOpen(u), false);
+  assert.strictEqual(u.pending.length, 1);
 });
 
 test('출퇴근기록 장부 재생: 저장 이후에 찍은 출근·퇴근·자동퇴근을 복구', () => {
@@ -863,3 +967,5 @@ test('버전: 엔진 번들의 ALBA_VERSION이 package.json 버전과 같다', (
   assert.ok(src.indexOf("ALBA_VERSION = '" + pkg.version + "'") > 0);
   assert.ok(/^\d+\.\d+\.\d+$/.test(pkg.version));
 });
+
+console.log('\n총 ' + passed + '개 단위 테스트 통과!');

@@ -850,7 +850,13 @@
     fillPunchUnit();
   }
 
-  function punchOpts() { return E.punchOptions(state.settings); }
+  function punchOpts() { var o = E.punchOptions(state.settings); o.autoOut = autoOut(); return o; }
+  function autoOut() { return state.settings.autoOutTime || '00:00'; }
+  function autoOutLabel(t) {
+    var h = Number(t.slice(0, 2));
+    if (t === '00:00') return tr('자정 (00:00)');
+    return h < 12 ? tr('새벽 {h}시 ({t})', { h: h, t: t }) : tr('밤 {h}시 ({t})', { h: h - 12, t: t });
+  }
   function punchUnit() { return punchOpts().unit; }
   function graceLabel(g) { return g === 0 ? tr('없음 (0분)') : tr('{n}분', { n: g }); }
   function fillPunchUnit() {
@@ -859,6 +865,11 @@
     var o = punchOpts();
     sel.value = String(o.unit);
     $('sInMode').value = o.inMode;
+    var ao = $('sAutoOut');
+    if (ao) {
+      ao.innerHTML = E.AUTO_OUT_CHOICES.map(function (t) { return '<option value="' + t + '">' + escHtml(autoOutLabel(t)) + (t === E.DEFAULT_AUTO_OUT ? ' · ' + escHtml(tr('기본')) : '') + '</option>'; }).join('');
+      ao.value = autoOut();
+    }
     $('sOutMode').value = o.outMode;
     // 유예는 단위의 절반까지, 0·5·10·15분 중에서
     [['sGraceIn', o.graceIn, o.inMode], ['sGraceOut', o.graceOut, o.outMode]].forEach(function (x) {
@@ -885,17 +896,18 @@
       var wage = Number(state.settings.minWage) || 0;
       lines.push(tr('봐주는 시간은 하루 최대 {m}분이에요. (최저시급 {w} 기준 하루 최대 약 {c})', { m: maxMin, w: E.moneyText(wage), c: E.moneyText(Math.round(wage * maxMin / 60 / 10) * 10) }));
     }
+    lines.push(tr('{t}까지 퇴근을 안 찍으면 자동으로 퇴근 처리하고, 근무 기록은 넣지 않고 급여 화면에 [퇴근 확인 필요]로 남겨요.', { t: autoOutLabel(autoOut()) }));
     $('punchUnitNote').innerHTML = lines.map(function (l) { return '<div>' + escHtml(l) + '</div>'; }).join('');
   }
   function readPunchSettings() {
     return {
       punchUnit: $('sPunchUnit').value, punchInMode: $('sInMode').value, punchOutMode: $('sOutMode').value,
-      punchGraceIn: $('sGraceIn').value, punchGraceOut: $('sGraceOut').value
+      punchGraceIn: $('sGraceIn').value, punchGraceOut: $('sGraceOut').value, autoOutTime: $('sAutoOut').value
     };
   }
   function punchRaw() {
     var st = state.settings;
-    return { punchUnit: st.punchUnit, punchInMode: st.punchInMode, punchOutMode: st.punchOutMode, punchGraceIn: st.punchGraceIn, punchGraceOut: st.punchGraceOut };
+    return { punchUnit: st.punchUnit, punchInMode: st.punchInMode, punchOutMode: st.punchOutMode, punchGraceIn: st.punchGraceIn, punchGraceOut: st.punchGraceOut, autoOutTime: st.autoOutTime };
   }
 
   /* 설정을 계산·화면에 반영 */
@@ -1074,6 +1086,7 @@
     $('rosterMonthLabel').textContent = tr('{y}년 {m}월', { y: pm.slice(0, 4), m: Number(pm.slice(5)) });
     renderChips();
     renderWorkNow();
+    renderPending();
     renderPunch();
 
     var ord = workingFirstOrder();
@@ -1654,7 +1667,7 @@
       $(id).addEventListener('change', onSettingsInput);
       $(id).addEventListener('blur', fillSettingsForm);   // 비우거나 잘못 넣었으면 적용된 값으로 되돌려 보여줌
     });
-    ['sPunchUnit', 'sInMode', 'sGraceIn', 'sOutMode', 'sGraceOut'].forEach(function (id) {
+    ['sPunchUnit', 'sInMode', 'sGraceIn', 'sOutMode', 'sGraceOut', 'sAutoOut'].forEach(function (id) {
       $(id).addEventListener('change', function () {
         state.settings = E.sanitizeSettings(Object.assign({ minWage: state.settings.minWage, rates: state.settings.rates, mealTimes: state.settings.mealTimes }, readPunchSettings()));
         saveJson(KEYS.settings, state.settings);
@@ -1954,14 +1967,21 @@
   function renderPunchCloud(connected, kind, clock) {
     var el = $('punchCloud');
     if (!el) return;
+    if (connected === undefined) {   // 주기 갱신: 지금 상태로 다시 그림
+      var C = window.AlbaCloud, st = C && C.getStatus ? C.getStatus() : null;
+      connected = !!(st && st.connected); kind = st ? st.kind : 'off'; clock = fmtClock(st && st.lastSaved);
+    }
+    var waiting = loadQueue().length;
+    var more = waiting ? tr(' · 시트에 아직 안 올라간 출퇴근 {n}건', { n: waiting }) : '';
     var cls = 'punch-cloud', txt;
     if (!connected) { cls += ' bad'; txt = tr('⚠️ 구글 로그인이 안 되어 있어요 · 지금은 이 기기에만 저장돼요. 사장님이 구글 연동을 해 주세요'); }
-    else if (kind === 'needLogin' || kind === 'error') { cls += ' bad'; txt = tr('⚠️ 구글 로그인이 풀렸어요 · 사장님이 다시 연결해 주세요 (출퇴근은 이 기기에 저장돼요)'); }
-    else if (kind === 'saving') { txt = tr('⏳ 구글 시트에 저장 중…'); }
-    else { cls += ' ok'; txt = tr('✅ 구글 시트 연결됨') + (clock ? tr(' · 마지막 저장 {c}', { c: clock }) : ''); }
+    else if (kind === 'needLogin' || kind === 'error') { cls += ' bad'; txt = tr('⚠️ 구글 로그인이 풀렸어요 · 화면을 누르면 다시 연결을 시도해요. 안 되면 사장님이 [다시 연결]을 눌러 주세요 (출퇴근은 이 기기에 저장돼요)') + more; }
+    else if (kind === 'saving') { txt = tr('⏳ 구글 시트에 저장 중…') + more; }
+    else { cls += waiting ? '' : ' ok'; txt = (waiting ? tr('⏳ 구글 시트 연결됨') : tr('✅ 구글 시트 연결됨')) + (clock ? tr(' · 마지막 저장 {c}', { c: clock }) : '') + more; }
     el.className = cls;
     el.textContent = txt;
   }
+
 
   function renderCloudUi(st) {
     if (st && st.notice && st.notice !== shownNotice) { shownNotice = st.notice; showToast('🗑️ ' + st.notice); }
@@ -2064,6 +2084,8 @@
       getAdminPin: function () { return getPin(); },
       onStatus: function (st) { renderCloudUi(st); if (st && st.kind === 'saved') { flushPunchQueue(); retryPurges(); } }
     });
+    // 화면을 누르는 순간(사용자 동작)에 구글 로그인을 조용히 갱신: 타이머 갱신은 브라우저가 막아서 1시간쯤 뒤 풀리는 문제 대응
+    document.addEventListener('click', function () { if (C.renewOnGesture) C.renewOnGesture(); }, true);
 
     function openModal() { renderCloudUi(C.getStatus()); $('cloudModal').hidden = false; }
     function closeModal() { $('cloudModal').hidden = true; }
@@ -2176,6 +2198,7 @@
     var q = loadQueue();
     q.push(row);
     try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q.slice(-500))); } catch (e) {}
+    renderPunchCloud();
     flushPunchQueue();
   }
   function flushPunchQueue() {
@@ -2187,7 +2210,7 @@
     C.appendPunch(q).then(function () {
       var rest = loadQueue().slice(q.length);
       try { localStorage.setItem(QUEUE_KEY, JSON.stringify(rest)); } catch (e) {}
-    }).catch(function () { /* 다음 저장 때 다시 시도 */ }).then(function () { queueBusy = false; });
+    }).catch(function () { /* 다음 저장 때 다시 시도 */ }).then(function () { queueBusy = false; renderPunchCloud(); });
   }
 
   /* 지운 알바생의 출퇴근 장부 줄도 지운다 (이 기기에 쌓인 대기분 + 구글 시트). codes가 null이면 전부 */
@@ -2233,15 +2256,115 @@
 
   /* 자정까지 퇴근을 안 찍은 사람은 그날 출근을 무효(휴무)로 처리 */
   function runAutoClose() {
-    var done = E.autoCloseOpen(state.workers, new Date());
+    var done = E.autoCloseOpen(state.workers, new Date(), autoOut());
     if (!done.length) return;
     saveWorkers();
-    loadSelected(); recalcPayroll(); renderRoster();
+    loadSelected(); recalcPayroll(); renderRoster(); renderPending();
     done.forEach(function (d) {
-      enqueuePunch([tsOf(d.ts), d.worker.code, d.worker.name, '퇴근누락(무효)', '자동(자정)', '정상(자동)', '자정까지 퇴근을 찍지 않아 그날 출근(' + d.date + ' ' + d.start + ')을 무효·휴무로 처리']);
+      enqueuePunch([tsOf(d.ts), d.worker.code, d.worker.name, '퇴근누락(확인필요)', '자동(마감)', '정상(자동)', '자동 퇴근 시각까지 퇴근을 찍지 않아 퇴근 처리. 근무(' + d.date + ' ' + d.start + ' 출근)는 기록하지 않고 확인 필요로 남김']);
     });
-    showToast(tr('🌙 퇴근을 안 찍어 {n}님의 어제 출근은 무효(휴무) 처리했습니다', { n: done.map(function (d) { return d.worker.name; }).join(', ') }));
+    showToast(tr('🌙 퇴근을 안 찍은 {n}님은 자동 퇴근 처리했어요. 급여 화면 [퇴근 확인 필요]에서 퇴근 시각을 넣어 주세요.', { n: done.map(function (d) { return d.worker.name; }).join(', ') }));
   }
+
+  /* ---------- 사용 방법: 바로가기 · 검색 · 모두 펼치기 ---------- */
+  function initGuide() {
+    var list = $('guideList');
+    if (!list) return;
+    var items = function () { return Array.prototype.slice.call(list.querySelectorAll('.guide-item')); };
+    var nav = document.querySelector('.guide-nav');
+    if (nav) nav.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-guide-go]');
+      if (!b) return;
+      var it = $(b.getAttribute('data-guide-go'));
+      if (!it) return;
+      $('guideSearch').value = ''; applyFilter();
+      it.open = true;
+      it.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      it.classList.remove('guide-flash'); void it.offsetWidth; it.classList.add('guide-flash');
+    });
+    function syncToggle() {
+      var all = items().filter(function (x) { return !x.hidden; });
+      var allOpen = all.length && all.every(function (x) { return x.open; });
+      $('guideToggleAll').textContent = allOpen ? tr('모두 접기') : tr('모두 펼치기');
+    }
+    function applyFilter() {
+      var q = $('guideSearch').value.trim().toLowerCase();
+      var shown = 0;
+      items().forEach(function (it) {
+        var hit = !q || it.textContent.toLowerCase().indexOf(q) >= 0;
+        it.hidden = !hit;
+        if (hit) shown++;
+        if (q && hit) it.open = true;
+      });
+      $('guideEmpty').hidden = shown > 0;
+      syncToggle();
+    }
+    $('guideSearch').addEventListener('input', applyFilter);
+    $('guideToggleAll').addEventListener('click', function () {
+      var all = items().filter(function (x) { return !x.hidden; });
+      var open = !all.every(function (x) { return x.open; });
+      all.forEach(function (x) { x.open = open; });
+      syncToggle();
+    });
+    list.addEventListener('toggle', syncToggle, true);
+    window.addEventListener('alba:lang', syncToggle);
+    syncToggle();
+  }
+
+  /* ---------- 퇴근 확인 필요 (자동 퇴근된 근무) ---------- */
+  function renderPending() {
+    var box = $('pendingBox');
+    if (!box) return;
+    var items = [];
+    state.workers.forEach(function (w) {
+      (w.pending || []).forEach(function (p, i) { items.push({ w: w, p: p, i: i }); });
+    });
+    if (!items.length) { box.hidden = true; box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="pending-head">' + tr('⚠️ 퇴근 확인 필요 {n}건', { n: items.length }) + '</div>' +
+      '<p class="pending-note">' + tr('퇴근을 안 찍어 자동 퇴근된 근무예요. 실제 퇴근 시각을 넣으면 달력에 기록돼요. 일하지 않았으면 [근무 없음]을 누르세요.') + '</p>' +
+      items.map(function (x) {
+        var d = x.p.date, wd = E.dayName((new Date(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8))).getDay() + 6) % 7);
+        var key = escHtml(x.w.id) + '|' + x.i;
+        return '<div class="pending-row">' +
+          '<div class="pending-who"><b>' + escHtml(x.w.name) + '</b> · ' + tr('{m}월 {d}일 ({w}) {t} 출근', { m: Number(d.slice(5, 7)), d: Number(d.slice(8)), w: wd, t: escHtml(x.p.start) }) + '</div>' +
+          '<div class="pending-act">' +
+            '<input type="time" class="pending-time" data-pending-time="' + key + '" aria-label="' + escHtml(tr('퇴근 시각')) + '">' +
+            '<button type="button" class="btn btn-primary" data-pending-ok="' + key + '">' + tr('퇴근 기록') + '</button>' +
+            '<button type="button" class="btn" data-pending-no="' + key + '">' + tr('근무 없음') + '</button>' +
+          '</div></div>';
+      }).join('');
+    box.hidden = false;
+  }
+  function pendingTarget(key) {
+    var k = String(key).split('|');
+    var w = state.workers.filter(function (x) { return x.id === k[0]; })[0];
+    return w ? { w: w, i: Number(k[1]) } : null;
+  }
+  function onPendingClick(ev) {
+    var ok = ev.target.closest('[data-pending-ok]'), no = ev.target.closest('[data-pending-no]');
+    if (!ok && !no) return;
+    var key = (ok || no).getAttribute(ok ? 'data-pending-ok' : 'data-pending-no');
+    var t = pendingTarget(key);
+    if (!t || !t.w.pending || !t.w.pending[t.i]) { renderPending(); return; }
+    var p = t.w.pending[t.i];
+    if (ok) {
+      var inp = document.querySelector('[data-pending-time="' + key.replace(/"/g, '') + '"]');
+      var end = inp ? inp.value : '';
+      if (!/^\d{2}:\d{2}$/.test(end)) { showToast(tr('퇴근 시각을 넣어 주세요.')); if (inp) inp.focus(); return; }
+      var r = E.resolvePending(t.w, t.i, end);
+      if (!r.ok) { showToast(r.error); return; }
+      enqueuePunch([tsOf(new Date()), t.w.code, t.w.name, '퇴근확인', '사장님 입력', '확인', p.date + ' ' + p.start + '~' + end + ' 근무로 기록']);
+      showToast(tr('{n}님 {d} 근무를 {s}~{e}로 기록했어요.', { n: t.w.name, d: p.date.slice(5).replace('-', '/'), s: p.start, e: end }));
+    } else {
+      if (!window.confirm(tr('{n}님 {d} {s} 출근을 근무 없음으로 정리할까요?', { n: t.w.name, d: p.date.slice(5).replace('-', '/'), s: p.start }))) return;
+      E.dismissPending(t.w, t.i);
+      enqueuePunch([tsOf(new Date()), t.w.code, t.w.name, '퇴근확인', '사장님 입력', '근무 없음', p.date + ' ' + p.start + ' 출근을 근무 없음으로 정리']);
+      showToast(tr('근무 없음으로 정리했어요.'));
+    }
+    saveWorkers();
+    loadSelected(); recalcPayroll(); renderRoster(); renderPending(); renderPunch();
+  }
+
 
   /* ---------- 화면 보호기 (번인 방지) ---------- */
   var EGG_TEXT = '진주 경상대점 맘스터치 점장님 짱 ✨';   // 이스터에그 문구 (언어와 상관없이 그대로)
@@ -2316,8 +2439,9 @@
       var chip = working
         ? '<span class="punch-chip on">' + tr('근무 중 · {t} 출근', { t: escHtml(w.punch.time) }) + '</span>'
         : '<span class="punch-chip">' + tr('퇴근 상태') + '</span>';
+      var pend = (w.pending || []).length ? '<span class="punch-chip warn">' + tr('⚠️ 퇴근 확인 필요') + '</span>' : '';
       return '<button type="button" class="punch-row' + (working ? ' on' : '') + '" data-punch="' + escHtml(w.id) + '">' +
-        '<span class="punch-name">' + escHtml(w.name) + '</span>' + chip + '</button>';
+        '<span class="punch-name">' + escHtml(w.name) + '</span>' + pend + chip + '</button>';
     }).join('');
   }
 
@@ -2581,7 +2705,7 @@
     initSaver();
     runAutoClose();
     tickClock();
-    setInterval(function () { tickClock(); runAutoClose(); renderPunch(); renderChips(); renderWorkNow(); }, 15000);
+    setInterval(function () { tickClock(); runAutoClose(); renderPunch(); renderChips(); renderWorkNow(); renderPunchCloud(); }, 15000);
 
     $('punchList').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-punch]');
@@ -2591,7 +2715,9 @@
       if (!w.password) { showToast(tr('{n}님은 아직 출퇴근 비밀번호가 없어요. 사장님께 정해 달라고 하세요.', { n: w.name })); return; }
       openPunchPw(w);
     });
+    initGuide();
     $('punchAllOut').addEventListener('click', askBulkOut);
+    $('pendingBox').addEventListener('click', onPendingClick);
     $('punchPwForm').addEventListener('submit', function (ev) { ev.preventDefault(); punchSubmit(); });
     $('punchPw').addEventListener('click', function (ev) { if (ev.target.closest('[data-punch-close]')) closePunchPw(); });
     $('punchResult').addEventListener('click', function (ev) { if (ev.target.closest('[data-punch-result-close]')) closePunchResult(); });

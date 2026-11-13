@@ -553,6 +553,47 @@ function makeDevice(google, opts) {
     assert.strictEqual(saved.workers[0].password, '1234');   // 시트에도 반영됨
   });
 
+  await test('화면을 누를 때 토큰이 곧 만료되거나 풀렸으면 조용히 갱신하고, 밀린 변경을 저장', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', {})];
+    await a.cloud.connect();
+    const t0 = a.tokens;
+    assert.strictEqual(await a.cloud.renewOnGesture(), false);          // 아직 넉넉하면 아무것도 안 함
+    a.clock.t += 52 * 60000;                                            // 만료 8분 전
+    assert.strictEqual(await a.cloud.renewOnGesture(), true);
+    assert.strictEqual(a.tokens, t0 + 1);
+    a.clock.t += 5000;
+    assert.strictEqual(await a.cloud.renewOnGesture(), false);          // 방금 갱신했으니 그대로
+    // 타이머 갱신이 막혀 로그인이 풀린 상태(needLogin)에서 바꾼 내용이 있음
+    a.clock.t += 2 * 3600000;
+    a.tokenFail = true;
+    a.data.workers.push(worker('영희', {}));
+    a.cloud.markDirty();
+    await a.cloud.saveNow().catch(() => {});
+    assert.strictEqual(a.lastStatus.kind !== 'saved', true);
+    assert.strictEqual(JSON.parse(a.store['alba.cloud.v1']).dirty, true);
+    // 누를 때 갱신도 실패하면 그대로 '다시 연결' 상태, 변경은 보관
+    a.clock.t += 30000;
+    assert.strictEqual(await a.cloud.renewOnGesture(), false);
+    assert.strictEqual(a.lastStatus.kind, 'needLogin');
+    assert.strictEqual(JSON.parse(a.store['alba.cloud.v1']).dirty, true);
+    // 구글 세션이 살아 있으면 다음 터치에 복구 + 저장
+    a.tokenFail = false;
+    a.clock.t += 5000;
+    assert.strictEqual(await a.cloud.renewOnGesture(), false);          // 20초 안에는 다시 시도 안 함
+    a.clock.t += 20000;
+    assert.strictEqual(await a.cloud.renewOnGesture(), true);
+    assert.strictEqual(a.lastStatus.kind, 'saved');
+    assert.strictEqual(JSON.parse(a.store['alba.cloud.v1']).dirty, false);
+    const saved = JSON.parse(g.rows(JSON.parse(a.store['alba.cloud.v1']).sheetId, '데이터').slice(2).map(r => r[0]).join(''));
+    assert.deepStrictEqual(saved.workers.map(w => w.name), ['철수', '영희']);
+    // 연동 안 했으면 아무것도 안 함
+    const b = makeDevice(makeGoogle());
+    assert.strictEqual(await b.cloud.renewOnGesture(), false);
+    assert.strictEqual(b.tokens, 0);
+  });
+
   await test('앱에서 알바생을 지우면 시트 출퇴근기록 장부에서도 그 사람 줄이 지워짐 (전체 삭제는 전부)', async () => {
     const g = makeGoogle();
     const a = makeDevice(g);

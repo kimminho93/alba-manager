@@ -197,6 +197,7 @@
     '{h}시간 × {w}원': '{h} h × ₩{w}',
     '{n}주 대상 (15시간 이상 + 약속 출근일 개근)': '{n} wk eligible (15 h+ and all agreed days attended)',
     '{n}회 × {a}원 (점심·저녁 끼니마다 1회)': '{n} × ₩{a} (once per lunch/dinner)',
+    "확인할 기록이 없어요.": "No record to check.", "퇴근 시각을 HH:MM 으로 넣어 주세요.": "Enter the clock-out time as HH:MM.", "퇴근 시각이 출근 시각과 같아요.": "Clock-out time is the same as clock-in time.", "이전 출근은 퇴근을 안 찍어 자동 퇴근, 확인 필요로 남김": "Previous clock-in had no clock-out; closed automatically and marked for checking", 
     '{n}분': '{n} min',
     '기본급 + 주휴수당 + 식대': 'Base pay + weekly holiday pay + meals',
     '식대': 'Meals',

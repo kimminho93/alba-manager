@@ -157,6 +157,8 @@
       if (dflt) item.defaults = dflt;
       var pn = cleanPunch(raw.punch);
       if (pn) item.punch = pn;
+      var pd = cleanPending(raw.pending);
+      if (pd.length) item.pending = pd;
       out.push(item);
     });
     return out;
@@ -177,6 +179,39 @@
     var o = { date: raw.date, time: raw.time };
     if (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(raw.at))) o.at = raw.at;   // 실제로 찍은 시각(올림 전)
     return o;
+  }
+
+  /* 퇴근을 안 찍어 자동 퇴근된 근무: 기록은 하지 않고 '확인 필요'로 남김 { date, start, at, cut:'YYYY-MM-DD HH:MM' } */
+  var HM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+  function cleanPending(raw) {
+    if (!Array.isArray(raw)) return [];
+    var out = [], seen = {};
+    raw.forEach(function (x) {
+      if (!isObj(x) || !/^\d{4}-\d{2}-\d{2}$/.test(String(x.date)) || !HM_RE.test(String(x.start))) return;
+      var k = x.date + ' ' + x.start;
+      if (seen[k]) return;
+      seen[k] = true;
+      var o = { date: x.date, start: x.start };
+      if (HM_RE.test(String(x.at))) o.at = x.at;
+      if (/^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d$/.test(String(x.cut))) o.cut = x.cut;
+      out.push(o);
+    });
+    return out.slice(-30);
+  }
+
+  /* 자동 퇴근(영업 마감) 시각: 이 시각까지 퇴근을 안 찍으면 퇴근 처리하고 '확인 필요'로 남김. 기본 자정 */
+  var AUTO_OUT_CHOICES = ['20:00', '21:00', '22:00', '23:00', '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00'];
+  var DEFAULT_AUTO_OUT = '00:00';
+  function cleanAutoOut(v) { return AUTO_OUT_CHOICES.indexOf(String(v)) >= 0 ? String(v) : DEFAULT_AUTO_OUT; }
+  /** 출근(실제 찍은 시각) 뒤 처음 돌아오는 자동 퇴근 시각 */
+  function autoOutDeadline(open, cut) {
+    cut = cleanAutoOut(cut);
+    var y = Number(open.date.slice(0, 4)), m = Number(open.date.slice(5, 7)) - 1, d = Number(open.date.slice(8, 10));
+    var t = open.at || open.time;
+    var inAt = new Date(y, m, d, Number(t.slice(0, 2)), Number(t.slice(3)), 0);
+    var dl = new Date(y, m, d, Number(cut.slice(0, 2)), Number(cut.slice(3)), 0);
+    if (dl.getTime() <= inAt.getTime()) dl = new Date(y, m, d + 1, Number(cut.slice(0, 2)), Number(cut.slice(3)), 0);
+    return dl;
   }
 
   var PUNCH_UNITS = [1, 5, 10, 15, 20, 30, 60];   // 출퇴근 시각을 끊는 단위(분). 1 = 끊지 않음
@@ -250,6 +285,12 @@
     var open = cleanPunch(worker.punch);
     var today = ymdOf(now), time = hmOf(now);
     var note = '';
+    if (open && opts && typeof opts === 'object' && opts.autoOut !== undefined && now.getTime() >= autoOutDeadline(open, opts.autoOut).getTime()) {
+      // 자동 퇴근 시각이 이미 지났는데 아직 처리 전이면(앱이 꺼져 있었음 등) 먼저 퇴근 처리 → 확인 필요로 남기고 새 출근
+      closeAsPending(worker, open, autoOutDeadline(open, opts.autoOut));
+      open = null;
+      note = P.t('이전 출근은 퇴근을 안 찍어 자동 퇴근, 확인 필요로 남김');
+    }
     if (open) {
       var inMs = new Date(open.date + 'T' + (open.at || open.time) + ':00').getTime();
       var elapsed = (now.getTime() - inMs) / 60000;
@@ -276,18 +317,20 @@
     var shifts = workerShifts(worker, pm);
     var cur = shifts[idx];
     var start = open.time, breakMin = 0, merged = false;
-    if (cur && !cur.off && toMin(cur.end) > toMin(cur.start) && toMin(end) > toMin(start)) {
-      if (toMin(start) >= toMin(cur.end)) {
-        // 같은 날 앞선 근무가 있으면 한 칸으로 합치고 사이 시간은 휴게로
-        breakMin = (cur.breakMinutes || 0) + (toMin(start) - toMin(cur.end));
-        start = cur.start;
-      } else {
-        // 유예·올림으로 새 출근이 앞선 근무 끝보다 앞당겨져 겹치면, 앞선 근무를 지우지 않고 둘을 이어 붙임 (겹친 시간은 한 번만)
-        breakMin = cur.breakMinutes || 0;
-        if (toMin(cur.start) < toMin(start)) start = cur.start;
-        if (toMin(cur.end) > toMin(end)) end = cur.end;
+    var s0 = toMin(start), e0 = toMin(end);
+    if (e0 <= s0) e0 += 1440;   // 밤을 넘겨 퇴근
+    if (cur && !cur.off && cur.start && cur.end && cur.start !== cur.end) {
+      var cs = toMin(cur.start), ce = toMin(cur.end);
+      if (ce <= cs) ce += 1440;
+      var lo = Math.min(s0, cs), hi = Math.max(e0, ce);
+      if (hi - lo < 1440) {
+        // 같은 날 앞선 근무와 한 칸으로 합침: 사이 시간은 휴게, 겹치면 겹친 만큼은 한 번만 (앞선 근무를 지우지 않음)
+        var gap = Math.max(0, Math.max(s0, cs) - Math.min(e0, ce));
+        breakMin = (cur.breakMinutes || 0) + gap;
+        start = pad2(Math.floor(lo / 60) % 24) + ':' + pad2(lo % 60);
+        end = pad2(Math.floor(hi / 60) % 24) + ':' + pad2(hi % 60);
+        merged = true;
       }
-      merged = true;
     }
     if (idx >= 0 && idx < shifts.length) {
       shifts[idx] = { off: false, start: start, end: end, breakMinutes: breakMin };
@@ -303,23 +346,59 @@
   }
 
 
+
   /**
    * 자정까지 퇴근을 안 찍은 사람은 그 출근을 무효로 하고 그 날은 휴무(근무 없음)로 둔다.
    * (달력 칸은 퇴근을 찍어야 채워지므로, 출근 중 표시만 지우면 된다. 그 날 앞서 끝난 근무가 있으면 그대로 남는다.)
    * 앱을 켜 둔 동안은 자정이 지나면, 꺼져 있었다면 다음에 열 때 처리한다.
    * 반환: 무효 처리된 사람 목록 [{worker, date, start, ts(자정 시각)}]
    */
-  function autoCloseOpen(workers, now) {
-    var today = ymdOf(now), out = [];
+  function closeAsPending(w, open, ts) {
+    delete w.punch;
+    var p = cleanPending(w.pending);
+    p.push({ date: open.date, start: open.time, at: open.at || open.time, cut: ymdOf(ts) + ' ' + hmOf(ts) });
+    w.pending = cleanPending(p);
+    return { worker: w, date: open.date, start: open.time, ts: ts };
+  }
+  /**
+   * 자동 퇴근 시각(기본 자정)까지 퇴근을 안 찍은 사람은 퇴근 처리하고, 근무 기록은 넣지 않고 '확인 필요'(pending)로 남긴다.
+   * 사장님이 퇴근 시각을 넣으면(resolvePending) 그때 달력에 기록된다.
+   * 반환: 처리한 사람 목록 [{worker, date, start, ts(자동 퇴근 시각)}]
+   */
+  function autoCloseOpen(workers, now, cut) {
+    var out = [];
     (workers || []).forEach(function (w) {
       var open = cleanPunch(w.punch);
-      if (!open || open.date >= today) return;
-      var y = Number(open.date.slice(0, 4)), m = Number(open.date.slice(5, 7)), d = Number(open.date.slice(8, 10));
-      delete w.punch;
-      out.push({ worker: w, date: open.date, start: open.time, ts: new Date(y, m - 1, d + 1, 0, 0, 0) });
+      if (!open) return;
+      var dl = autoOutDeadline(open, cut);
+      if (now.getTime() < dl.getTime()) return;
+      out.push(closeAsPending(w, open, dl));
     });
     return out;
   }
+  /** 확인 필요 근무에 사장님이 퇴근 시각을 넣음 → 그 날 달력에 기록 (지금 근무 중 상태는 그대로 둠) */
+  function resolvePending(worker, i, end) {
+    var p = cleanPending(worker.pending);
+    var item = p[i];
+    if (!item) return { ok: false, error: P.t('확인할 기록이 없어요.') };
+    if (!HM_RE.test(String(end))) return { ok: false, error: P.t('퇴근 시각을 HH:MM 으로 넣어 주세요.') };
+    if (end === item.start) return { ok: false, error: P.t('퇴근 시각이 출근 시각과 같아요.') };
+    var keep = worker.punch;
+    var r = clockOut(worker, { date: item.date, time: item.start, at: item.at }, end);
+    if (keep) worker.punch = keep;
+    p.splice(i, 1);
+    if (p.length) worker.pending = p; else delete worker.pending;
+    return { ok: true, result: r };
+  }
+  /** 확인 필요 근무를 '근무 없음'으로 정리 */
+  function dismissPending(worker, i) {
+    var p = cleanPending(worker.pending);
+    if (!p[i]) return false;
+    p.splice(i, 1);
+    if (p.length) worker.pending = p; else delete worker.pending;
+    return true;
+  }
+
 
   function parseLogTs(str) {
     var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(String(str || '').trim());
@@ -339,10 +418,17 @@
       if (!ts || ts.getTime() <= afterMs) return;
       var kind = String(row[3] || '').trim();
       if (String(row[5] || '').indexOf('정상') !== 0) return;
-      if (String(row[4] || '').indexOf('자동') === 0) { n += autoCloseOpen(workers, ts).length ? 1 : 0; return; }
-      if (kind !== '출근' && kind !== '퇴근') return;
       var code = String(row[1] || '').trim();
       var w = (workers || []).filter(function (x) { return x.code === code; })[0];
+      var cut = opts && typeof opts === 'object' ? opts.autoOut : undefined;
+      var closed = autoCloseOpen(workers, ts, cut);   // 그 사이 지난 자동 퇴근 시각 먼저 처리
+      if (String(row[4] || '').indexOf('자동') === 0) {
+        var op = w && cleanPunch(w.punch);
+        if (op) { closeAsPending(w, op, ts); n++; }
+        else if (closed.some(function (c) { return c.worker === w; })) n++;
+        return;
+      }
+      if (kind !== '출근' && kind !== '퇴근') return;
       if (!w) return;
       var r = applyPunch(w, ts, opts);
       if (r.kind === 'in' || r.kind === 'out') n++;
@@ -518,7 +604,8 @@
       punchInMode: pu.inMode,
       punchOutMode: pu.outMode,
       punchGraceIn: pu.graceIn,
-      punchGraceOut: pu.graceOut
+      punchGraceOut: pu.graceOut,
+      autoOutTime: cleanAutoOut((raw || {}).autoOutTime)
     };
   }
 
@@ -543,6 +630,11 @@
     roundDownUnit: roundDownUnit,
     punchNext: punchNext,
     autoCloseOpen: autoCloseOpen,
+    resolvePending: resolvePending,
+    dismissPending: dismissPending,
+    autoOutDeadline: autoOutDeadline,
+    AUTO_OUT_CHOICES: AUTO_OUT_CHOICES,
+    DEFAULT_AUTO_OUT: DEFAULT_AUTO_OUT,
     replayPunchLog: replayPunchLog,
     monthSummary: monthSummary,
     normalizeWorkers: normalizeWorkers,

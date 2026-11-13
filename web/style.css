@@ -2390,3 +2390,47 @@ body.on-punch .app-footer, body.locked .app-footer { display: none; }
 .punch-all { display: block; margin: 18px auto 0; max-width: 560px; width: 100%; padding: 16px; font-size: 18px; font-weight: 800; border-radius: 14px; background: var(--text); color: var(--card); border: 0; }
 .punch-all[hidden] { display: none; }
 @media print { .punch-all { display: none !important; } }
+
+/* 퇴근 확인 필요 (자동 퇴근된 근무) */
+.pending-box { margin: 8px 0 12px; padding: 12px 14px; border-radius: 14px; background: rgba(240,140,30,.10); border: 1px solid rgba(240,140,30,.45); }
+.pending-box[hidden] { display: none; }
+.pending-head { font-weight: 800; font-size: 16px; color: #c06a00; }
+html[data-theme="dark"] .pending-head, .dark .pending-head { color: #ffb050; }
+.pending-note { margin: 4px 0 8px; font-size: 13px; opacity: .85; }
+.pending-row { padding: 8px 0; border-top: 1px dashed rgba(240,140,30,.4); }
+.pending-who { font-size: 15px; margin-bottom: 6px; }
+.pending-act { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pending-time { font-size: 16px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line, #ccc); background: var(--card); color: var(--text); }
+.pending-act .btn { padding: 8px 12px; }
+.punch-chip.warn { background: rgba(240,140,30,.15); color: #c06a00; border: 1px solid rgba(240,140,30,.45); margin-right: 6px; }
+@media print { .pending-box { display: none !important; } }
+
+/* 사용 방법: 검색 · 역할별 바로가기 · 자동 번호 */
+.guide-tools { display: flex; gap: 8px; margin: 0 0 12px; }
+.guide-search { flex: 1; min-width: 0; font-size: 17px; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); color: var(--text); }
+.guide-tools .btn { flex: none; white-space: nowrap; }
+.guide-nav { background: var(--card-2); border-radius: 14px; padding: 10px 12px 12px; margin-bottom: 14px; }
+.guide-nav-title { margin: 6px 0 6px; font-size: 15px; font-weight: 800; color: var(--muted); }
+.guide-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.guide-chips button { font: inherit; font-size: 15px; font-weight: 700; padding: 8px 12px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+.guide-chips button:hover, .guide-chips button:focus-visible { border-color: var(--primary, #3563e9); color: var(--primary, #3563e9); }
+.guide-empty { text-align: center; color: var(--muted); padding: 16px; }
+.guide-empty[hidden] { display: none; }
+.guide-list { counter-reset: gitem; }
+.guide-item { counter-increment: gitem; scroll-margin-top: 12px; }
+.guide-item[hidden] { display: none; }
+.guide-item summary::before {
+  content: counter(gitem);
+  flex: none; width: 32px; height: 32px; border-radius: 50%;
+  background: var(--primary, #3563e9); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.guide-sum { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.guide-sub { font-weight: 600; color: var(--muted); font-size: 14px; line-height: 1.35; }
+.guide-table-wrap { overflow-x: auto; margin: 8px 0 12px; }
+.guide-table { border-collapse: collapse; width: 100%; max-width: 420px; font-size: 16px; }
+.guide-table th, .guide-table td { border: 1px solid var(--line); padding: 6px 10px; text-align: center; }
+.guide-table th { background: var(--card-2); font-weight: 800; }
+.guide-flash { animation: guideFlash 1.2s ease; }
+@keyframes guideFlash { 0% { box-shadow: 0 0 0 4px rgba(53,99,240,.45); } 100% { box-shadow: 0 0 0 0 rgba(53,99,240,0); } }
+@media print { .guide-tools, .guide-nav { display: none; } .guide-item { break-inside: avoid; } }

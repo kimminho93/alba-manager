@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611132300">
+  <link rel="stylesheet" href="./style.css?v=202611140100">
 </head>
 <body>
   <header class="app-header">
@@ -69,6 +69,8 @@
       <div id="workerChips" class="worker-chips" role="tablist" aria-label="알바생 선택"></div>
       <!-- 출퇴근 탭에서 출근 중인 사람 표시 -->
       <div id="workNow" class="work-now" hidden role="status"></div>
+      <!-- 퇴근을 안 찍어 자동 퇴근된 근무: 사장님이 퇴근 시각 입력 -->
+      <div id="pendingBox" class="pending-box" hidden></div>
       <!-- 폰 전용: 알바생이 없을 때 안내 -->
       <div id="emptyCard" class="empty-card">
         <div class="empty-plus" aria-hidden="true">＋</div>
@@ -416,6 +418,7 @@
         <div class="snd-row"><label for="sGraceIn">지각 봐주기</label><select id="sGraceIn"></select></div>
         <div class="snd-row"><label for="sOutMode">퇴근 방식</label><select id="sOutMode"><option value="round">내림 (단위로 끊기)</option><option value="exact">찍은 그대로 (분 단위)</option></select></div>
         <div class="snd-row"><label for="sGraceOut">조기퇴근 봐주기</label><select id="sGraceOut"></select></div>
+        <div class="snd-row"><label for="sAutoOut">자동 퇴근 시각</label><select id="sAutoOut"></select></div>
         <div class="set-note" id="punchUnitNote"></div>
 
         <h3 class="set-title">출퇴근 알림음 <small class="pin-state">· 이 기기에만 적용</small></h3>
@@ -433,7 +436,7 @@
         <div class="set-note">처음에는 휴대폰·브라우저 언어를 따라갑니다. 영어로 바꾸면 화면, 사용 방법, 점검표, 카톡 명세서·엑셀 파일도 영어로 나옵니다.</div>
 
         <h3 class="set-title">앱 정보</h3>
-        <div class="set-note">사장님 도우미 <b class="ver-text">v1.3.1</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
+        <div class="set-note">사장님 도우미 <b class="ver-text">v1.4.0</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
 
         <h3 class="set-title">최저시급</h3>
         <label class="field set-field"><span>올해 최저시급 (원) <em class="hint">새 알바생을 추가할 때 기본 시급으로 들어갑니다</em></span>
@@ -472,10 +475,34 @@
     <section id="tab-guide" class="tab-panel" role="tabpanel">
       <div class="card guide">
         <h2 class="guide-title">📖 사용 방법</h2>
-        <p class="guide-lead">궁금한 항목을 눌러 펼쳐 보세요. 처음이시라면 <b>1번부터 순서대로</b> 읽으시면 됩니다.</p>
+        <p class="guide-lead">아래 버튼에서 <b>내 역할과 궁금한 것</b>을 누르면 바로 그 설명이 열립니다. 검색칸에 단어를 넣어 찾을 수도 있어요.</p>
+        <div class="guide-tools">
+          <input type="search" id="guideSearch" class="guide-search" placeholder="🔍 검색 (예: 퇴근, 엑셀)" aria-label="사용 방법 검색">
+          <button type="button" id="guideToggleAll" class="btn">모두 펼치기</button>
+        </div>
+        <div class="guide-nav">
+          <p class="guide-nav-title">👤 알바생</p>
+          <div class="guide-chips"><button type="button" data-guide-go="g-staff">출퇴근 찍기</button></div>
+          <p class="guide-nav-title">🧑‍💼 사장님</p>
+          <div class="guide-chips">
+            <button type="button" data-guide-go="g-start">처음 시작</button>
+            <button type="button" data-guide-go="g-setup">매장 기기 준비</button>
+            <button type="button" data-guide-go="g-rules">출퇴근 시간 규칙</button>
+            <button type="button" data-guide-go="g-miss">퇴근 안 찍음</button>
+            <button type="button" data-guide-go="g-pay">급여 계산</button>
+            <button type="button" data-guide-go="g-weekly">주휴·식대</button>
+            <button type="button" data-guide-go="g-roster">여러 명·엑셀</button>
+            <button type="button" data-guide-go="g-hygiene">위생 점검</button>
+            <button type="button" data-guide-go="g-cloud">구글 저장</button>
+            <button type="button" data-guide-go="g-backup">백업·기기 옮기기</button>
+            <button type="button" data-guide-go="g-faq">자주 묻는 질문</button>
+          </div>
+        </div>
+        <p id="guideEmpty" class="guide-empty" hidden>찾는 내용이 없어요. 다른 말로 찾아보세요.</p>
 
-        <details class="guide-item" open>
-          <summary><span class="guide-no">1</span>처음 시작하기</summary>
+        <div id="guideList" class="guide-list">
+        <details class="guide-item" id="g-start" open>
+          <summary><span class="guide-sum"><span class="guide-name">처음 시작하기</span><small class="guide-sub">로그인 없이 바로 · 글씨 크게 · 홈 화면에 추가</small></span></summary>
           <div class="guide-body">
             <ol>
               <li>회원가입이나 로그인 없이 바로 쓸 수 있습니다.</li>
@@ -488,18 +515,93 @@
                 </ul>
               </li>
             </ol>
-            <p class="guide-tip">💡 입력한 내용은 이 기기에 저장됩니다. 구글 시트에 저장하는 방법은 <b>6번</b>, 알바생이 직접 출퇴근을 찍게 하는 방법은 <b>9번</b>을 보세요.</p>
+            <p class="guide-tip">💡 입력한 내용은 이 기기에 저장됩니다. 구글 시트에 저장하려면 <b>[구글 시트 자동 저장]</b>, 알바생이 직접 출퇴근을 찍게 하려면 <b>[매장 기기 준비]</b>를 보세요.</p>
           </div>
         </details>
 
-        <details class="guide-item">
-          <summary><span class="guide-no">2</span>알바 급여 계산하기</summary>
+        <details class="guide-item" id="g-staff">
+          <summary><span class="guide-sum"><span class="guide-name">알바생: 출퇴근 찍기</span><small class="guide-sub">이름 → 비밀번호 → 출근/퇴근</small></span></summary>
+          <div class="guide-body">
+            <p>매장 기기의 <b>⏱️ 출퇴근</b> 화면에서 찍습니다. 근무 중인 사람은 <b>맨 위에 파란색</b>으로 보입니다.</p>
+            <ol>
+              <li>출퇴근 화면에서 <b>내 이름</b>을 누릅니다.</li>
+              <li><b>비밀번호</b>를 입력하고 <b>[출근 찍기]</b>(출근 중이면 <b>[퇴근 찍기]</b>)를 누릅니다.</li>
+              <li>결과 창에 <b>이번 달 일한 일수와 누적 근무시간</b>이 나오고, <b>5초 뒤 자동으로 닫힙니다</b>. 바로 닫으려면 [닫기]를 누르세요.</li>
+            </ol>
+            <figure class="guide-fig"><img src="./img/guide-punch-list.webp" alt="출퇴근 화면 (초록색이 근무 중)" loading="lazy" decoding="async"><figcaption>출퇴근 화면 (초록색이 근무 중)</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-punch-pw.webp" alt="비밀번호 입력" loading="lazy" decoding="async"><figcaption>비밀번호 입력</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-punch-out.webp" alt="퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)" loading="lazy" decoding="async"><figcaption>퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)</figcaption></figure>
+            <ul>
+              <li><b>퇴근을 꼭 찍어 주세요.</b> 안 찍으면 자동 퇴근 처리되고, 그날 근무는 사장님이 확인한 뒤에 기록됩니다.</li>
+              <li>비밀번호를 5번 연속 틀리면 30초 동안 막힙니다. 틀린 기록도 시트에 남습니다.</li>
+              <li>내 이름 옆에 <b>"⚠️ 퇴근 확인 필요"</b>가 보이면 사장님께 실제 퇴근 시각을 알려 주세요.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="guide-item" id="g-setup">
+          <summary><span class="guide-sum"><span class="guide-name">사장님: 매장 기기 준비</span><small class="guide-sub">비밀번호 · 관리자 잠금 · 구글 연동 · 화면 보호기 · 소리</small></span></summary>
+          <div class="guide-body">
+            <p>매장에 두는 <b>공용 기기(사장님 폰·태블릿)</b>에서 알바생이 직접 출근·퇴근을 찍게 하려면 아래를 한 번만 해 두세요.</p>
+            <ol>
+              <li>알바생마다 <b>[정산 설정]</b>(컴퓨터는 왼쪽 입력칸)의 <b>"출퇴근 비밀번호"</b>를 정해 줍니다. 비밀번호가 없는 알바생은 출퇴근을 찍을 수 없습니다.</li>
+              <li><b>⚙️ 설정 → 관리자 비밀번호</b>를 정합니다. 처음 직원을 추가하면 안내창이 뜨는데, 바로 정하거나 <b>[나중에]</b>를 눌러 나중에 정해도 됩니다. 정하면 평소에는 <b>⏱️ 출퇴근 화면만</b> 보이고, 급여·위생·설정은 <b>[🔒 관리자]</b>를 눌러 비밀번호를 입력해야 열립니다. 아무것도 안 하면 10분 뒤 자동으로 다시 잠깁니다.</li>
+              <li><b>구글 저장</b>을 연동해 두세요. 출퇴근 기록이 시트에 쌓이고, 기기가 바뀌어도 기록이 남습니다. 연동이 안 되어 있으면 출퇴근 화면에 붉은 경고가 보입니다.</li>
+              <li><b>⚙️ 설정 → 출퇴근 시간 끊기</b>에서 시간 끊는 단위, 지각·조기퇴근 봐주기, <b>자동 퇴근 시각</b>을 매장에 맞게 정합니다. (바로 아래 [출퇴근 시간은 어떻게 기록되나요] 참고)</li>
+              <li>출퇴근 화면을 계속 켜 두면 <b>화면 보호기</b>가 작동합니다(기본 3분). 화면이 어두워지고 시계가 천천히 움직여 번인을 줄여요. 한 번 누르면 돌아옵니다. <b>⚙️ 설정 → 화면 보호기</b>에서 시간을 바꾸거나 끌 수 있습니다.</li>
+              <li><b>⚙️ 설정 → 출퇴근 알림음</b>에서 소리 크기를 키우고, 출근과 퇴근 소리를 각각 다른 소리로 고를 수 있습니다. (매장 기기에서 정하세요)</li>
+            </ol>
+            <p class="guide-tip">💡 알바생 비밀번호는 시트의 "알바생" 탭에도 그대로 보입니다. 다른 곳에서 쓰는 중요한 비밀번호는 쓰지 말고 <b>4자리 숫자</b>처럼 간단한 것으로 정하세요.</p>
+          </div>
+        </details>
+
+        <details class="guide-item" id="g-rules">
+          <summary><span class="guide-sum"><span class="guide-name">출퇴근 시간은 어떻게 기록되나요</span><small class="guide-sub">올림·내림 · 봐주기(유예) · 합치기 · 밤 넘김 · 일괄 퇴근</small></span></summary>
+          <div class="guide-body">
+            <p>출근은 <b>올림</b>, 퇴근은 <b>내림</b>으로 정한 단위(기본 30분)에 맞춰 달력에 기록되고, 급여 계산에 바로 반영됩니다.</p>
+            <div class="guide-table-wrap"><table class="guide-table">
+              <thead><tr><th>찍은 시각</th><th>유예 없음</th><th>유예 5분</th></tr></thead>
+              <tbody>
+                <tr><td>출근 08:59</td><td>09:00</td><td>09:00</td></tr>
+                <tr><td>출근 09:03</td><td>09:30</td><td>09:00</td></tr>
+                <tr><td>출근 09:06</td><td>09:30</td><td>09:30</td></tr>
+                <tr><td>퇴근 17:56</td><td>17:30</td><td>18:00</td></tr>
+                <tr><td>퇴근 18:10</td><td>18:00</td><td>18:00</td></tr>
+              </tbody>
+            </table></div>
+            <ul>
+              <li><b>⚙️ 설정 → 출퇴근 시간 끊기</b>에서 단위(5·10·15·20·30·60분), 지각·조기퇴근 <b>봐주기(유예 0·5·10·15분)</b>, 출근·퇴근 각각 <b>찍은 그대로(분 단위)</b>를 고를 수 있습니다. 설정 화면에 지금 설정으로 계산한 예시가 나옵니다.</li>
+              <li>달력에는 위 규칙으로 정한 시각이, 시트의 <b>출퇴근기록</b> 탭에는 <b>실제로 찍은 시각</b>이 그대로 남습니다.</li>
+              <li>같은 날 두 번 일하면(점심 후 다시 출근) 한 칸으로 합쳐지고 사이 시간은 휴게로 빠집니다. 휴게시간은 따로 넣지 않으면 0분입니다.</li>
+              <li>밤을 넘겨 퇴근해도(예: 18:00 출근, 01:00 퇴근) <b>자동 퇴근 시각 전이면</b> 출근한 날 칸에 야간 근무로 들어갑니다.</li>
+              <li>마감할 때는 출퇴근 화면 아래 <b>[🌙 근무 중인 사람 모두 퇴근]</b>으로 한 번에 퇴근시킬 수 있습니다. 관리자 비밀번호가 있으면 비밀번호를 먼저 묻습니다.</li>
+              <li>설정을 바꾸면 <b>지금부터 찍는 시각</b>에 적용되고, 이미 기록된 시각은 그대로입니다.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="guide-item" id="g-miss">
+          <summary><span class="guide-sum"><span class="guide-name">퇴근을 안 찍었어요</span><small class="guide-sub">자동 퇴근 · 퇴근 확인 필요 처리</small></span></summary>
+          <div class="guide-body">
+            <p><b>자동 퇴근 시각</b>(기본 <b>자정 00:00</b>, ⚙️ 설정에서 밤 8시~새벽 6시로 변경)까지 퇴근을 안 찍은 사람은 자동으로 퇴근 처리됩니다.</p>
+            <ol>
+              <li>그날 근무는 <b>달력에 기록하지 않고</b> 급여 계산 탭 맨 위 <b>[⚠️ 퇴근 확인 필요]</b>에 남습니다. 출퇴근 화면의 이름 옆에도 표시됩니다.</li>
+              <li>사장님이 실제 퇴근 시각을 넣고 <b>[퇴근 기록]</b>을 누르면 그날 칸에 기록됩니다. 밤을 넘긴 시각(예: 01:00)도 넣을 수 있습니다.</li>
+              <li>일하지 않았다면 <b>[근무 없음]</b>을 누르면 정리됩니다.</li>
+              <li>시트의 출퇴근기록 탭에는 "퇴근누락(확인필요)", 사장님이 처리하면 "퇴근확인"으로 남습니다.</li>
+            </ol>
+            <p class="guide-tip">💡 자동 퇴근 처리된 뒤에도 알바생은 평소처럼 다음 출근을 찍을 수 있습니다.</p>
+          </div>
+        </details>
+
+        <details class="guide-item" id="g-pay">
+          <summary><span class="guide-sum"><span class="guide-name">알바 급여 계산하기</span><small class="guide-sub">알바생 추가 · 달력 입력 · 줄 돈 · 명세서</small></span></summary>
           <div class="guide-body">
             <p class="guide-tip">💡 설명은 <b>휴대폰 화면</b> 기준입니다. 컴퓨터·태블릿 가로 화면은 왼쪽에 월·줄 돈·정산 설정·정산 명단, 오른쪽에 큰 달력으로 나뉘어 보이지만 하는 일은 같습니다.</p>
             <p class="guide-step-title">① 알바생 추가하기</p>
             <ol>
               <li>맨 위 이름 줄 왼쪽의 <b>[＋]</b>를 누릅니다. (처음에는 <b>[알바생 추가하기]</b> 버튼이 보입니다)</li>
-              <li><b>이름 · 계약서상 일하는 날 · 시급</b>을 넣고 <b>[알바생 추가]</b>를 누르면 끝입니다. 알바생이 직접 출퇴근을 찍게 하려면 <b>출퇴근 비밀번호</b>도 함께 정해 주세요(9번).</li>
+              <li><b>이름 · 계약서상 일하는 날 · 시급</b>을 넣고 <b>[알바생 추가]</b>를 누르면 끝입니다. 알바생이 직접 출퇴근을 찍게 하려면 <b>출퇴근 비밀번호</b>도 함께 정해 주세요.</li>
               <li>알바생이 여러 명이면 이름이 한 줄로 늘어섭니다. <b>손가락으로 옆으로 밀면</b> 다음 사람이 나옵니다. 이름을 누르면 그 사람의 기록으로 바뀝니다.</li>
             </ol>
             <figure class="guide-fig"><img src="./img/guide-add.webp" alt="알바생 추가 창" loading="lazy" decoding="async"><figcaption>알바생 추가 창</figcaption></figure>
@@ -525,14 +627,14 @@
             <ol>
               <li>달력 아래 <b>[정산 설정]</b> 줄을 누르면 설정 창이 올라옵니다.</li>
               <li><b>이름 · 시급 · 주 근무 약속일수 · 세금(3.3% / 4대보험 / 미적용) · 주휴수당 · 식대</b>를 여기서 고치고 <b>[완료]</b>를 누릅니다. 고치는 즉시 저장됩니다.</li>
-              <li><b>출퇴근 비밀번호</b>는 알바생이 매장 기기에서 출근·퇴근을 찍을 때 입력하는 번호입니다(9번). 직접 입력하는 방식으로 쓰지 않는다면 비워 두셔도 됩니다.</li>
+              <li><b>출퇴근 비밀번호</b>는 알바생이 매장 기기에서 출근·퇴근을 찍을 때 입력하는 번호입니다. 직접 입력하는 방식으로 쓰지 않는다면 비워 두셔도 됩니다.</li>
             </ol>
             <figure class="guide-fig"><img src="./img/guide-set.webp" alt="정산 설정 창" loading="lazy" decoding="async"><figcaption>정산 설정 창</figcaption></figure>
           </div>
         </details>
 
-        <details class="guide-item">
-          <summary><span class="guide-no">3</span>주휴수당과 식대는 어떻게 계산되나요?</summary>
+        <details class="guide-item" id="g-weekly">
+          <summary><span class="guide-sum"><span class="guide-name">주휴수당과 식대 계산</span><small class="guide-sub">15시간 · 약속한 날수 · 식대는 실비</small></span></summary>
           <div class="guide-body">
             <p class="guide-step-title">주휴수당</p>
             <ul>
@@ -551,8 +653,8 @@
           </div>
         </details>
 
-        <details class="guide-item">
-          <summary><span class="guide-no">4</span>알바생 여러 명 · 달마다 기록 · 엑셀로 받기</summary>
+        <details class="guide-item" id="g-roster">
+          <summary><span class="guide-sum"><span class="guide-name">여러 명 · 달마다 기록 · 엑셀</span><small class="guide-sub">정산 명단 · 사람 골라 엑셀 받기</small></span></summary>
           <div class="guide-body">
             <ol>
               <li>알바생은 맨 위 <b>[＋]</b>로 추가하고, 이름을 눌러 바꿔 가며 봅니다. 근무 기록은 <b>고치는 즉시 자동 저장</b>됩니다.</li>
@@ -566,8 +668,8 @@
           </div>
         </details>
 
-        <details class="guide-item">
-          <summary><span class="guide-no">5</span>위생 점검하기</summary>
+        <details class="guide-item" id="g-hygiene">
+          <summary><span class="guide-sum"><span class="guide-name">위생 점검하기</span><small class="guide-sub">41개 항목 · 보관함 · PDF·엑셀</small></span></summary>
           <div class="guide-body">
             <ol>
               <li>위쪽 <b>[🧼 위생 점검]</b> 탭을 누릅니다.</li>
@@ -582,8 +684,8 @@
           </div>
         </details>
 
-        <details class="guide-item">
-          <summary><span class="guide-no">6</span>구글 시트에 자동 저장하기 <small>(선택)</small></summary>
+        <details class="guide-item" id="g-cloud">
+          <summary><span class="guide-sum"><span class="guide-name">구글 시트 자동 저장</span><small class="guide-sub">연동 · 자동 저장 · 다시 연결</small></span></summary>
           <div class="guide-body">
             <p>휴대폰을 바꾸거나 다른 컴퓨터에서 열어도 <b>같은 기록</b>을 보고 싶을 때 쓰세요. 내 구글 드라이브에 자동으로 저장됩니다.</p>
             <p class="guide-step-title">연동하기</p>
@@ -603,14 +705,16 @@
             </ul>
             <p class="guide-step-title">버튼이 "⚠️ 다시 연결"로 바뀌었어요</p>
             <ul>
-              <li>구글 로그인은 일정 시간이 지나면 풀립니다. 그 버튼을 누르고 <b>[다시 연결하고 저장하기]</b>를 누르세요. 그동안 바꾼 내용은 이 기기에 남아 있다가 저장됩니다.</li>
+              <li>구글 로그인은 약 1시간마다 갱신이 필요합니다. <b>화면을 누를 때 자동으로 조용히 갱신</b>되므로 대부분은 그대로 이어집니다. 잠깐 작은 창이 깜빡일 수 있어요.</li>
+              <li>그래도 풀렸다면 그 버튼을 누르고 <b>[다시 연결하고 저장하기]</b>를 누르세요. 그동안 바꾼 내용과 출퇴근 기록은 이 기기에 남아 있다가 저장됩니다.</li>
+              <li>출퇴근 화면 아래에 <b>"시트에 아직 안 올라간 출퇴근 N건"</b>이 보이면, 연결이 돌아오는 대로 올라갑니다.</li>
             </ul>
             <p class="guide-tip">💡 두 기기에서 동시에 고치면 <b>마지막에 저장한 내용</b>이 남습니다. 한 번에 한 기기에서 작업하는 것이 안전합니다.</p>
           </div>
         </details>
 
-        <details class="guide-item">
-          <summary><span class="guide-no">7</span>다른 구글 계정·새 휴대폰으로 옮기기 (백업 파일)</summary>
+        <details class="guide-item" id="g-backup">
+          <summary><span class="guide-sum"><span class="guide-name">백업 · 새 휴대폰으로 옮기기</span><small class="guide-sub">백업 파일 받기 · 불러오기</small></span></summary>
           <div class="guide-body">
             <ol>
               <li>옮기기 전, <b>[☁️ 구글 저장]</b> 창 아래의 <b>[⬇️ 백업 파일 내려받기]</b>를 누릅니다. 기록 전체가 파일 하나로 저장됩니다.</li>
@@ -622,8 +726,8 @@
           </div>
         </details>
 
-        <details class="guide-item">
-          <summary><span class="guide-no">8</span>자주 묻는 질문</summary>
+        <details class="guide-item" id="g-faq">
+          <summary><span class="guide-sum"><span class="guide-name">자주 묻는 질문</span><small class="guide-sub">세금 비율 · 기록이 사라짐 · 비밀번호를 잊음</small></span></summary>
           <div class="guide-body">
             <p class="guide-q">세금이나 4대보험 비율이 바뀌었어요.</p>
             <p>위쪽 <b>⚙️ 설정</b> 탭에서 소득세·국민연금·건강보험 등의 비율과 최저시급을 고치면 바로 계산에 반영됩니다. 처음 값으로 되돌릴 수도 있습니다.</p>
@@ -635,52 +739,20 @@
             <p>기본적으로 어디로도 전송되지 않고 이 기기에서만 계산됩니다. 구글 연동을 켠 경우에만 내 구글 드라이브로 저장됩니다.</p>
             <p class="guide-q">계산 결과를 그대로 신고해도 되나요?</p>
             <p>결과는 참고용입니다. 실제 신고·납부는 세무 전문가나 관할 기관의 기준을 확인하세요.</p>
+            <p class="guide-q">관리자 비밀번호를 잊었어요.</p>
+            <p>구글 저장을 켜 두었다면 구글 시트의 <b>관리자</b> 탭 오른쪽 칸(B1)에 비밀번호가 적혀 있습니다. 그 칸을 새 비밀번호로 고친 뒤 잠금 창에서 <b>[비밀번호를 잊었어요]</b>를 누르면 적용됩니다. 구글 저장도 백업도 없다면 열 방법이 없으니 꼭 해 두세요.</p>
+            <p class="guide-q">알바생이 출퇴근을 잘못 찍었어요.</p>
+            <p>급여 계산 탭 달력에서 <b>그 날을 눌러 시간을 고치면</b> 됩니다. 시트의 출퇴근기록 탭에는 실제로 찍은 시각이 그대로 남아 있어 나중에 확인할 수 있습니다.</p>
           </div>
         </details>
-
-        <details class="guide-item">
-          <summary><span class="guide-no">9</span>알바생 출퇴근 찍기 · 관리자 비밀번호</summary>
-          <div class="guide-body">
-            <p>매장에 두는 <b>공용 기기(사장님 폰·태블릿)</b>에서 알바생이 직접 출근·퇴근을 찍게 하는 기능입니다. 찍은 시각은 그대로 달력과 구글 시트에 들어갑니다.</p>
-            <p class="guide-step-title">① 준비 (사장님이 한 번만)</p>
-            <ol>
-              <li>알바생마다 <b>[정산 설정]</b>(컴퓨터는 왼쪽 입력칸)의 <b>"출퇴근 비밀번호"</b>를 정해 줍니다. 비밀번호가 없는 알바생은 출퇴근을 찍을 수 없습니다.</li>
-              <li><b>⚙️ 설정 → 관리자 비밀번호</b>를 정합니다. 처음 직원을 추가하면 안내창이 뜨는데, 바로 정하거나 <b>[나중에]</b>를 눌러 나중에 정해도 됩니다. 정하면 평소에는 <b>⏱️ 출퇴근 화면만</b> 보이고, 급여·위생·설정은 <b>[🔒 관리자]</b>를 눌러 비밀번호를 입력해야 열립니다. 아무것도 안 하면 10분 뒤 자동으로 다시 잠깁니다.</li>
-              <li><b>자정까지 퇴근을 안 찍으면</b> 출근 중인 사람은 그날 <b>출근이 무효(휴무)로 처리</b>됩니다. 퇴근을 꼭 찍어 주세요. 잊었다면 사장님이 달력에서 그날 시간을 직접 넣어 주세요. (시트 기록에는 "퇴근누락(무효)·자동(자정)"으로 남습니다) 다시 로그인하거나 시트에서 불러오면 시트의 출퇴근 기록을 읽어 출근/퇴근 상태도 되살립니다.</li>
-              <li>출퇴근 화면 맨 아래에 <b>구글 저장 연결 상태</b>가 보입니다. 빨간 글씨 "구글 로그인이 풀렸어요"가 보이면 사장님이 [🔒 관리자]로 들어가 구글을 다시 연결해 주세요. 새로고침해도 로그인·관리자 잠금 해제는 약 10분(구글은 약 1시간) 동안 유지됩니다.</li>
-              <li>알바생이나 명단을 지우면 시트의 <b>출퇴근기록</b> 탭에서도 그 사람 줄이 함께 지워집니다.</li>
-              <li>출퇴근 화면을 계속 켜 두면 <b>화면 보호기</b>가 작동합니다(기본 3분). 화면이 어두워지고 시계가 천천히 움직여 번인을 줄여요. 한 번 누르면 돌아옵니다. <b>⚙️ 설정 → 화면 보호기</b>에서 시간을 바꾸거나 끌 수 있습니다.</li>
-              <li><b>⚙️ 설정 → 출퇴근 알림음</b>에서 소리 크기를 키우고, 출근과 퇴근 소리를 각각 다른 소리로 고를 수 있습니다. (매장 기기에서 정하세요)</li>
-              <li><b>잊어버렸다면?</b> 구글 저장을 켜 두면 구글 시트의 <b>관리자</b> 탭 오른쪽 칸(B1)에 비밀번호가 적혀 있습니다. 그 칸을 새 비밀번호로 고친 뒤, 잠금 창에서 <b>[비밀번호를 잊었어요]</b>를 누르면 적용됩니다.</li>
-              <li>비밀번호를 잊으면 열 방법이 없으니 <b>구글 저장이나 백업 파일</b>을 꼭 해 두세요.</li>
-            </ol>
-            <p class="guide-step-title">② 알바생이 찍는 방법</p>
-            <ol>
-              <li>출퇴근 화면에서 <b>내 이름</b>을 누릅니다.</li>
-              <li><b>비밀번호</b>를 입력하고 <b>[출근 찍기]</b>(출근 중이면 <b>[퇴근 찍기]</b>)를 누릅니다.</li>
-              <li>결과 창에 <b>이번 달 일한 일수와 누적 근무시간</b>이 나오고, <b>5초 뒤 자동으로 닫힙니다</b>. 바로 닫으려면 [닫기]를 누르세요.</li>
-            </ol>
-            <figure class="guide-fig"><img src="./img/guide-punch-list.webp" alt="출퇴근 화면 (초록색이 근무 중)" loading="lazy" decoding="async"><figcaption>출퇴근 화면 (초록색이 근무 중)</figcaption></figure>
-            <figure class="guide-fig"><img src="./img/guide-punch-pw.webp" alt="비밀번호 입력" loading="lazy" decoding="async"><figcaption>비밀번호 입력</figcaption></figure>
-            <figure class="guide-fig"><img src="./img/guide-punch-out.webp" alt="퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)" loading="lazy" decoding="async"><figcaption>퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)</figcaption></figure>
-            <p class="guide-step-title">③ 어떻게 기록되나요</p>
-            <ul>
-              <li>출근 중이 아니면 <b>출근</b>, 출근 중이면 <b>퇴근</b>이 찍힙니다. 달력의 그 날 칸에 들어가 급여 계산에 바로 반영됩니다. <b>출근은 올림, 퇴근은 내림</b>으로 끊습니다(기본 30분 단위: 출근 08:59→09:00, 09:01→09:30 / 퇴근 09:59→09:30, 10:00 이후→10:00). 설정의 [출퇴근 시간 끊기]에서 단위, 지각·조기퇴근 <b>봐주기(유예 5·10·15분)</b>, 찍은 그대로 기록을 고를 수 있습니다. 예) 유예 5분이면 09:05 출근은 09:00, 17:55 퇴근은 18:00으로 기록됩니다. 마감할 때는 출퇴근 화면의 [근무 중인 사람 모두 퇴근]으로 한 번에 퇴근시킬 수 있습니다. 휴게시간은 따로 넣지 않으면 0분입니다.</li>
-              <li><b>자정(00:00)까지 퇴근을 안 찍으면</b> 그날 출근은 무효(휴무)가 됩니다. 밤 12시를 넘겨 일하는 근무는 자동으로 이어지지 않으니, 그런 날은 달력에서 직접 넣어 주세요.</li>
-              <li>같은 날 두 번 일하면(점심 후 다시 출근) 한 칸으로 합쳐지고 사이 시간은 휴게로 빠집니다.</li>
-              <li>잘못 찍었거나 안 찍었다면 <b>달력에서 그 날을 눌러 고치면</b> 됩니다.</li>
-              <li>구글 저장을 켜 두었다면 시트의 <b>"출퇴근기록" 탭</b>에 찍은 시각·이름·출근/퇴근·처리결과가 한 줄씩 쌓입니다. 비밀번호를 틀린 기록도 남고, 5번 연속 틀리면 30초 동안 막힙니다.</li>
-            </ul>
-            <p class="guide-tip">💡 알바생 비밀번호는 시트의 "알바생" 탭에도 그대로 보입니다. 다른 곳에서 쓰는 중요한 비밀번호는 쓰지 말고 <b>4자리 숫자</b>처럼 간단한 것으로 정하세요.</p>
-          </div>
-        </details>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="app-footer">
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
-    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.3.1</span></div>
+    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.4.0</span></div>
   </footer>
 
   <!-- 출퇴근: 비밀번호 입력 -->
@@ -908,10 +980,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611132300"></script>
-  <script src="./lang_web.js?v=202611132300"></script>
-  <script src="./i18n.js?v=202611132300"></script>
-  <script src="./gsync.js?v=202611132300"></script>
-  <script src="./app.js?v=202611132300"></script>
+  <script src="./engine.js?v=202611140100"></script>
+  <script src="./lang_web.js?v=202611140100"></script>
+  <script src="./i18n.js?v=202611140100"></script>
+  <script src="./gsync.js?v=202611140100"></script>
+  <script src="./app.js?v=202611140100"></script>
 </body>
 </html>
