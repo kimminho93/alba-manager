@@ -2183,7 +2183,7 @@
   }
 
   /* ---------- 화면 보호기 (번인 방지) ---------- */
-  var EGG_TEXT = '진주 경상대점 맘스터치 매니저님 짱 ✨';   // 이스터에그 문구 (언어와 상관없이 그대로)
+  var EGG_TEXT = '진주 경상대점 맘스터치 점장님 짱 ✨';   // 이스터에그 문구 (언어와 상관없이 그대로)
   var SAVER_KEY = 'alba.saverMin';
   var saverState = { last: Date.now(), on: false, moveTimer: null };
   function saverMinutes() {
