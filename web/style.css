@@ -2385,3 +2385,8 @@ body.on-punch .app-footer, body.locked .app-footer { display: none; }
 .pill-work { background: rgba(53,99,240,.12); color: var(--primary); border: 1px solid rgba(53,99,240,.35); margin-left: 6px; font-weight: 700; }
 .wchip .wdot { margin-right: 6px; }
 @media print { .work-now { display: none !important; } }
+
+/* 근무 중인 사람 일괄 퇴근 */
+.punch-all { display: block; margin: 18px auto 0; max-width: 560px; width: 100%; padding: 16px; font-size: 18px; font-weight: 800; border-radius: 14px; background: var(--text); color: var(--card); border: 0; }
+.punch-all[hidden] { display: none; }
+@media print { .punch-all { display: none !important; } }

@@ -351,7 +351,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var ENGINE_VERSION = '1.1.0';
+  var ENGINE_VERSION = '1.2.0';
 
   /** "10,000원", " 62 " 같은 값을 숫자로 변환. 실패 시 def 반환 */
   function toNumber(v, def) {
@@ -1817,13 +1817,29 @@
     return o;
   }
 
-  /** 출근 시각은 30분 단위로 올림: 09:00 → 09:00, 09:01 → 09:30, 09:31 → 10:00 (자정을 넘기면 23:59로 제한) */
-  function roundUp30(hm) {
-    var m = Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3));
-    var r = Math.ceil(m / 30) * 30;
-    if (r >= 1440) return '23:59';
-    return ('0' + Math.floor(r / 60)).slice(-2) + ':' + ('0' + (r % 60)).slice(-2);
+  var PUNCH_UNITS = [1, 5, 10, 15, 20, 30, 60];   // 출퇴근 시각을 끊는 단위(분). 1 = 끊지 않음
+  var DEFAULT_PUNCH_UNIT = 30;
+  function cleanUnit(u) {
+    u = Number(u);
+    return PUNCH_UNITS.indexOf(u) >= 0 ? u : DEFAULT_PUNCH_UNIT;
   }
+  function hmFromMin(r) { return ('0' + Math.floor(r / 60)).slice(-2) + ':' + ('0' + (r % 60)).slice(-2); }
+
+  /** 출근 시각은 단위로 올림: 30분 단위면 09:00 → 09:00, 09:01 → 09:30, 08:59 → 09:00 (자정을 넘기면 23:59로 제한) */
+  function roundUpUnit(hm, unit) {
+    unit = cleanUnit(unit);
+    var m = Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3));
+    var r = Math.ceil(m / unit) * unit;
+    if (r >= 1440) return '23:59';
+    return hmFromMin(r);
+  }
+  /** 퇴근 시각은 단위로 내림: 30분 단위면 10:00 이후 → 10:00, 09:59 → 09:30 */
+  function roundDownUnit(hm, unit) {
+    unit = cleanUnit(unit);
+    var m = Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3));
+    return hmFromMin(Math.floor(m / unit) * unit);
+  }
+  function roundUp30(hm) { return roundUpUnit(hm, 30); }
 
   function punchIsOpen(worker) { return !!(worker && cleanPunch(worker.punch)); }
 
@@ -1835,7 +1851,8 @@
    * 같은 날 두 번 일하면 한 칸에 합치고 사이 시간은 휴게시간으로 뺀다.
    * 반환: { kind:'in'|'out'|'too_soon', date, start, end, note }
    */
-  function applyPunch(worker, now) {
+  function applyPunch(worker, now, unit) {
+    unit = cleanUnit(unit === undefined ? DEFAULT_PUNCH_UNIT : unit);
     var open = cleanPunch(worker.punch);
     var today = ymdOf(now), time = hmOf(now);
     var note = '';
@@ -1844,16 +1861,17 @@
       var elapsed = (now.getTime() - inMs) / 60000;
       if (elapsed >= 0 && elapsed <= PUNCH_MAX_MIN) {
         if (elapsed < 1) return { kind: 'too_soon', date: open.date, start: open.time, end: time, note: '' };
-        if (today === open.date && toMin(time) < toMin(open.time)) {
-          // 올림한 출근 시각(예: 09:30)보다 일찍 퇴근 → 근무 시간 0, 기록은 남기지 않고 출근만 취소
+        var endT = roundDownUnit(time, unit);   // 퇴근은 내림
+        if (today === open.date && toMin(endT) <= toMin(open.time)) {
+          // 올림한 출근 시각(예: 09:30)보다 일찍, 또는 같은 시각으로 끊기면 근무 시간 0 → 기록은 남기지 않고 출근만 취소
           delete worker.punch;
           return { kind: 'out', date: open.date, start: open.time, end: open.time, note: P.t('출근 시각({t}) 전에 퇴근해서 근무 시간은 0시간이에요', { t: open.time }), empty: true };
         }
-        return clockOut(worker, open, time);
+        return clockOut(worker, open, endT);
       }
       note = P.t('이전 출근({d})은 퇴근 기록이 없어 무시하고 새로 출근 처리', { d: open.date + ' ' + open.time });
     }
-    var rounded = roundUp30(time);
+    var rounded = roundUpUnit(time, unit);
     worker.punch = { date: today, time: rounded, at: time };
     return { kind: 'in', date: today, start: rounded, end: '', note: note };
   }
@@ -1912,7 +1930,7 @@
    * 시간순으로 다시 적용한다. rows 한 줄 = [기록시각, 고유코드, 이름, 구분, 입력방식, 처리결과, 메모]
    * 반환: 적용한 줄 수
    */
-  function replayPunchLog(workers, rows, afterMs) {
+  function replayPunchLog(workers, rows, afterMs, unit) {
     var n = 0;
     (rows || []).forEach(function (row) {
       if (!row || row.length < 4) return;
@@ -1925,10 +1943,21 @@
       var code = String(row[1] || '').trim();
       var w = (workers || []).filter(function (x) { return x.code === code; })[0];
       if (!w) return;
-      var r = applyPunch(w, ts);
+      var r = applyPunch(w, ts, unit);
       if (r.kind === 'in' || r.kind === 'out') n++;
     });
     return n;
+  }
+
+  /** 근무 중인 사람 모두 한꺼번에 퇴근 처리. 반환: [{worker, result}] (방금 출근해 too_soon 인 사람은 빠짐) */
+  function applyPunchAll(workers, now, unit) {
+    var out = [];
+    (workers || []).forEach(function (w) {
+      if (punchNext(w, now) !== 'out') return;
+      var r = applyPunch(w, now, unit);
+      if (r.kind === 'out') out.push({ worker: w, result: r });
+    });
+    return out;
   }
 
   /** 지금 찍으면 어떤 처리가 되는지: 'in'(출근) | 'out'(퇴근) */
@@ -2072,7 +2101,8 @@
     return {
       minWage: isFinite(mw) && mw > 0 && mw < 1000000 ? mw : DEFAULT_MIN_WAGE,
       rates: P.sanitizeRates(raw.rates),
-      mealTimes: P.sanitizeMealTimes(raw.mealTimes)
+      mealTimes: P.sanitizeMealTimes(raw.mealTimes),
+      punchUnit: cleanUnit(raw.punchUnit)
     };
   }
 
@@ -2087,6 +2117,11 @@
     cleanPassword: cleanPassword,
     punchIsOpen: punchIsOpen,
     applyPunch: applyPunch,
+    applyPunchAll: applyPunchAll,
+    PUNCH_UNITS: PUNCH_UNITS,
+    DEFAULT_PUNCH_UNIT: DEFAULT_PUNCH_UNIT,
+    roundUpUnit: roundUpUnit,
+    roundDownUnit: roundDownUnit,
     punchNext: punchNext,
     autoCloseOpen: autoCloseOpen,
     replayPunchLog: replayPunchLog,
@@ -3152,4 +3187,4 @@
 });
 
 /* ===== 버전 (package.json 의 version) ===== */
-;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.1.0';
+;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.2.0';

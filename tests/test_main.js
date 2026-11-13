@@ -579,10 +579,10 @@ test('출퇴근: 출근 → 퇴근이면 그 날 달력 칸에 시각이 그대�
   assert.strictEqual(sh.off, false);
   assert.strictEqual(a.start, '09:30');   // 출근은 30분 단위 올림
   assert.strictEqual(sh.start, '09:30');
-  assert.strictEqual(sh.end, '18:33');
+  assert.strictEqual(sh.end, '18:30');   // 퇴근은 30분 단위 내림
   const sum = E.monthSummary(w, '2026-11');
   assert.strictEqual(sum.workDays, 1);
-  assert.ok(Math.abs(sum.totalHours - 9.05) < 0.01);
+  assert.ok(Math.abs(sum.totalHours - 9) < 0.01);
 });
 
 test('출근 30분 올림: 정각 유지, 1분이라도 지나면 다음 30분, 올림 전 시각 기준으로 중복 찍기 판단', () => {
@@ -600,6 +600,57 @@ test('출근 30분 올림: 정각 유지, 1분이라도 지나면 다음 30분, 
   assert.strictEqual(E.applyPunch(w, at(9, 5)).kind, 'too_soon');   // 1분 안에 또 누름
   assert.strictEqual(E.punchIsOpen(w), true);
   assert.strictEqual(E.applyPunch(w, at(13, 0)).kind, 'out');
+});
+
+test('출퇴근 끊기: 출근 올림(08:59→09:00, 09:01→09:30), 퇴근 내림(09:59→09:30, 10:00 이후→10:00), 단위 설정', () => {
+  const at = (h, m) => new Date(2026, 10, 12, h, m, 0);
+  const inT = (h, m, u) => { const w = E.createWorker('가', 5, 10320); return E.applyPunch(w, at(h, m), u).start; };
+  assert.strictEqual(inT(8, 59), '09:00');
+  assert.strictEqual(inT(9, 0), '09:00');
+  assert.strictEqual(inT(9, 1), '09:30');
+  const outT = (h, m, u) => { const w = E.createWorker('가', 5, 10320); E.applyPunch(w, at(8, 50), u); const r = E.applyPunch(w, at(h, m), u); return r.end; };
+  assert.strictEqual(outT(9, 59), '09:30');
+  assert.strictEqual(outT(10, 0), '10:00');
+  assert.strictEqual(outT(10, 29), '10:00');
+  assert.strictEqual(outT(10, 30), '10:30');
+  // 단위 바꾸기
+  assert.strictEqual(inT(9, 1, 15), '09:15');
+  assert.strictEqual(inT(9, 1, 60), '10:00');
+  assert.strictEqual(inT(9, 1, 1), '09:01');
+  assert.strictEqual(outT(10, 29, 15), '10:15');
+  assert.strictEqual(outT(10, 29, 1), '10:29');
+  assert.strictEqual(outT(10, 59, 60), '10:00');
+  // 엉뚱한 단위는 30분으로
+  assert.strictEqual(E.sanitizeSettings({ punchUnit: 7 }).punchUnit, 30);
+  assert.strictEqual(E.sanitizeSettings({ punchUnit: '15' }).punchUnit, 15);
+  assert.strictEqual(E.sanitizeSettings({}).punchUnit, 30);
+  // 출근 직후(같은 단위 안) 퇴근하면 근무 0시간, 기록은 남기지 않고 출근만 취소
+  const w = E.createWorker('나', 5, 10320);
+  E.applyPunch(w, at(9, 5));   // 09:30 기록
+  const r = E.applyPunch(w, at(9, 40));   // 내림 09:30 = 출근과 같음
+  assert.strictEqual(r.kind, 'out'); assert.strictEqual(r.empty, true);
+  assert.strictEqual(E.punchIsOpen(w), false);
+  assert.deepStrictEqual(E.monthSummary(w, '2026-11'), { workDays: 0, totalHours: 0 });
+});
+
+test('일괄 퇴근: 근무 중인 사람만 한꺼번에 퇴근, 출근 안 한 사람은 그대로, 시트 기록 재생도 같은 결과', () => {
+  const at = (h, m) => new Date(2026, 10, 12, h, m, 0);
+  const a = E.createWorker('가', 5, 10320), b = E.createWorker('나', 5, 10320), c = E.createWorker('다', 5, 10320);
+  E.applyPunch(a, at(9, 0)); E.applyPunch(b, at(13, 5));
+  const done = E.applyPunchAll([a, b, c], at(22, 12));
+  assert.strictEqual(done.length, 2);
+  assert.deepStrictEqual(done.map(d => d.worker.name), ['가', '나']);
+  assert.strictEqual(done[0].result.end, '22:00');
+  assert.strictEqual(E.punchIsOpen(a) || E.punchIsOpen(b) || E.punchIsOpen(c), false);
+  assert.strictEqual(E.workerShifts(a, '2026-11')[11].end, '22:00');
+  assert.strictEqual(E.workerShifts(b, '2026-11')[11].start, '13:30');
+  assert.strictEqual(E.applyPunchAll([a, b, c], at(22, 13)).length, 0);   // 두 번 눌러도 안전
+  // 다른 기기에서 시트 기록으로 복구해도 같은 결과
+  const a2 = E.createWorker('가', 5, 10320); a2.code = a.code;
+  const ts = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':00';
+  const rows = [[ts(at(9, 0)), a.code, '가', '출근', '이름+비밀번호', '정상', ''], [ts(at(22, 12)), a.code, '가', '퇴근', '일괄 퇴근(관리자)', '정상', '']];
+  assert.strictEqual(E.replayPunchLog([a2], rows, 0, 30), 2);
+  assert.strictEqual(E.workerShifts(a2, '2026-11')[11].end, '22:00');
 });
 
 test('출퇴근: 1분 안에 다시 찍으면 무시, 출근 후 16시간이 넘으면 퇴근 누락으로 보고 새 출근', () => {
