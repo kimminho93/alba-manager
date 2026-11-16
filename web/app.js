@@ -99,19 +99,26 @@
   }
 
   var syncSuspended = false; // 구글 시트에서 받은 내용을 반영하는 중에는 다시 저장하지 않음
+  var storageWarnAt = 0;
+  function storageFull() {   // 기기 저장 공간이 꽉 차 저장에 실패함 → 1분에 한 번 빨간 알림
+    if (Date.now() - storageWarnAt < 60000) return;
+    storageWarnAt = Date.now();
+    showToast(tr('⚠️ 기기 저장 공간이 부족해 저장하지 못했어요. 지난 점검 보관함을 정리하거나 사장님께 알려 주세요.'), true);
+  }
   function saveJson(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { storageFull(); }
     if (!syncSuspended && SYNC_KEYS[key] && window.AlbaCloud) window.AlbaCloud.markDirty();
   }
 
   var toastTimer = null;
-  function showToast(msg) {
+  function showToast(msg, isError) {
     var el = $('toast');
     if (!el) return;
     el.textContent = msg;
+    el.classList.toggle('error', !!isError);
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2400);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, isError ? 5000 : 2400);
   }
 
   function pad2(n) { return String(n).padStart(2, '0'); }
@@ -2206,11 +2213,23 @@
 
   /* ---------- 시트 '출퇴근기록' 탭에 한 줄씩 덧붙임 (연동 중일 때) ---------- */
   var queueBusy = false;
-  function loadQueue() { var q = loadJson(QUEUE_KEY, []); return Array.isArray(q) ? q : []; }
+  /* 대기 줄 하나 = {id, row}. 예전 버전은 row(7칸 배열)만 저장했으므로 읽을 때 id를 붙임 */
+  var queueSeq = 0;
+  function queueId() { return Date.now().toString(36) + '-' + (queueSeq++).toString(36) + '-' + Math.random().toString(36).slice(2, 8); }
+  function loadQueue() {
+    var q = loadJson(QUEUE_KEY, []);
+    if (!Array.isArray(q)) return [];
+    return q.map(function (x) {
+      if (Array.isArray(x)) return { id: 'old-' + JSON.stringify(x), row: x };
+      return x && Array.isArray(x.row) ? { id: String(x.id || queueId()), row: x.row } : null;
+    }).filter(Boolean);
+  }
+  function saveQueue(q) { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); return true; } catch (e) { storageFull(); return false; } }
   function enqueuePunch(row) {
     var q = loadQueue();
-    q.push(row);
-    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q.slice(-500))); } catch (e) {}
+    q.push({ id: queueId(), row: row });
+    if (q.length > 500) showToast(tr('⚠️ 시트에 못 올린 출퇴근 기록이 500건을 넘어 가장 오래된 기록부터 지워져요. 구글 로그인을 확인해 주세요.'), true);
+    saveQueue(q.slice(-500));
     renderPunchCloud();
     flushPunchQueue();
   }
@@ -2220,16 +2239,20 @@
     var q = loadQueue();
     if (!q.length) return;
     queueBusy = true;
-    C.appendPunch(q).then(function () {
-      var rest = loadQueue().slice(q.length);
-      try { localStorage.setItem(QUEUE_KEY, JSON.stringify(rest)); } catch (e) {}
-    }).catch(function () { /* 다음 저장 때 다시 시도 */ }).then(function () { queueBusy = false; renderPunchCloud(); });
+    var sent = {}, more = false;
+    q.forEach(function (x) { sent[x.id] = true; });
+    C.appendPunch(q.map(function (x) { return x.row; })).then(function () {
+      // 보낸 줄만 지움 (보내는 사이 새로 찍힌 줄·지워진 줄이 있어도 순서와 상관없이 정확히)
+      var rest = loadQueue().filter(function (x) { return !sent[x.id]; });
+      saveQueue(rest);
+      more = rest.length > 0;
+    }).catch(function () { /* 다음 저장 때 다시 시도 */ }).then(function () { queueBusy = false; renderPunchCloud(); if (more) flushPunchQueue(); });
   }
 
   /* 지운 알바생의 출퇴근 장부 줄도 지운다 (이 기기에 쌓인 대기분 + 구글 시트). codes가 null이면 전부 */
   function purgePunchRows(codes) {
-    var q = loadQueue().filter(function (r) { return codes && codes.indexOf(String(r[1])) < 0; });
-    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch (e) {}
+    var q = loadQueue().filter(function (x) { return codes && codes.indexOf(String(x.row[1])) < 0; });
+    saveQueue(q);
     // 시트에서 지우는 일은 로그인이 풀려 있거나 실패하면 보관했다가, 다음에 저장이 성공할 때 다시 시도
     var p = loadPurges();
     p.push({ codes: codes, before: tsOf(new Date()) });
@@ -2335,6 +2358,7 @@
     var C = window.AlbaCloud, st = C && C.getStatus ? C.getStatus() : null;
     if (st && st.kind === 'saving') return false;
     if (queueBusy || purgeBusy) return false;
+    if (navigator.onLine === false) return false;   // 인터넷이 끊긴 순간 새로고침하면 빈 화면이 뜨므로
     try {   // 같은 버전으로 계속 새로고침하는 일 방지 (10분에 한 번만 시도)
       var tried = JSON.parse(sessionStorage.getItem('alba.updTried') || 'null');
       if (tried && tried.v === update.next && Date.now() - tried.t < 600000) return false;
@@ -2411,26 +2435,42 @@
     state.workers.forEach(function (w) {
       (w.pending || []).forEach(function (p, i) { items.push({ w: w, p: p, i: i }); });
     });
-    if (!items.length) { box.hidden = true; box.innerHTML = ''; return; }
+    if (!items.length) { box.hidden = true; box.innerHTML = ''; box.removeAttribute('data-sig'); return; }
+    // 같은 내용이면 다시 그리지 않음 (넣고 있던 퇴근 시각이 지워지지 않게). 다시 그려도 넣던 값은 살림
+    var sig = JSON.stringify([E.getLang(), items.map(function (x) { return [x.w.id, x.w.name, x.p.id || (x.p.date + ' ' + x.p.start), x.p.end || '']; })]);
+    if (!box.hidden && box.getAttribute('data-sig') === sig) return;
+    var typed = {}, focusKey = null;
+    box.querySelectorAll('[data-pending-time]').forEach(function (el) {
+      if (el.value) typed[el.getAttribute('data-pending-time')] = el.value;
+      if (el === document.activeElement) focusKey = el.getAttribute('data-pending-time');
+    });
     box.innerHTML = '<div class="pending-head">' + tr('⚠️ 퇴근 확인 필요 {n}건', { n: items.length }) + '</div>' +
       '<p class="pending-note">' + tr('퇴근을 안 찍어 자동 퇴근된 근무예요. 실제 퇴근 시각을 넣으면 달력에 기록돼요. 일하지 않았으면 [근무 없음]을 누르세요.') + '</p>' +
       items.map(function (x) {
         var d = x.p.date, wd = E.dayName((new Date(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8))).getDay() + 6) % 7);
-        var key = escHtml(x.w.id) + '|' + x.i;
+        var rawKey = x.w.id + '|' + (x.p.id || (x.p.date + ' ' + x.p.start));
+        var key = escHtml(rawKey);
+        var val = typed[rawKey] || x.p.end || '';
         return '<div class="pending-row">' +
           '<div class="pending-who"><b>' + escHtml(x.w.name) + '</b> · ' + tr('{m}월 {d}일 ({w}) {t} 출근', { m: Number(d.slice(5, 7)), d: Number(d.slice(8)), w: wd, t: escHtml(x.p.start) }) + '</div>' +
           '<div class="pending-act">' +
-            '<input type="time" class="pending-time" data-pending-time="' + key + '" aria-label="' + escHtml(tr('퇴근 시각')) + '">' +
+            '<input type="time" class="pending-time" data-pending-time="' + key + '" value="' + escHtml(val) + '" aria-label="' + escHtml(tr('퇴근 시각')) + '">' +
             '<button type="button" class="btn btn-primary" data-pending-ok="' + key + '">' + tr('퇴근 기록') + '</button>' +
             '<button type="button" class="btn" data-pending-no="' + key + '">' + tr('근무 없음') + '</button>' +
           '</div></div>';
       }).join('');
     box.hidden = false;
+    box.setAttribute('data-sig', sig);
+    if (focusKey) box.querySelectorAll('[data-pending-time]').forEach(function (el) { if (el.getAttribute('data-pending-time') === focusKey) el.focus(); });
   }
   function pendingTarget(key) {
-    var k = String(key).split('|');
-    var w = state.workers.filter(function (x) { return x.id === k[0]; })[0];
-    return w ? { w: w, i: Number(k[1]) } : null;
+    var k = String(key), cut = k.indexOf('|');
+    var wid = k.slice(0, cut), pid = k.slice(cut + 1);
+    var w = state.workers.filter(function (x) { return x.id === wid; })[0];
+    if (!w) return null;
+    var i = -1;
+    (w.pending || []).forEach(function (p, j) { if ((p.id || (p.date + ' ' + p.start)) === pid) i = j; });
+    return i >= 0 ? { w: w, i: i } : null;
   }
   function onPendingClick(ev) {
     var ok = ev.target.closest('[data-pending-ok]'), no = ev.target.closest('[data-pending-no]');
@@ -2440,7 +2480,8 @@
     if (!t || !t.w.pending || !t.w.pending[t.i]) { renderPending(); return; }
     var p = t.w.pending[t.i];
     if (ok) {
-      var inp = document.querySelector('[data-pending-time="' + key.replace(/"/g, '') + '"]');
+      var inp = null;
+      $('pendingBox').querySelectorAll('[data-pending-time]').forEach(function (el) { if (el.getAttribute('data-pending-time') === key) inp = el; });
       var end = inp ? inp.value : '';
       if (!/^\d{2}:\d{2}$/.test(end)) { showToast(tr('퇴근 시각을 넣어 주세요.')); if (inp) inp.focus(); return; }
       var r = E.resolvePending(t.w, t.i, end);
@@ -2698,6 +2739,7 @@
     else go();
   }
   function doBulkOut() {
+    runAutoClose();   // 자동 퇴근 시각이 지난 근무부터 정리 (그 사람에게 새 출근이 찍히지 않게)
     var now = new Date();
     var done = E.applyPunchAll(state.workers, now, punchOpts());
     if (!done.length) { showToast(tr('지금 근무 중인 사람이 없어요.')); renderPunch(); return; }
@@ -2714,7 +2756,7 @@
       var r = d.result, w = d.worker;
       var sh = r.empty ? null : E.workerShifts(w, r.date.slice(0, 7))[Number(r.date.slice(8)) - 1];
       var hrs = sh && !sh.off ? fmtHM(E.calcShiftHours(sh.start, sh.end, sh.breakMinutes)) : fmtHM(0);
-      return '<div>' + escHtml(w.name) + ' · ' + (r.empty ? tr('근무 0시간') : escHtml(r.start + '~' + r.end) + ' (' + hrs + ')') + '</div>';
+      return '<div>' + escHtml(w.name) + ' · ' + (r.held ? tr('확인 필요') : r.empty ? tr('근무 0시간') : escHtml(r.start + '~' + r.end) + ' (' + hrs + ')') + '</div>';
     }).join('');
     var bar = $('punchTimerBar');
     bar.style.animation = 'none'; void bar.offsetWidth;

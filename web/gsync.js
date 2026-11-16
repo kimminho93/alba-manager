@@ -253,7 +253,7 @@
       if (remote && remote.stamp === meta.stamp) confirmWritten();
       if (!remote || remote.stamp === meta.stamp || !hasContent(remote.data)) return pushNow(mode);
       settleWritten(remote);
-      var merged = merge3(loadBase(), JSON.parse(JSON.stringify(host.getData())), remote.data);
+      var merged = mergeData(loadBase(), JSON.parse(JSON.stringify(host.getData())), remote.data);
       saveBase(JSON.stringify(remote.data));   // 지금 시트 내용을 봤으니 이게 새 기준
       meta.stamp = remote.stamp; meta.lineage = remote.lineage; writeMeta();
       host.applyData(merged);
@@ -263,7 +263,7 @@
   }
   function replayAfter(stamp) {
     if (!host.replayPunchLog || !meta.sheetId) return Promise.resolve();
-    var rng = encodeURIComponent(SHEET_PUNCH + '!A2:G5000');
+    var rng = encodeURIComponent(SHEET_PUNCH + '!A2:G');
     return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + rng, undefined, 'silent').then(function (res) {
       host.replayPunchLog((res && res.values) || [], stampMs(stamp));
     }).catch(function () {});
@@ -365,8 +365,10 @@
         return t.always || created[t.name] !== undefined || lastTabs[t.name] !== tabKey(t);
       });
       if (!changed.length) return null;
-      var names = changed.map(function (t) { return t.name; });
-      return api('POST', SHEETS + '/' + id + '/values:batchClear', { ranges: names }, mode).then(function () {
+      // 데이터 탭은 늘 300줄을 통째로 덮어쓰므로 지우지 않음 (지운 직후 끊기면 시트가 잠깐 비는 일 방지)
+      var names = changed.filter(function (t) { return t.name !== SHEET_DATA; }).map(function (t) { return t.name; });
+      var clear = names.length ? api('POST', SHEETS + '/' + id + '/values:batchClear', { ranges: names }, mode) : Promise.resolve();
+      return clear.then(function () {
         return api('POST', SHEETS + '/' + id + '/values:batchUpdate', {
           valueInputOption: 'RAW',
           data: changed.map(function (t) { return { range: t.name + '!A1', values: t.rows && t.rows.length ? t.rows : [['']] }; })
@@ -455,6 +457,14 @@
     }
     return l;   // 같은 칸을 양쪽이 다르게 바꿈 → 이 기기 쪽
   }
+  /* 예전 버전이 저장한 '퇴근 확인 필요' 항목에는 id가 없음 → 합치기 전에 붙여서 항목끼리 맞출 수 있게 */
+  function fixPend(d) {
+    if (d && Array.isArray(d.workers)) d.workers.forEach(function (w) {
+      if (w && Array.isArray(w.pending)) w.pending.forEach(function (p) { if (isObj(p) && !p.id && p.date && p.start) p.id = p.date + ' ' + p.start; });
+    });
+    return d;
+  }
+  function mergeData(b, l, r) { return merge3(fixPend(b), fixPend(l), fixPend(r)); }
   var BASE_KEY = 'alba.cloud.base', WRITTEN_KEY = 'alba.cloud.written';
   function saveBase(json) { try { deps.storage.set(BASE_KEY, json); deps.storage.remove(WRITTEN_KEY); } catch (e) {} }
   /* 방금 시트에 쓴 내용: 거의 동시에 다른 기기가 덮어썼을 수 있으므로, 시트에 내 저장 표시가 그대로 있는 걸 다시 확인한 뒤에 기준으로 삼는다 */
@@ -480,7 +490,7 @@
     // 이 기기가 쓴 내용이 다른 기기의 동시 저장에 덮였을 수 있으니, 마지막으로 확인한 기준과 비교해 이 기기 변경이 빠졌으면 다시 합친다
     var local = JSON.parse(JSON.stringify(host.getData()));
     if (!replace) settleWritten(r);
-    var merged = replace ? r.data : merge3(loadBase(), local, r.data);
+    var merged = replace ? r.data : mergeData(loadBase(), local, r.data);
     var lost = !replace && JSON.stringify(merged) !== JSON.stringify(r.data);
     host.applyData(merged);
     lastJson = JSON.stringify(r.data);
@@ -493,7 +503,7 @@
     writeMeta();
     // 저장 이후에 찍힌 출퇴근은 '출퇴근기록' 장부로 다시 맞춘다 (실패해도 불러오기는 그대로 성공)
     if (!host.replayPunchLog || !meta.sheetId) return Promise.resolve();
-    var rng = encodeURIComponent(SHEET_PUNCH + '!A2:G5000');
+    var rng = encodeURIComponent(SHEET_PUNCH + '!A2:G');
     return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + rng, undefined, 'silent').then(function (res) {
       host.replayPunchLog((res && res.values) || [], stampMs(r.stamp));
     }).catch(function () {});
@@ -652,7 +662,7 @@
   /* 앱에서 알바생/기록을 지우면 시트 '출퇴근기록' 장부에서도 그 사람(codes) 줄을 지운다. codes가 비면 전부 지운다 */
   function purgePunchLog(codes, beforeTs) {
     if (!meta.connected || !meta.sheetId) return Promise.resolve(false);
-    var rng = SHEET_PUNCH + '!A2:G5000';
+    var rng = SHEET_PUNCH + '!A2:G';
     return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(rng), undefined, 'silent').then(function (res) {
       var rows = (res && res.values) || [];
       // beforeTs 가 있으면 그 시각 이전 줄만 지움 (나중에 다시 시도할 때, 그 사이 새로 찍힌 기록은 지키기 위해)
@@ -748,6 +758,7 @@
     renewOnGesture: renewOnGesture,
     refresh: refresh,
     merge3: merge3,
+    mergeData: mergeData,
     mergeCount: function () { return merges; },
     appendPunch: appendPunch,
     purgePunchLog: purgePunchLog,

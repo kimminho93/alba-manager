@@ -866,7 +866,7 @@ test('자동 퇴근 시각: 기본 자정, 설정한 시각에 퇴근 처리하�
   const done = E.autoCloseOpen([b], D(13, 0, 0), '00:00');
   assert.strictEqual(done.length, 1);
   assert.strictEqual(E.punchIsOpen(b), false);
-  assert.deepStrictEqual(b.pending, [{ date: '2026-11-12', start: '18:00', at: '17:40', cut: '2026-11-13 00:00' }]);
+  assert.deepStrictEqual(b.pending, [{ id: '2026-11-12 18:00', date: '2026-11-12', start: '18:00', at: '17:40', cut: '2026-11-13 00:00' }]);
   assert.ok(Math.abs(E.monthSummary(b, '2026-11').totalHours - 3) < 0.01);   // 오전 근무만
   // 저장·불러오기 정리에서도 유지
   assert.deepStrictEqual(E.normalizeWorkers([JSON.parse(JSON.stringify(b))])[0].pending, b.pending);
@@ -878,13 +878,13 @@ test('자동 퇴근 시각: 기본 자정, 설정한 시각에 퇴근 처리하�
   assert.strictEqual(rr.ok, true);
   const s2 = E.workerShifts(b, '2026-11')[11];
   assert.deepStrictEqual([s2.start, s2.end, s2.breakMinutes], ['09:00', '22:00', 360]);
-  assert.strictEqual(b.pending, undefined);
+  assert.deepStrictEqual(b.pending, []);
   assert.strictEqual(E.punchIsOpen(b), true);   // 근무 중 상태 유지
   // 근무 없음으로 정리
   const c = E.createWorker('다', 5, 10320);
   E.applyPunch(c, D(12, 20, 0)); E.autoCloseOpen([c], D(13, 0, 1));
   assert.strictEqual(E.dismissPending(c, 0), true);
-  assert.strictEqual(c.pending, undefined);
+  assert.deepStrictEqual(c.pending, []);
   assert.strictEqual(E.monthSummary(c, '2026-11').workDays, 0);
   // 밤을 넘긴 퇴근 시각 입력(02:00)도 그 날 칸에 야간으로
   const d = E.createWorker('라', 5, 10320);
@@ -979,6 +979,87 @@ test('자정 직후 출근(00:06→00:30 올림)도 근무 중으로 표시', ()
   assert.strictEqual(r.start, '00:30');
   assert.strictEqual(E.punchNext(w, new Date(2026, 10, 13, 0, 7, 0)), 'out');
   assert.strictEqual(E.autoCloseOpen([w], new Date(2026, 10, 13, 0, 8, 0)).length, 0);   // 오늘 출근은 무효 처리 안 됨
+});
+
+test('검토 반영: 24시간 넘게 합쳐야 하면 앞선 근무를 지우지 않고 확인 필요로 남김', () => {
+  const D = (d, h, m) => new Date(2026, 10, d, h, m, 0);
+  const o = { unit: 30, autoOut: '06:00' };
+  const w = E.createWorker('가', 5, 10320);
+  E.applyPunch(w, D(16, 1, 0), o); E.applyPunch(w, D(16, 5, 0), o);      // 새벽 01:00~05:00
+  E.applyPunch(w, D(16, 22, 0), o);                                         // 밤 22:00 출근
+  const r = E.applyPunch(w, D(17, 2, 0), o);                                // 다음 날 02:00 퇴근 → 합치면 25시간
+  assert.strictEqual(r.kind, 'out');
+  assert.strictEqual(r.held, true);
+  const sh = E.workerShifts(w, '2026-11')[15];
+  assert.deepStrictEqual([sh.start, sh.end], ['01:00', '05:00']);           // 앞선 근무 그대로
+  assert.strictEqual(E.punchIsOpen(w), false);
+  assert.strictEqual(w.pending.length, 1);
+  assert.deepStrictEqual([w.pending[0].start, w.pending[0].end], ['22:00', '02:00']);
+  // 사장님이 그대로 확인하려 해도 합칠 수 없으면 오류 (무한 반복·거짓 성공 없음), 목록 유지
+  const rr = E.resolvePending(w, 0, '02:00');
+  assert.strictEqual(rr.ok, false);
+  assert.ok(/24/.test(rr.error));
+  assert.strictEqual(w.pending.length, 1);
+  assert.deepStrictEqual([E.workerShifts(w, '2026-11')[15].start, E.workerShifts(w, '2026-11')[15].end], ['01:00', '05:00']);
+  assert.strictEqual(E.dismissPending(w, 0), true);
+  assert.deepStrictEqual(w.pending, []);
+});
+
+test('검토 반영: 자정 직전 출근이 24:00으로 올림되면 다음 날 00:00부터 기록', () => {
+  const D = (d, h, m) => new Date(2026, 10, d, h, m, 0);
+  const o = { unit: 30, autoOut: '06:00' };
+  const a = E.createWorker('가', 5, 10320);
+  assert.strictEqual(E.applyPunch(a, D(16, 23, 31), o).start, '23:59');
+  const r = E.applyPunch(a, D(17, 3, 10), o);
+  assert.strictEqual(r.kind, 'out');
+  assert.strictEqual(E.workerShifts(a, '2026-11')[15].off, true);            // 전날 칸 비어 있음
+  const sh = E.workerShifts(a, '2026-11')[16];
+  assert.deepStrictEqual([sh.start, sh.end], ['00:00', '03:00']);
+  // 00:15 퇴근(→00:00)은 근무 0
+  const b = E.createWorker('나', 5, 10320);
+  E.applyPunch(b, D(16, 23, 31), o);
+  const r2 = E.applyPunch(b, D(17, 0, 15), o);
+  assert.strictEqual(r2.empty, true);
+  assert.strictEqual(E.monthSummary(b, '2026-11').workDays, 0);
+  assert.strictEqual(E.punchIsOpen(b), false);
+  // 찍은 그대로(exact) 23:59 출근은 그대로 1분부터
+  const c = E.createWorker('다', 5, 10320);
+  E.applyPunch(c, D(16, 23, 59), { unit: 1, autoOut: '06:00' });
+  E.applyPunch(c, D(17, 1, 0), { unit: 1, autoOut: '06:00' });
+  assert.deepStrictEqual([E.workerShifts(c, '2026-11')[15].start, E.workerShifts(c, '2026-11')[15].end], ['23:59', '01:00']);
+});
+
+test('검토 반영: 장부 줄이 시간순이 아니어도(오프라인 기기가 늦게 올림) 시간순으로 재생', () => {
+  const o = { unit: 30, autoOut: '00:00' };
+  const mk = () => { const a = E.createWorker('A', 5, 10320); a.code = 'AAAAAA'; const b = E.createWorker('B', 5, 10320); b.code = 'BBBBBB'; return [a, b]; };
+  const rows = [
+    ['2026-11-16 22:00:00', 'AAAAAA', 'A', '출근', '이름+비밀번호', '정상', ''],
+    ['2026-11-17 01:00:00', 'BBBBBB', 'B', '출근', '이름+비밀번호', '정상', ''],
+    ['2026-11-16 23:30:00', 'AAAAAA', 'A', '퇴근', '이름+비밀번호', '정상', '']
+  ];
+  const ws = mk();
+  E.replayPunchLog(ws, rows, 0, o);
+  const sh = E.workerShifts(ws[0], '2026-11')[15];
+  assert.deepStrictEqual([sh.start, sh.end], ['22:00', '23:30']);
+  assert.deepStrictEqual(ws[0].pending || [], []);
+  assert.strictEqual(E.punchIsOpen(ws[0]), false);
+  assert.strictEqual(E.punchIsOpen(ws[1]), true);
+  // 원래 배열은 건드리지 않음
+  assert.strictEqual(rows[1][0], '2026-11-17 01:00:00');
+});
+
+test('검토 반영: 자동 퇴근 시각이 지난 뒤 [모두 퇴근]을 눌러도 새 출근이 찍히지 않음', () => {
+  const o = { unit: 30, autoOut: '00:00' };
+  const w = E.createWorker('가', 5, 10320), v = E.createWorker('나', 5, 10320);
+  E.applyPunch(w, new Date(2026, 10, 16, 18, 0, 0), o);
+  E.applyPunch(v, new Date(2026, 10, 16, 23, 50, 0), o);
+  const now = new Date(2026, 10, 17, 0, 0, 5);
+  const done = E.applyPunchAll([w, v], now, o);
+  assert.strictEqual(done.length, 0);
+  assert.strictEqual(w.punch.date, '2026-11-16');   // 손대지 않음 → 자동 마감이 처리
+  assert.strictEqual(E.autoCloseOpen([w, v], now, '00:00').length, 2);
+  assert.strictEqual(E.punchIsOpen(w), false);
+  assert.strictEqual(w.pending.length, 1);
 });
 
 test('버전: 엔진 번들의 ALBA_VERSION이 package.json 버전과 같다', () => {

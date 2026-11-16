@@ -157,8 +157,7 @@
       if (dflt) item.defaults = dflt;
       var pn = cleanPunch(raw.punch);
       if (pn) item.punch = pn;
-      var pd = cleanPending(raw.pending);
-      if (pd.length) item.pending = pd;
+      if (Array.isArray(raw.pending)) item.pending = cleanPending(raw.pending);   // 빈 목록도 남김 (다른 기기와 합칠 때 '확인 끝남'을 알 수 있게)
       if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(raw.lastTs))) { item.lastTs = raw.lastTs; if (/^(in|out|auto)$/.test(String(raw.lastKind))) item.lastKind = raw.lastKind; }
       out.push(item);
     });
@@ -192,8 +191,9 @@
       var k = x.date + ' ' + x.start;
       if (seen[k]) return;
       seen[k] = true;
-      var o = { date: x.date, start: x.start };
+      var o = { id: k, date: x.date, start: x.start };   // id: 기기끼리 합칠 때 같은 항목을 맞추는 열쇠
       if (HM_RE.test(String(x.at))) o.at = x.at;
+      if (HM_RE.test(String(x.end))) o.end = x.end;   // 찍었지만 달력에 못 넣은 퇴근 시각 (사장님 확인용)
       if (/^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d$/.test(String(x.cut))) o.cut = x.cut;
       out.push(o);
     });
@@ -303,12 +303,25 @@
       if (elapsed >= 0 && elapsed <= PUNCH_MAX_MIN) {
         if (elapsed < 1) return { kind: 'too_soon', date: open.date, start: open.time, end: time, note: '' };
         var endT = ruleOut(time, o);   // 퇴근: 내림(+유예) 또는 찍은 그대로
+        if (o.inMode !== 'exact' && open.time === '23:59' && today !== open.date) {
+          // 자정 직전 출근을 올림하면 다음 날 00:00 출근 → 다음 날 칸에 00:00부터 기록 (23:59~00:00 1분 근무가 생기지 않게)
+          open = { date: today, time: '00:00', at: open.at };
+        }
         if (today === open.date && toMin(endT) <= toMin(open.time)) {
           // 올림한 출근 시각(예: 09:30)보다 일찍, 또는 같은 시각으로 끊기면 근무 시간 0 → 기록은 남기지 않고 출근만 취소
           delete worker.punch;
           return { kind: 'out', date: open.date, start: open.time, end: open.time, note: P.t('출근 시각({t}) 전에 퇴근해서 근무 시간은 0시간이에요', { t: open.time }), empty: true };
         }
-        return clockOut(worker, open, endT);
+        var co = clockOut(worker, open, endT);
+        if (co.unmerged) {
+          // 같은 날 앞선 근무와 합치면 24시간이 넘음 → 앞선 근무는 그대로 두고, 이번 근무는 퇴근 시각과 함께 '확인 필요'로 남김
+          delete worker.punch;
+          var pp = cleanPending(worker.pending);
+          pp.push({ date: open.date, start: open.time, at: open.at || open.time, end: endT, cut: today + ' ' + time });
+          worker.pending = cleanPending(pp);
+          return { kind: 'out', date: open.date, start: open.time, end: endT, empty: true, held: true, note: P.t('같은 날 다른 근무와 합칠 수 없어 확인 필요로 남겼어요') };
+        }
+        return co;
       }
       note = P.t('이전 출근({d})은 퇴근 기록이 없어 무시하고 새로 출근 처리', { d: open.date + ' ' + open.time });
     }
@@ -336,6 +349,9 @@
         start = pad2(Math.floor(lo / 60) % 24) + ':' + pad2(lo % 60);
         end = pad2(Math.floor(hi / 60) % 24) + ':' + pad2(hi % 60);
         merged = true;
+      } else {
+        // 앞선 근무와 합치면 24시간이 넘음 → 한 칸에 담을 수 없으니 앞선 근무를 지우지 않고 그대로 둠 (부른 쪽이 확인 필요로 남김)
+        return { kind: 'out', unmerged: true, date: open.date, start: open.time, end: end };
       }
     }
     if (idx >= 0 && idx < shifts.length) {
@@ -392,9 +408,10 @@
     if (end === item.start) return { ok: false, error: P.t('퇴근 시각이 출근 시각과 같아요.') };
     var keep = worker.punch;
     var r = clockOut(worker, { date: item.date, time: item.start, at: item.at }, end);
-    if (keep) worker.punch = keep;
+    if (keep) worker.punch = keep; else delete worker.punch;
+    if (r.unmerged) return { ok: false, error: P.t('이 날에 이미 다른 근무가 있어 합치면 24시간이 넘어요. 달력에서 직접 고치거나 [근무 없음]으로 정리해 주세요.') };
     p.splice(i, 1);
-    if (p.length) worker.pending = p; else delete worker.pending;
+    worker.pending = p;
     return { ok: true, result: r };
   }
   /** 확인 필요 근무를 '근무 없음'으로 정리 */
@@ -402,7 +419,7 @@
     var p = cleanPending(worker.pending);
     if (!p[i]) return false;
     p.splice(i, 1);
-    if (p.length) worker.pending = p; else delete worker.pending;
+    worker.pending = p;
     return true;
   }
 
@@ -423,7 +440,11 @@
    */
   function replayPunchLog(workers, rows, afterMs, opts) {
     var n = 0;
-    (rows || []).forEach(function (row) {
+    // 기록시각 순서로 (오프라인이던 기기가 나중에 올린 줄이 시트 아래에 붙어도 시간순으로 적용). 같은 시각은 원래 순서 유지
+    var list = (rows || []).map(function (row, i) { return { row: row, i: i, k: row && row[0] !== undefined ? String(row[0]).trim() : '' }; });
+    list.sort(function (a, b) { return a.k < b.k ? -1 : a.k > b.k ? 1 : a.i - b.i; });
+    list.forEach(function (it) {
+      var row = it.row;
       if (!row || row.length < 4) return;
       var ts = parseLogTs(row[0]);
       if (!ts || ts.getTime() <= afterMs) return;
@@ -456,6 +477,8 @@
     var out = [];
     (workers || []).forEach(function (w) {
       if (punchNext(w, now) !== 'out') return;
+      // 자동 퇴근 시각이 이미 지난 사람은 일괄 퇴근에서 빼고(새 출근이 찍히지 않게) 자동 마감 처리에 맡김
+      if (opts && typeof opts === 'object' && opts.autoOut !== undefined && now.getTime() >= autoOutDeadline(cleanPunch(w.punch), opts.autoOut).getTime()) return;
       var r = applyPunch(w, now, opts);
       if (r.kind === 'out') out.push({ worker: w, result: r });
     });

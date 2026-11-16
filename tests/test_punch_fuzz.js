@@ -101,11 +101,11 @@ function round(seed) {
         let e = (Number(p.start.slice(0, 2)) + 1 + Math.floor(R() * 8)) % 24;
         const endHM = p2(e) + ':' + p2(Math.floor(R() * 60));
         const r = E.resolvePending(w, 0, endHM);
-        if (!r.ok) { assert.strictEqual(endHM, p.start); E.dismissPending(w, 0); }
+        if (!r.ok) { assert.ok(endHM === p.start || /24/.test(r.error), r.error); E.dismissPending(w, 0); }
       } else E.dismissPending(w, 0);
     }
     assert.strictEqual(JSON.stringify(w.punch || null), keep, '확인 처리 중 근무 중 상태가 바뀜');
-    assert.strictEqual(w.pending, undefined);
+    assert.deepStrictEqual(w.pending || [], []);
   });
   return rows.length;
 }

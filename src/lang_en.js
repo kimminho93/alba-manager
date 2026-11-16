@@ -157,6 +157,8 @@
   /* ---------- 출퇴근·백업 (workers.js / backup.js) ---------- */
   I.addDict({
     '출근 시각({t}) 전에 퇴근해서 근무 시간은 0시간이에요': 'Clocked out before the start time ({t}), so 0 hours are counted',
+    '같은 날 다른 근무와 합칠 수 없어 확인 필요로 남겼어요': 'Could not combine with another shift that day, so it was left for a check',
+    '이 날에 이미 다른 근무가 있어 합치면 24시간이 넘어요. 달력에서 직접 고치거나 [근무 없음]으로 정리해 주세요.': 'That day already has another shift and combining them would exceed 24 hours. Edit the calendar directly or choose [No work].',
     '이전 출근({d})은 퇴근 기록이 없어 무시하고 새로 출근 처리': 'The earlier clock-in ({d}) had no clock-out, so it was ignored and a new clock-in recorded',
     '같은 날 앞선 근무와 합쳐 사이 시간을 휴게로 처리': 'Merged with the earlier shift that day; the gap is treated as a break',
     '비어 있는 파일입니다.': 'The file is empty.',

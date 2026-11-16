@@ -62,7 +62,7 @@ function makeGoogle() {
         return res(200, { replies });
       }
       if (rest === '/values:batchClear') {
-        JSON.parse(opt.body).ranges.forEach(r => { const pm = /^(.+)!A2:G5000$/.exec(r); if (pm) { const pt = tab(pm[1]); pt.rows = pt.rows.slice(0, 1); return; } const t = tab(r); if (!t) throw new Error('없는 탭 clear: ' + r); t.rows = []; });
+        JSON.parse(opt.body).ranges.forEach(r => { const pm = /^(.+)!A2:G$/.exec(r); if (pm) { const pt = tab(pm[1]); pt.rows = pt.rows.slice(0, 1); return; } const t = tab(r); if (!t) throw new Error('없는 탭 clear: ' + r); t.rows = []; });
         return res(200, {});
       }
       if (rest === '/values:batchUpdate') {
@@ -94,7 +94,7 @@ function makeGoogle() {
       }
       const hm = /^\/values\/(.+)!A1:Z1$/.exec(rest);
       if (hm) { const t = tab(hm[1]); return res(200, t && t.rows[0] ? { values: [t.rows[0]] } : {}); }
-      const lm = /^\/values\/(.+)!A2:G5000$/.exec(decodeURIComponent(rest));
+      const lm = /^\/values\/(.+)!A2:G$/.exec(decodeURIComponent(rest));
       if (lm) { const t = tab(lm[1]); return res(200, { values: t ? t.rows.slice(1) : [] }); }
       const sm = /^\/values\/(.+)!A2$/.exec(decodeURIComponent(rest));
       if (sm) { const t = tab(sm[1]); g.stampReads = (g.stampReads || 0) + 1; return res(200, t && t.rows[1] ? { values: [[t.rows[1][0]]] } : {}); }
@@ -554,6 +554,23 @@ function makeDevice(google, opts) {
     assert.deepStrictEqual(a.data.workers[0].punch, { date: '2026-11-12', time: '09:30', at: '09:05' });
     const saved = JSON.parse(g.rows('sheet1', '데이터').slice(2).map(r => r[0]).join(''));
     assert.strictEqual(saved.workers[0].password, '1234');   // 시트에도 반영됨
+  });
+
+  await test('검토 반영: 퇴근 확인 필요(pending) 목록은 항목별로 합침 — 양쪽 추가 모두 살림, 처리한 항목은 되살아나지 않음', async () => {
+    const m = makeDevice(makeGoogle()).cloud.merge3;
+    const P1 = { id: '2026-11-12 18:00', date: '2026-11-12', start: '18:00' }, P2 = { id: '2026-11-13 19:00', date: '2026-11-13', start: '19:00' };
+    // 기준엔 없음, 두 기기가 각각 다른 항목 추가 → 둘 다
+    assert.deepStrictEqual(m({ pending: [] }, { pending: [P1] }, { pending: [P2] }).pending, [P1, P2]);
+    assert.deepStrictEqual(m(undefined, { pending: [P1] }, { pending: [P2] }).pending, [P1, P2]);
+    // 이 기기가 P1 확인(빈 목록), 다른 기기는 P2 추가 → P2만
+    assert.deepStrictEqual(m({ pending: [P1] }, { pending: [] }, { pending: [P1, P2] }).pending, [P2]);
+    // 반대 방향
+    assert.deepStrictEqual(m({ pending: [P1] }, { pending: [P1, P2] }, { pending: [] }).pending, [P2]);
+    // 예전 버전이 저장한 id 없는 항목도 id를 붙여 같은 항목으로 맞춤 (중복 생기지 않음)
+    const md = makeDevice(makeGoogle()).cloud.mergeData;
+    const old = { date: '2026-11-12', start: '18:00' };
+    const out = md({ workers: [{ id: 'a', pending: [Object.assign({}, old)] }] }, { workers: [{ id: 'a', pending: [P1, P2] }] }, { workers: [{ id: 'a', pending: [Object.assign({}, old)] }] });
+    assert.deepStrictEqual(out.workers[0].pending.map(p => p.id), [P1.id, P2.id]);
   });
 
   await test('합치기(merge3): 양쪽 변경 모두 살림 · 지운 것은 지움 · 같은 칸 충돌만 이 기기 우선', async () => {

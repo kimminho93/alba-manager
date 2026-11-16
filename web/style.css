@@ -1463,6 +1463,12 @@ html[data-theme="dark"] .toast {
   transform: translate(-50%, 0);
 }
 
+.toast.error,
+html[data-theme="dark"] .toast.error {
+  background: #d93f45;
+  color: #fff;
+}
+
 .fatal {
   padding: 14px 20px;
   background: #d93f45;
