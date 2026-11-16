@@ -724,6 +724,27 @@ test('출퇴근: 유예로 새 출근이 앞선 근무 끝보다 앞당겨져도
   assert.deepStrictEqual([s2.start, s2.end], ['09:00', '18:20']);
 });
 
+test('장부 재생은 같은 줄을 두 번 적용하지 않음 (기기 시계가 달라 저장 시각보다 늦게 찍힌 줄로 보여도)', () => {
+  const D = (h, m, s) => new Date(2026, 10, 16, h, m, s || 0);
+  const ts = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
+  const w = E.createWorker('가', 5, 10320);
+  E.applyPunch(w, D(9, 2, 5)); E.applyPunch(w, D(14, 3, 10));   // 갤럭시(시계가 몇 분 빠름)에서 출근·퇴근 → 데이터에 반영됨
+  const rows = [[ts(D(9, 2, 5)), w.code, '가', '출근', '이름+비밀번호', '정상', ''], [ts(D(14, 3, 10)), w.code, '가', '퇴근', '이름+비밀번호', '정상', '']];
+  const before = JSON.stringify(w);
+  // 다른 기기(시계가 느림)가 13:58 에 저장한 데이터로 보고 그 뒤 줄을 다시 적용 → 퇴근 줄이 '새 출근'이 되면 안 됨
+  assert.strictEqual(E.replayPunchLog([w], rows, D(13, 58).getTime()), 0);
+  assert.strictEqual(E.punchIsOpen(w), false);
+  assert.strictEqual(JSON.stringify(w), before);
+  // 처음부터 두 번 재생해도 같음
+  const f = E.createWorker('가', 5, 10320); f.code = w.code;
+  E.replayPunchLog([f], rows, 0); const once = JSON.stringify(f);
+  E.replayPunchLog([f], rows, 0);
+  assert.strictEqual(JSON.stringify(f), once);
+  assert.strictEqual(f.lastTs, ts(D(14, 3, 10)));
+  // 저장·불러오기 정리에서도 유지
+  assert.strictEqual(E.normalizeWorkers([JSON.parse(once)])[0].lastTs, f.lastTs);
+});
+
 test('일괄 퇴근: 근무 중인 사람만 한꺼번에 퇴근, 출근 안 한 사람은 그대로, 시트 기록 재생도 같은 결과', () => {
   const at = (h, m) => new Date(2026, 10, 12, h, m, 0);
   const a = E.createWorker('가', 5, 10320), b = E.createWorker('나', 5, 10320), c = E.createWorker('다', 5, 10320);

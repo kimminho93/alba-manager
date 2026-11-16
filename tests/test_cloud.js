@@ -96,7 +96,10 @@ function makeGoogle() {
       if (hm) { const t = tab(hm[1]); return res(200, t && t.rows[0] ? { values: [t.rows[0]] } : {}); }
       const lm = /^\/values\/(.+)!A2:G5000$/.exec(decodeURIComponent(rest));
       if (lm) { const t = tab(lm[1]); return res(200, { values: t ? t.rows.slice(1) : [] }); }
+      const sm = /^\/values\/(.+)!A2$/.exec(decodeURIComponent(rest));
+      if (sm) { const t = tab(sm[1]); g.stampReads = (g.stampReads || 0) + 1; return res(200, t && t.rows[1] ? { values: [[t.rows[1][0]]] } : {}); }
       const vm = /^\/values\/(.+)!A1:A300$/.exec(rest);
+      if (vm) g.fullReads = (g.fullReads || 0) + 1;
       if (vm) { const t = tab(vm[1]); return res(200, { values: t ? t.rows : [] }); }
     }
     return res(404, {});
@@ -517,7 +520,7 @@ function makeDevice(google, opts) {
     const a = makeDevice(g);
     a.data.workers = [worker('철수', { '2026-11': { net: 2 } })];
     await a.cloud.connect();
-    const stamp = Date.parse(JSON.parse(a.store['alba.cloud.v1']).stamp);
+    const stamp = Date.parse(JSON.parse(a.store['alba.cloud.v1']).stamp.split('#')[0]);
     await a.cloud.appendPunch([['2026-11-12 12:00:00', 'C1', '철수', '출근', '이름+비밀번호', '정상', '']]);
     const b = makeDevice(g);                       // 새 기기(저장소 비어 있음)로 로그인
     b.confirmAnswer = true;
@@ -632,6 +635,30 @@ function makeDevice(google, opts) {
     // 둘 다 지웠으면 지움 / 한쪽만 지우고 다른 쪽 그대로면 지움
     assert.strictEqual(m(b, l, l).workers[0].punch, undefined);
     assert.strictEqual(m(b, l, b).workers[0].punch, undefined);
+  });
+
+  await test('새로 받기는 저장 표시만 먼저 읽고, 바뀌었을 때만 전체를 읽음 · 예전 형식 저장 표시도 그대로 동작', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', {})];
+    await a.cloud.connect();
+    const b = makeDevice(g);
+    await b.cloud.connect();
+    const f0 = g.fullReads || 0, s0 = g.stampReads || 0;
+    for (let i = 0; i < 5; i++) { b.clock.t += 30000; assert.strictEqual(await b.cloud.refresh(), false); }
+    assert.strictEqual(g.fullReads || 0, f0);
+    assert.strictEqual((g.stampReads || 0) - s0, 5);
+    // 예전 형식(계보 없는 저장 표시)으로 저장된 시트
+    const sid = JSON.parse(a.store['alba.cloud.v1']).sheetId;
+    const rows = g.rows(sid, '데이터');
+    rows[1] = ['2026-11-12T03:00:00.000Z'];
+    a.clock.t += 60000; b.clock.t += 60000;
+    assert.strictEqual(await b.cloud.refresh(), true);
+    b.data.workers.push(worker('영희', {})); b.cloud.markDirty(); await b.cloud.saveNow();
+    const after = g.rows(sid, '데이터')[1][0].split('|');
+    assert.strictEqual(after[1], '2026-11-12T03:00:00.000Z');   // 새 저장은 예전 표시를 계보로 이어 받음
+    assert.strictEqual(await a.cloud.refresh(), true);
+    assert.deepStrictEqual(a.data.workers.map(w => w.name), ['철수', '영희']);
   });
 
   await test('30초 새로 받기: 다른 기기 변경을 받아 옴, 저장 안 된 변경이 있거나 입력 중이면 덮어쓰지 않음', async () => {

@@ -80,6 +80,15 @@ function round(seed) {
   E.autoCloseOpen(fresh, new Date(end), opts.autoOut);
   assert.deepStrictEqual(state(fresh), state(live), '시드 ' + seed + ': 장부 재생 결과가 이 기기와 다름 ' + JSON.stringify(opts));
 
+  // 이미 다 반영된 데이터에 장부를 아무 시점부터 다시 적용해도 그대로 (다른 기기 시계가 달라 '저장 이후 줄'로 보이는 경우)
+  const snap = JSON.stringify(state(live));
+  const copy = E.normalizeWorkers(JSON.parse(JSON.stringify(live)));
+  const from = new Date(2026, 10, 3 + Math.floor(R() * 10), Math.floor(R() * 24), 0, 0).getTime();
+  E.replayPunchLog(copy, rows, from, opts);
+  assert.strictEqual(JSON.stringify(state(copy)), snap, '시드 ' + seed + ': 이미 반영한 장부를 다시 적용했더니 바뀜');
+  E.replayPunchLog(copy, rows, 0, opts);
+  assert.strictEqual(JSON.stringify(state(copy)), snap, '시드 ' + seed + ': 장부를 처음부터 다시 적용했더니 바뀜');
+
   // 저장·불러오기 정리 후에도 같음
   assert.deepStrictEqual(state(E.normalizeWorkers(JSON.parse(JSON.stringify(live)))), state(live), '시드 ' + seed + ': 저장 정리 후 달라짐');
 

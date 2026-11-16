@@ -216,14 +216,21 @@
   }
 
   /* ---------------- 읽기/쓰기 ---------------- */
+  function stampMs(st) { return Date.parse(String(st || '').split('#')[0]) || 0; }
+  function pullStamp(mode) {
+    return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(SHEET_DATA + '!A2'), undefined, mode).then(function (r) {
+      return r && r.values && r.values[0] ? String(r.values[0][0] || '').split('|')[0] : '';
+    });
+  }
   function pull(mode) {
     var range = encodeURIComponent(SHEET_DATA + '!A1:A300');
     return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + range, undefined, mode).then(function (r) {
       var rows = (r.values || []).map(function (x) { return x[0] === undefined ? '' : String(x[0]); });
-      var stamp = rows[1] || '';
+      var lineage = String(rows[1] || '').split('|').filter(Boolean);   // 저장 표시|이 저장이 바탕으로 한 이전 저장 표시들…
+      var stamp = lineage[0] || '';
       var json = rows.slice(2).join('');
       if (!json) return null;
-      try { return { stamp: stamp, data: JSON.parse(json) }; } catch (e) { return null; }
+      try { return { stamp: stamp, lineage: lineage, data: JSON.parse(json) }; } catch (e) { return null; }
     });
   }
 
@@ -243,8 +250,12 @@
     if (force || !meta.stamp || !meta.sheetId) return pushNow(mode);
     // 내가 마지막으로 맞춘 뒤 다른 기기가 저장했으면 덮어쓰지 않고 합친 뒤 저장
     return pull(mode).then(function (remote) {
+      if (remote && remote.stamp === meta.stamp) confirmWritten();
       if (!remote || remote.stamp === meta.stamp || !hasContent(remote.data)) return pushNow(mode);
+      settleWritten(remote);
       var merged = merge3(loadBase(), JSON.parse(JSON.stringify(host.getData())), remote.data);
+      saveBase(JSON.stringify(remote.data));   // 지금 시트 내용을 봤으니 이게 새 기준
+      meta.stamp = remote.stamp; meta.lineage = remote.lineage; writeMeta();
       host.applyData(merged);
       merges++;
       return replayAfter(remote.stamp).then(function () { return pushNow(mode); });
@@ -254,7 +265,7 @@
     if (!host.replayPunchLog || !meta.sheetId) return Promise.resolve();
     var rng = encodeURIComponent(SHEET_PUNCH + '!A2:G5000');
     return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + rng, undefined, 'silent').then(function (res) {
-      host.replayPunchLog((res && res.values) || [], Date.parse(stamp) || 0);
+      host.replayPunchLog((res && res.values) || [], stampMs(stamp));
     }).catch(function () {});
   }
   var merges = 0;
@@ -262,7 +273,8 @@
   function pushNow(mode) {
     var data = host.getData();
     var json = JSON.stringify(data);
-    var stamp = new Date(deps.now()).toISOString();
+    // 저장 표시: 시각 + 기기별 임의 글자 (두 기기가 같은 순간에 저장해도 표시가 겹치지 않게)
+    var stamp = new Date(deps.now()).toISOString() + '#' + Math.random().toString(36).slice(2, 8);
     var chunks = [];
     for (var i = 0; i < json.length; i += CHUNK) chunks.push([json.slice(i, i + CHUNK)]);
     var tables = host.getTables ? host.getTables() : { sheets: [] };
@@ -284,7 +296,12 @@
         rows: [['관리자 비밀번호', adminPin], ['※ 잊었다면 위 오른쪽 칸을 새 비밀번호(4자 이상)로 고치세요. 그다음 매장 기기의 잠금 창에서 [비밀번호를 잊었어요]를 누르면 적용됩니다.']]
       });
     }
-    wanted.push({ name: SHEET_DATA, rows: [['사장님 도우미 데이터 — 이 탭은 앱이 사용하는 저장 공간입니다. 수정하지 마세요.'], [stamp]].concat(chunks), bold: [], always: true });
+    // 데이터 탭은 300줄을 한 번에 통째로 씀 (빈 줄까지): 두 기기가 동시에 저장해도 긴 내용의 꼬리가 남아 내용이 섞이지 않게
+    var prev = meta.lineage && meta.lineage.length ? meta.lineage : (meta.stamp ? [meta.stamp] : []);
+    var lineage = [stamp].concat(prev).slice(0, 40);
+    var dataRows = [['사장님 도우미 데이터 — 이 탭은 앱이 사용하는 저장 공간입니다. 수정하지 마세요.'], [lineage.join('|')]].concat(chunks);
+    while (dataRows.length < 300) dataRows.push(['']);
+    wanted.push({ name: SHEET_DATA, rows: dataRows, bold: [], always: true });
     var wantedNames = {};
     wanted.forEach(function (t) { wantedNames[t.name] = true; });
     wantedNames[SHEET_ADMIN] = true;   // 이 기기에 비밀번호가 없어도(저장소를 지운 경우 등) 시트의 복구용 탭은 지우지 않음
@@ -372,8 +389,9 @@
       });
     }).then(function () {
       lastJson = json;
-      saveBase(json);
+      saveWritten(json);   // 기준은 다음 확인 때 확정 (그사이 다른 기기가 덮어썼다면 내 변경을 다시 합쳐 올림)
       meta.stamp = stamp;
+      meta.lineage = lineage;
       meta.dirty = false;
       meta.lastSaved = deps.now();
       notice = removedOld ? tr('5년이 지난 {n}개 달의 탭을 구글 시트에서 정리했습니다. (이 기기의 기록은 그대로입니다)', { n: removedOld }) : '';
@@ -437,27 +455,47 @@
     }
     return l;   // 같은 칸을 양쪽이 다르게 바꿈 → 이 기기 쪽
   }
-  var BASE_KEY = 'alba.cloud.base';
-  function saveBase(json) { try { deps.storage.set(BASE_KEY, json); } catch (e) {} }
+  var BASE_KEY = 'alba.cloud.base', WRITTEN_KEY = 'alba.cloud.written';
+  function saveBase(json) { try { deps.storage.set(BASE_KEY, json); deps.storage.remove(WRITTEN_KEY); } catch (e) {} }
+  /* 방금 시트에 쓴 내용: 거의 동시에 다른 기기가 덮어썼을 수 있으므로, 시트에 내 저장 표시가 그대로 있는 걸 다시 확인한 뒤에 기준으로 삼는다 */
+  function saveWritten(json) { try { deps.storage.set(WRITTEN_KEY, json); } catch (e) {} }
+  function confirmWritten() { try { var w = deps.storage.get(WRITTEN_KEY); if (w) saveBase(w); } catch (e) {} }
+  /* 다른 기기가 저장한 시트를 봤을 때: 그 저장이 내 마지막 저장을 바탕으로 했으면(계보에 있음) 내 저장은 살아 있음 → 기준 확정,
+     없으면 내 저장은 동시 저장에 덮인 것 → 예전 기준으로 다시 합쳐 내 변경을 되살림 */
+  function settleWritten(remote) {
+    var w = null;
+    try { w = deps.storage.get(WRITTEN_KEY); } catch (e) {}
+    if (!w || !remote) return;
+    if (remote.stamp === meta.stamp || (remote.lineage || []).indexOf(meta.stamp) >= 0) saveBase(w);
+    else { try { deps.storage.remove(WRITTEN_KEY); } catch (e) {} }
+  }
   function loadBase() { try { var t = deps.storage.get(BASE_KEY); return t ? JSON.parse(t) : undefined; } catch (e) { return undefined; } }
 
   function hasContent(d) {
     return !!d && ((d.workers && d.workers.length) || (d.roster && d.roster.length) || (d.archive && d.archive.length));
   }
 
-  function applyRemote(r) {
-    host.applyData(r.data);
-    lastJson = JSON.stringify(host.getData());
+  function applyRemote(r, replace) {
+    // replace: 사용자가 '시트 기록으로 바꾸기'를 고른 경우 → 합치지 않고 그대로
+    // 이 기기가 쓴 내용이 다른 기기의 동시 저장에 덮였을 수 있으니, 마지막으로 확인한 기준과 비교해 이 기기 변경이 빠졌으면 다시 합친다
+    var local = JSON.parse(JSON.stringify(host.getData()));
+    if (!replace) settleWritten(r);
+    var merged = replace ? r.data : merge3(loadBase(), local, r.data);
+    var lost = !replace && JSON.stringify(merged) !== JSON.stringify(r.data);
+    host.applyData(merged);
+    lastJson = JSON.stringify(r.data);
     saveBase(JSON.stringify(r.data));
+    if (lost) { merges++; meta.dirty = true; writeMeta(); schedule(); }
     meta.stamp = r.stamp;
-    meta.dirty = false;
+    meta.lineage = r.lineage || [r.stamp];
+    if (!lost) meta.dirty = false;
     meta.lastSaved = deps.now();
     writeMeta();
     // 저장 이후에 찍힌 출퇴근은 '출퇴근기록' 장부로 다시 맞춘다 (실패해도 불러오기는 그대로 성공)
     if (!host.replayPunchLog || !meta.sheetId) return Promise.resolve();
     var rng = encodeURIComponent(SHEET_PUNCH + '!A2:G5000');
     return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + rng, undefined, 'silent').then(function (res) {
-      host.replayPunchLog((res && res.values) || [], Date.parse(r.stamp) || 0);
+      host.replayPunchLog((res && res.values) || [], stampMs(r.stamp));
     }).catch(function () {});
   }
 
@@ -500,14 +538,15 @@
         var same = JSON.stringify(remote.data) === JSON.stringify(local);
         if (!same && hasContent(local)) {
           var useRemote = host.confirm(tr('이 구글 계정에 저장된 기록이 이미 있습니다.\n\n[확인] 구글 시트에 저장된 기록을 불러옵니다 (이 기기의 기록은 대체됩니다)\n[취소] 이 기기의 기록을 구글 시트에 저장합니다 (시트의 기존 기록은 대체됩니다)'));
-          if (useRemote) return applyRemote(remote);
+          if (useRemote) return applyRemote(remote, true);
           else return push('user', true);   // 사용자가 '이 기기 기록으로' 고름 → 합치지 않고 그대로 저장
         } else if (!same) {
-          return applyRemote(remote);
+          return applyRemote(remote, true);
         } else {
           lastJson = JSON.stringify(local);
           saveBase(lastJson);
           meta.stamp = remote.stamp;
+          meta.lineage = remote.lineage;
           meta.dirty = false;
         }
         return null;
@@ -581,7 +620,10 @@
     if (meta.dirty) { schedule(); return Promise.resolve(false); }
     if (host.isBusy && host.isBusy()) return Promise.resolve(false);
     refreshing = true;
-    return pull('silent').then(function (remote) {
+    return pullStamp('silent').then(function (st) {
+      if (!st || st === (meta.stamp || '')) { if (st) confirmWritten(); return null; }   // 바뀐 게 없으면 데이터는 안 읽음
+      return pull('silent');
+    }).then(function (remote) {
       if (!remote || remote.stamp === (meta.stamp || '') || meta.dirty || saving) return false;
       if (host.isBusy && host.isBusy()) return false;
       return applyRemote(remote).then(function () { setStatus('saved', ''); return true; });
@@ -675,7 +717,7 @@
       return withSheetRetry(function () { return pull('user'); }, 'user');
     }).then(function (remote) {
       if (!remote) { setStatus('saved', ''); return 'empty'; }
-      return applyRemote(remote).then(function () { setStatus('saved', ''); return 'ok'; });
+      return applyRemote(remote, true).then(function () { setStatus('saved', ''); return 'ok'; });
     }).catch(function (e) {
       setStatus('error', friendly(e));
       return 'error';

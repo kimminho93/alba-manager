@@ -194,7 +194,10 @@ async function scenarioStale(seed) {
       continue;
     }
     d.cloud.markDirty();
-    if (R() < 0.6) { if (R() < 0.15) g.fail401Once = true; await d.cloud.saveNow().catch(() => {}); }   // 바로 저장 또는 나중에
+    if (R() < 0.25) {                                     // 두 기기가 같은 순간에 저장 (확인→쓰기 사이에 서로 끼어듦)
+      a.cloud.markDirty(); b.cloud.markDirty();
+      await Promise.all([a.cloud.saveNow().catch(() => {}), b.cloud.saveNow().catch(() => {})]);
+    } else if (R() < 0.6) { if (R() < 0.15) g.fail401Once = true; await d.cloud.saveNow().catch(() => {}); }   // 바로 저장 또는 나중에
   }
   // 마무리: 둘 다 저장하고 서로 받아오기
   for (let i = 0; i < 3; i++) for (const d of [a, b]) {

@@ -352,7 +352,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var ENGINE_VERSION = '1.4.3';
+  var ENGINE_VERSION = '1.4.4';
 
   /** "10,000원", " 62 " 같은 값을 숫자로 변환. 실패 시 def 반환 */
   function toNumber(v, def) {
@@ -1798,6 +1798,7 @@
       if (pn) item.punch = pn;
       var pd = cleanPending(raw.pending);
       if (pd.length) item.pending = pd;
+      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(raw.lastTs))) { item.lastTs = raw.lastTs; if (/^(in|out|auto)$/.test(String(raw.lastKind))) item.lastKind = raw.lastKind; }
       out.push(item);
     });
     return out;
@@ -1920,6 +1921,11 @@
    * 반환: { kind:'in'|'out'|'too_soon', date, start, end, note }
    */
   function applyPunch(worker, now, opts) {
+    var r = applyPunch0(worker, now, opts);
+    if (r.kind === 'in' || r.kind === 'out') markTs(worker, now, r.kind);
+    return r;
+  }
+  function applyPunch0(worker, now, opts) {
     var o = punchOpts(opts);
     var open = cleanPunch(worker.punch);
     var today = ymdOf(now), time = hmOf(now);
@@ -1994,6 +2000,7 @@
    */
   function closeAsPending(w, open, ts) {
     delete w.punch;
+    markTs(w, ts, 'auto');
     var p = cleanPending(w.pending);
     p.push({ date: open.date, start: open.time, at: open.at || open.time, cut: ymdOf(ts) + ' ' + hmOf(ts) });
     w.pending = cleanPending(p);
@@ -2039,6 +2046,10 @@
   }
 
 
+  function tsStrOf(d) { return ymdOf(d) + ' ' + hmOf(d) + ':' + pad2(d.getSeconds()); }
+  /* 이 알바생에게 마지막으로 반영한 출퇴근 기록 시각 → 장부를 다시 맞출 때 이미 반영한 줄은 건너뜀 (기기 시계가 달라도 같은 줄은 같은 시각 문자열) */
+  function markTs(w, d, kind) { var t = tsStrOf(d); if (!w.lastTs || t >= w.lastTs) { w.lastTs = t; w.lastKind = kind; } }
+  function rowKind(row) { return String(row[4] || '').indexOf('자동') === 0 ? 'auto' : (String(row[3] || '').trim() === '출근' ? 'in' : 'out'); }
   function parseLogTs(str) {
     var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(String(str || '').trim());
     return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
@@ -2059,6 +2070,10 @@
       if (String(row[5] || '').indexOf('정상') !== 0) return;
       var code = String(row[1] || '').trim();
       var w = (workers || []).filter(function (x) { return x.code === code; })[0];
+      if (w && w.lastTs) {   // 이미 반영한 줄은 건너뜀 (같은 줄을 두 번 적용하지 않음). 같은 초에 다른 종류(자동 퇴근 직후 출근)는 반영
+        var rt = String(row[0]).trim();
+        if (rt < w.lastTs || (rt === w.lastTs && rowKind(row) === w.lastKind)) return;
+      }
       var cut = opts && typeof opts === 'object' ? opts.autoOut : undefined;
       var closed = autoCloseOpen(workers, ts, cut);   // 그 사이 지난 자동 퇴근 시각 먼저 처리
       if (String(row[4] || '').indexOf('자동') === 0) {
@@ -3337,4 +3352,4 @@
 });
 
 /* ===== 버전 (package.json 의 version) ===== */
-;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.4.3';
+;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.4.4';
