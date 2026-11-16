@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611162300">
+  <link rel="stylesheet" href="./style.css?v=202611170100">
 </head>
 <body>
   <header class="app-header">
@@ -48,6 +48,8 @@
     <button class="tab" type="button" role="tab" data-tab="guide" aria-selected="false">📖 사용 방법</button>
   </nav>
 
+  <div id="devBar" class="dev-bar" hidden role="status"></div>
+
   <main class="container">
     <!-- ======================= 출퇴근 (알바생이 이름 → 비밀번호) ======================= -->
     <section id="tab-punch" class="tab-panel" role="tabpanel">
@@ -56,7 +58,8 @@
           <div id="punchTime" class="punch-time">--:--</div>
           <div id="punchDate" class="punch-date"></div>
         </div>
-        <h2 class="punch-title">내 이름을 누르고 비밀번호를 입력하세요</h2>
+        <h2 id="punchTitle" class="punch-title">내 이름을 누르고 비밀번호를 입력하세요</h2>
+        <div id="punchRemote" class="punch-remote" hidden></div>
         <div id="punchList" class="punch-list"></div>
         <button id="punchAllOut" type="button" class="btn punch-all" hidden>🌙 근무 중인 사람 모두 퇴근</button>
         <div id="punchCloud" class="punch-cloud off" role="status">☁️ 구글 저장 상태 확인 중…</div>
@@ -413,6 +416,15 @@
           <button id="btnPinClear" type="button" class="btn btn-ghost">없애기</button>
         </div>
 
+        <h3 class="set-title">출퇴근 기기 <small id="devState" class="pin-state"></small></h3>
+        <div class="set-note">출퇴근을 찍는 <b>매장 기기 1대만</b> 구글 시트에 저장하고, 다른 기기(사장님 폰·PC)에서 고친 내용은 <b>수정 요청</b>으로 보내 매장 기기가 반영합니다. 여러 기기의 수정이 서로 덮이는 일을 막아요. <b>구글 저장</b>과 <b>관리자 비밀번호</b>가 필요하고, 매장 기기에서 한 번만 지정하면 됩니다.</div>
+        <div id="devInfo" class="dev-info"></div>
+        <div class="pin-row">
+          <input id="sDevName" type="text" maxlength="20" placeholder="이 기기 이름 (예: 매장 태블릿)" aria-label="이 기기 이름">
+          <button id="btnDevSet" type="button" class="btn btn-primary">이 기기를 출퇴근 기기로 지정</button>
+          <button id="btnDevClear" type="button" class="btn btn-ghost" hidden>지정 해제</button>
+        </div>
+
         <h3 class="set-title">출퇴근 시간 끊기 <small class="pin-state">· 모든 기기 공통</small></h3>
         <div class="snd-row"><label for="sPunchUnit">끊는 단위</label><select id="sPunchUnit"><option value="30">30분 (기본)</option><option value="60">1시간</option><option value="20">20분</option><option value="15">15분</option><option value="10">10분</option><option value="5">5분</option></select></div>
         <div class="snd-row"><label for="sInMode">출근 방식</label><select id="sInMode"><option value="round">올림 (단위로 끊기)</option><option value="exact">찍은 그대로 (분 단위)</option></select></div>
@@ -437,7 +449,7 @@
         <div class="set-note">처음에는 휴대폰·브라우저 언어를 따라갑니다. 영어로 바꾸면 화면, 사용 방법, 점검표, 카톡 명세서·엑셀 파일도 영어로 나옵니다.</div>
 
         <h3 class="set-title">앱 정보</h3>
-        <div class="set-note">사장님 도우미 <b class="ver-text">v1.4.6</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
+        <div class="set-note">사장님 도우미 <b class="ver-text">v1.5.0</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
         <div class="share-box">
           <img class="share-qr" src="./img/share-qr.svg" alt="사장님 도우미 주소 QR 코드" width="160" height="160">
           <div class="share-text">
@@ -722,7 +734,15 @@
               <li>그래도 풀렸다면 그 버튼을 누르고 <b>[다시 연결하고 저장하기]</b>를 누르세요. 그동안 바꾼 내용과 출퇴근 기록은 이 기기에 남아 있다가 저장됩니다.</li>
               <li>출퇴근 화면 아래에 <b>"시트에 아직 안 올라간 출퇴근 N건"</b>이 보이면, 연결이 돌아오는 대로 올라갑니다.</li>
             </ul>
-            <p class="guide-tip">💡 두 기기에서 동시에 고치면 <b>마지막에 저장한 내용</b>이 남습니다. 한 번에 한 기기에서 작업하는 것이 안전합니다.</p>
+            <p class="guide-step-title">출퇴근 기기 지정 (기기 여러 대를 쓸 때)</p>
+            <ul>
+              <li><b>매장 태블릿</b>에서 관리자 비밀번호를 정한 뒤 <b>설정 → 출퇴근 기기</b>에 이름(예: 매장 태블릿)을 적고 <b>[이 기기를 출퇴근 기기로 지정]</b>을 누릅니다. 한 번만 하면 됩니다.</li>
+              <li>그러면 <b>매장 태블릿만</b> 구글 시트에 저장하고, 사장님 폰·PC에서 고친 내용은 <b>수정 요청</b>으로 보내져 매장 태블릿이 30초 안에 반영합니다. 기기끼리 서로 덮어쓰는 일이 없습니다.</li>
+              <li>폰·PC 위쪽에 <b>"📍 출퇴근 기기: 매장 태블릿 · 1분 전 응답"</b>이 보이고, 반영 전에는 <b>"내 수정 요청 N건 대기 중"</b>이 함께 보입니다. <b>"⚠️ 응답이 없어요"</b>가 보이면 매장 태블릿이 꺼져 있거나 인터넷이 끊긴 것이니 확인해 주세요. 요청은 쌓여 있다가 켜지면 반영됩니다.</li>
+              <li>그 사이 매장에서 같은 곳이 바뀌었으면 요청은 <b>반영되지 않고 빨간 알림</b>이 뜹니다. 화면을 확인하고 다시 고쳐 주세요.</li>
+              <li>출퇴근은 <b>매장 태블릿에서만</b> 찍을 수 있고, 폰·PC에서는 근무 현황만 보입니다. 태블릿을 바꿀 때는 새 기기에서 같은 버튼을 누르면 됩니다.</li>
+            </ul>
+            <p class="guide-tip">💡 출퇴근 기기를 지정하지 않으면, 두 기기에서 동시에 고칠 때 <b>마지막에 저장한 내용</b>이 남을 수 있습니다(겹친 곳은 급여 탭 맨 위에 알려 드려요). 기기를 여러 대 쓰면 출퇴근 기기를 지정해 두세요.</p>
           </div>
         </details>
 
@@ -765,7 +785,7 @@
 
   <footer class="app-footer">
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
-    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.4.6</span></div>
+    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.5.0</span></div>
   </footer>
 
   <!-- 출퇴근: 비밀번호 입력 -->
@@ -993,10 +1013,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611162300"></script>
-  <script src="./lang_web.js?v=202611162300"></script>
-  <script src="./i18n.js?v=202611162300"></script>
-  <script src="./gsync.js?v=202611162300"></script>
-  <script src="./app.js?v=202611162300"></script>
+  <script src="./engine.js?v=202611170100"></script>
+  <script src="./lang_web.js?v=202611170100"></script>
+  <script src="./i18n.js?v=202611170100"></script>
+  <script src="./gsync.js?v=202611170100"></script>
+  <script src="./app.js?v=202611170100"></script>
 </body>
 </html>

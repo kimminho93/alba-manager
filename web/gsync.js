@@ -86,7 +86,10 @@
   var SHEET_DATA = '데이터';
   var SHEET_PUNCH = '출퇴근기록';   // 나중에 출퇴근 프로그램이 한 줄씩 추가하는 탭 (앱은 처음에 머리글만 만들고 그 뒤로는 건드리지 않음)
   var PUNCH_HEAD = ['기록시각', '알바생 고유코드', '이름', '구분(출근/퇴근)', '입력방식', '처리결과', '메모'];
-  var SHEET_ADMIN = '관리자';       // 관리자 비밀번호 복구용 탭: B1 칸이 비밀번호 (사장님이 시트에서 고치면 앱의 '시트에서 다시 불러오기'로 적용)
+  var SHEET_ADMIN = '관리자';
+  var SHEET_DEV = '기기';           // 출퇴근 기기 지정: A1 기기ID | B1 이름 | C1 마지막 응답 시각 | D1 앱 버전
+  var SHEET_REQ = '수정요청';       // 다른 기기가 보낸 수정 요청 (덧붙이기만). 상태 칸은 사람이 보는 참고용, 진실은 데이터의 reqLog
+  var REQ_HEAD = ['요청ID', '보낸 시각', '기기ID', '기기 이름', '설명', '변경(JSON)', '상태', '처리 시각', '사유'];       // 관리자 비밀번호 복구용 탭: B1 칸이 비밀번호 (사장님이 시트에서 고치면 앱의 '시트에서 다시 불러오기'로 적용)
   var MONTH_TAB = /^\d{4}-\d{2}$/;
   var RETAIN_MONTHS = 60;
   var CHUNK = 40000;
@@ -245,11 +248,28 @@
 
   function colorFmt() { return { textFormat: { bold: true }, backgroundColor: { red: 0.88, green: 0.92, blue: 1 } }; }
 
+  /* 시트에 저장하는 데이터 = 앱 데이터 + 요청 처리 기록(reqLog: 출퇴근 기기만 씀, 이 모듈이 보관) */
+  function dataOut() {
+    var d = host.getData();
+    if (meta.reqLog) { var o = {}; Object.keys(d || {}).forEach(function (k) { o[k] = d[k]; }); o.reqLog = meta.reqLog; return o; }
+    return d;
+  }
+  function toHost(d) {
+    if (d && isObj(d.reqLog)) meta.reqLog = d.reqLog;
+    host.applyData(d);
+  }
+
   /* 시트의 탭 구성을 맞추고(추가/삭제/순서), 바뀐 탭만 다시 쓴다 */
+  var LOST_WRITER = { lost: true };
   function push(mode, force) {
+    if (role() === 'requester') return flushRequests();
     if (force || !meta.stamp || !meta.sheetId) return pushNow(mode);
-    if (meta.replayStamp) return replayPending().then(function () { return push2(mode); });
-    return push2(mode);
+    // 출퇴근 기기는 쓰기 직전에 '아직 내가 지정 기기인지' 확인 (교체됐으면 쓰지 않고 요청 기기로)
+    var fence = role() === 'writer' ? readHead(mode, 0).then(function (h) { updateDev(h.dev); if (role() !== 'writer') throw LOST_WRITER; }) : Promise.resolve();
+    return fence.then(function () {
+      if (meta.replayStamp) return replayPending().then(function () { return push2(mode); });
+      return push2(mode);
+    }).catch(function (e) { if (e === LOST_WRITER) return loseWriter(); throw e; });
   }
   function push2(mode) {
     // 내가 마지막으로 맞춘 뒤 다른 기기가 저장했으면 덮어쓰지 않고 합친 뒤 저장
@@ -257,10 +277,10 @@
       if (remote && remote.stamp === meta.stamp) confirmWritten();
       if (!remote || remote.stamp === meta.stamp || !hasContent(remote.data)) return pushNow(mode);
       settleWritten(remote);
-      var merged = mergeData(loadBase(), JSON.parse(JSON.stringify(host.getData())), remote.data);
+      var merged = mergeData(loadBase(), JSON.parse(JSON.stringify(dataOut())), remote.data);
       saveBase(JSON.stringify(remote.data));   // 지금 시트 내용을 봤으니 이게 새 기준
       meta.stamp = remote.stamp; meta.lineage = remote.lineage; writeMeta();
-      host.applyData(merged);
+      toHost(merged);
       merges++;
       return replayAfter(remote.stamp).then(function () { return pushNow(mode); });
     });
@@ -278,8 +298,10 @@
   function replayPending() { return meta.replayStamp ? replayAfter(meta.replayStamp) : Promise.resolve(); }
   var merges = 0;
 
+  /* 데이터 저장과 함께 쓸 칸들 (수정요청 상태 칸 등). 저장이 실패하거나 앱이 꺼져도 다음 저장 때 쓰도록 meta에 보관 */
+  function pendWrites() { return Array.isArray(meta.pendWrites) ? meta.pendWrites : []; }
   function pushNow(mode) {
-    var data = host.getData();
+    var data = dataOut();
     var json = JSON.stringify(data);
     // 저장 표시: 시각 + 기기별 임의 글자 (두 기기가 같은 순간에 저장해도 표시가 겹치지 않게)
     var stamp = new Date(deps.now()).toISOString() + '#' + Math.random().toString(36).slice(2, 8);
@@ -296,6 +318,7 @@
     var wi = -1;
     wanted.forEach(function (t, k) { if (t.name === '알바생') wi = k; });
     wanted.splice(wi >= 0 ? wi + 1 : wanted.length, 0, punchTab);
+    if (role() === 'writer') wanted.splice(wanted.indexOf(punchTab) + 1, 0, { name: SHEET_REQ, rows: [REQ_HEAD], bold: [0], createOnly: true });
     var adminPin = host.getAdminPin ? String(host.getAdminPin() || '') : '';
     if (adminPin) {
       // 관리자 탭은 처음 만들 때만 적고, 그 뒤로는 앱이 덮어쓰지 않음 (사장님이 시트에서 고친 값을 지키기 위해)
@@ -376,11 +399,17 @@
       // 데이터 탭은 늘 300줄을 통째로 덮어쓰므로 지우지 않음 (지운 직후 끊기면 시트가 잠깐 비는 일 방지)
       var names = changed.filter(function (t) { return t.name !== SHEET_DATA; }).map(function (t) { return t.name; });
       var clear = names.length ? api('POST', SHEETS + '/' + id + '/values:batchClear', { ranges: names }, mode) : Promise.resolve();
+      var extra = pendWrites().slice(), nExtra = extra.length;
+      if (role() === 'writer') extra.push({ range: SHEET_DEV + '!C1:D1', values: [[new Date(deps.now()).toISOString(), appVer()]] });   // 응답 시각
       return clear.then(function () {
         return api('POST', SHEETS + '/' + id + '/values:batchUpdate', {
           valueInputOption: 'RAW',
-          data: changed.map(function (t) { return { range: t.name + '!A1', values: t.rows && t.rows.length ? t.rows : [['']] }; })
-        }, mode);
+          data: changed.map(function (t) { return { range: t.name + '!A1', values: t.rows && t.rows.length ? t.rows : [['']] }; }).concat(extra)
+        }, mode).then(function (r) {
+          meta.pendWrites = pendWrites().slice(nExtra);
+          if (role() === 'writer') meta.lastBeat = deps.now();
+          return r;
+        });
       }).then(function () {
         // 서식: 먼저 전체 서식을 지운 뒤 제목/머리글 줄만 굵게
         var fmt = [];
@@ -534,6 +563,118 @@
   }
   function loadBase() { try { var t = deps.storage.get(BASE_KEY); return t ? JSON.parse(t) : undefined; } catch (e) { return undefined; } }
 
+  /* ================= 단일 저장: 수정 요청(ops) =================
+     path 칸: 객체 키(문자열) · 날짜 칸 같은 자리 배열(숫자) · id 있는 목록의 항목({id})
+     op: {path, before, after}  → 지금 값이 before와 같을 때만 after로 (null = 없음)
+         {path, add: 항목} / {path, del: 항목} → id 없는 목록(점검 보관함 등): 내용으로 넣고 빼기 */
+  function canon(x) {
+    if (x === undefined) return 'null';
+    if (Array.isArray(x)) return '[' + x.map(canon).join(',') + ']';
+    if (isObj(x)) return '{' + Object.keys(x).filter(function (k) { return x[k] !== undefined; }).sort().map(function (k) { return JSON.stringify(k) + ':' + canon(x[k]); }).join(',') + '}';
+    return JSON.stringify(x);
+  }
+  function ceq(a, b) { return canon(a) === canon(b); }
+  var POSITIONAL = { dailyShifts: 1, weekExcuse: 1 };
+  var SETLIKE = { archive: 1, pendingDone: 1 };
+  var SKIP_DIFF = { lastTs: 1, lastKind: 1, punch: 1 };   // 요청 기기는 출퇴근을 못 찍으므로 출퇴근 상태는 요청에 넣지 않음
+  function clone(x) { return x === undefined ? undefined : JSON.parse(JSON.stringify(x)); }
+  function diffOps(b, c, path, out, all) {
+    out = out || []; path = path || [];
+    if (ceq(b, c)) return out;
+    var last = path[path.length - 1];
+    if (!all && typeof last === 'string' && SKIP_DIFF[last] && path.length > 2) return out;
+    if (path.length === 1 && last === 'reqLog') return out;
+    if (isObj(b) && isObj(c)) {
+      var seen = {};
+      Object.keys(b).concat(Object.keys(c)).forEach(function (k) {
+        if (seen[k]) return; seen[k] = true;
+        diffOps(b[k], c[k], path.concat([k]), out, all);
+      });
+      return out;
+    }
+    if (Array.isArray(b) && Array.isArray(c)) {
+      if ((keyedArr(b) || !b.length) && (keyedArr(c) || !c.length) && (keyedArr(b) || keyedArr(c))) {
+        var bm = {}, cm = {}, ids = [], have = {};
+        b.forEach(function (x) { bm[x.id] = x; if (!have[x.id]) { have[x.id] = 1; ids.push(x.id); } });
+        c.forEach(function (x) { cm[x.id] = x; if (!have[x.id]) { have[x.id] = 1; ids.push(x.id); } });
+        ids.forEach(function (id) {
+          var p = path.concat([{ id: id }]);
+          if (bm[id] === undefined || cm[id] === undefined) { if (!ceq(bm[id], cm[id])) out.push({ path: p, before: bm[id] === undefined ? null : bm[id], after: cm[id] === undefined ? null : cm[id] }); }
+          else diffOps(bm[id], cm[id], p, out, all);
+        });
+        return out;
+      }
+      if (POSITIONAL[last] && b.length === c.length) {
+        c.forEach(function (x, i) { if (!ceq(b[i], x)) out.push({ path: path.concat([i]), before: b[i] === undefined ? null : b[i], after: x === undefined ? null : x }); });
+        return out;
+      }
+      if (SETLIKE[last]) {
+        var bc = {}, cc = {};
+        b.forEach(function (x) { var k = canon(x); bc[k] = (bc[k] || 0) + 1; });
+        c.forEach(function (x) { var k = canon(x); cc[k] = (cc[k] || 0) + 1; });
+        b.forEach(function (x) { var k = canon(x); if ((cc[k] || 0) < bc[k]) { out.push({ path: path, del: x }); bc[k]--; } });
+        var used = {};
+        c.forEach(function (x) { var k = canon(x); used[k] = (used[k] || 0) + 1; if (used[k] > (bc[k] || 0)) out.push({ path: path, add: x }); });
+        return out;
+      }
+    }
+    out.push({ path: path, before: b === undefined ? null : b, after: c === undefined ? null : c });
+    return out;
+  }
+  /* path를 따라가 부모와 마지막 열쇠를 찾음. 없으면 null */
+  function locate(root, path) {
+    var cur = root;
+    for (var i = 0; i < path.length - 1; i++) {
+      cur = step(cur, path[i]);
+      if (cur === undefined || cur === null || typeof cur !== 'object') return null;
+    }
+    return { parent: cur, key: path[path.length - 1] };
+  }
+  function step(cur, k) {
+    if (isObj(k)) { if (!Array.isArray(cur)) return undefined; for (var j = 0; j < cur.length; j++) if (cur[j] && cur[j].id === k.id) return cur[j]; return undefined; }
+    return cur[k];
+  }
+  function getAt(root, path) { if (!path.length) return root; var loc = locate(root, path); return loc ? step(loc.parent, loc.key) : undefined; }
+  /* ops를 data에 적용 (data는 바꾸지 않고 새 사본 반환). 하나라도 지금 값이 before와 다르면 전부 취소 → {ok:false, path} */
+  function applyOps(data, ops) {
+    var d = clone(data) || {};
+    for (var i = 0; i < (ops || []).length; i++) {
+      var op = ops[i];
+      if (!op || !Array.isArray(op.path)) return { ok: false, path: [] };
+      if (op.add !== undefined || op.del !== undefined) {
+        var arr = getAt(d, op.path);
+        if (arr === undefined || arr === null) {
+          if (op.del !== undefined) continue;   // 목록이 없으면 지울 것도 없음
+          var lp = locate(d, op.path);
+          if (!lp || Array.isArray(lp.parent) && !isObj(lp.key)) return { ok: false, path: op.path };
+          lp.parent[lp.key] = arr = [];
+        }
+        if (!Array.isArray(arr)) return { ok: false, path: op.path };
+        var k = canon(op.add !== undefined ? op.add : op.del), at = -1;
+        for (var j = 0; j < arr.length; j++) if (canon(arr[j]) === k) { at = j; break; }
+        if (op.add !== undefined) { if (at < 0) arr.push(clone(op.add)); }
+        else if (at >= 0) arr.splice(at, 1);
+        continue;
+      }
+      var loc = locate(d, op.path);
+      if (!loc) return { ok: false, path: op.path };
+      var cur = step(loc.parent, loc.key);
+      if (!ceq(cur, op.before)) return { ok: false, path: op.path };
+      var after = op.after === null || op.after === undefined ? undefined : clone(op.after);
+      if (isObj(loc.key)) {   // id 목록의 항목
+        if (!Array.isArray(loc.parent)) return { ok: false, path: op.path };
+        var idx = -1;
+        for (var q = 0; q < loc.parent.length; q++) if (loc.parent[q] && loc.parent[q].id === loc.key.id) { idx = q; break; }
+        if (after === undefined) { if (idx >= 0) loc.parent.splice(idx, 1); }
+        else if (idx >= 0) loc.parent[idx] = after; else loc.parent.push(after);
+      } else if (Array.isArray(loc.parent)) {
+        loc.parent[loc.key] = after === undefined ? null : after;
+      } else if (after === undefined) delete loc.parent[loc.key];
+      else loc.parent[loc.key] = after;
+    }
+    return { ok: true, data: d };
+  }
+
   function hasContent(d) {
     return !!d && ((d.workers && d.workers.length) || (d.roster && d.roster.length) || (d.archive && d.archive.length));
   }
@@ -541,11 +682,12 @@
   function applyRemote(r, replace) {
     // replace: 사용자가 '시트 기록으로 바꾸기'를 고른 경우 → 합치지 않고 그대로
     // 이 기기가 쓴 내용이 다른 기기의 동시 저장에 덮였을 수 있으니, 마지막으로 확인한 기준과 비교해 이 기기 변경이 빠졌으면 다시 합친다
-    var local = JSON.parse(JSON.stringify(host.getData()));
+    if (role() === 'requester') return requesterApply(r);
+    var local = JSON.parse(JSON.stringify(dataOut()));
     if (!replace) settleWritten(r);
     var merged = replace ? r.data : mergeData(loadBase(), local, r.data);
     var lost = !replace && JSON.stringify(merged) !== JSON.stringify(r.data);
-    host.applyData(merged);
+    toHost(merged);
     lastJson = JSON.stringify(r.data);
     saveBase(JSON.stringify(r.data));
     if (lost) { merges++; meta.dirty = true; writeMeta(); schedule(); }
@@ -570,6 +712,297 @@
     });
   }
 
+
+  /* ================= 단일 저장: 기기 역할 =================
+     none: 출퇴근 기기 미지정(또는 미연동) → 예전처럼 모든 기기가 저장(3방향 합치기)
+     writer: 시트 '기기' 탭 A1이 내 기기ID → 데이터 탭을 쓰는 유일한 기기 (수정 요청을 받아 적용)
+     requester: 다른 기기가 지정됨 → 데이터는 읽기만, 수정은 '수정요청' 탭에 요청으로 보냄 */
+  var DEVICE_KEY = 'alba.deviceId', DEVNAME_KEY = 'alba.deviceName', REQQ_KEY = 'alba.reqQueue';
+  function myId() {
+    var v = deps.storage.get(DEVICE_KEY);
+    if (!v || !/^d[0-9a-z]{6,}$/.test(v)) { v = 'd' + deps.now().toString(36) + Math.random().toString(36).slice(2, 8); deps.storage.set(DEVICE_KEY, v); }
+    return v;
+  }
+  function myName() { return String(deps.storage.get(DEVNAME_KEY) || '').slice(0, 30); }
+  function appVer() { return host && host.version ? String(host.version) : ''; }
+  function role() {
+    if (!meta.connected || !meta.sheetId || !meta.dev || !meta.dev.id) return 'none';
+    return meta.dev.id === myId() ? 'writer' : 'requester';
+  }
+  function updateDev(d) {
+    if (!d) return;
+    var before = role(), prev = meta.dev || {};
+    meta.dev = { id: String(d.id || ''), name: String(d.name || ''), beat: String(d.beat || ''), ver: String(d.ver || '') };
+    writeMeta();
+    var after = role();
+    if (host && host.onDevice && (before !== after || prev.name !== meta.dev.name || prev.beat !== meta.dev.beat || prev.id !== meta.dev.id)) host.onDevice(deviceInfo());
+  }
+  function deviceInfo() {
+    var q = loadQ();
+    return { role: role(), myId: myId(), myName: myName(), dev: meta.dev || { id: '', name: '', beat: '', ver: '' }, queued: q.length, unsent: q.filter(function (x) { return !x.sent; }).length };
+  }
+
+  /* 저장 표시 + 기기 탭 (+ 출퇴근 기기는 수정요청 줄) 을 한 번에 읽기. 탭이 아직 없으면 있는 것만 */
+  var tabMissing = { dev: 0, req: 0 };   // 없던 탭: 5분마다 다시 확인
+  function readHead(mode, reqFrom) {
+    var now = deps.now();
+    var withDev = !(tabMissing.dev && now - tabMissing.dev < 300000);
+    var withReq = reqFrom && withDev && !(tabMissing.req && now - tabMissing.req < 300000);
+    var ranges = [SHEET_DATA + '!A2'];
+    if (withDev) ranges.push(SHEET_DEV + '!A1:D1');
+    if (withReq) ranges.push(SHEET_REQ + '!A' + reqFrom + ':I' + (reqFrom + 199));
+    var url = SHEETS + '/' + meta.sheetId + '/values:batchGet?' + ranges.map(function (r) { return 'ranges=' + encodeURIComponent(r); }).join('&');
+    return api('GET', url, undefined, mode).then(function (r) {
+      var vr = (r && r.valueRanges) || [];
+      var st = vr[0] && vr[0].values && vr[0].values[0] ? String(vr[0].values[0][0] || '').split('|')[0] : '';
+      var dv = withDev && vr[1] && vr[1].values && vr[1].values[0] ? vr[1].values[0] : null;
+      if (withDev) tabMissing.dev = 0;
+      if (withReq) tabMissing.req = 0;
+      return { stamp: st, dev: withDev ? { id: dv ? dv[0] : '', name: dv ? dv[1] : '', beat: dv ? dv[2] : '', ver: dv ? dv[3] : '' } : null, reqRows: withReq ? ((vr[2] && vr[2].values) || []) : null, reqFrom: reqFrom };
+    }, function (e) {
+      if (!e || e.status !== 400) throw e;
+      // 없는 탭이 섞여 있음 → 줄여서 다시
+      if (withReq) { tabMissing.req = now; return readHead(mode, reqFrom); }
+      if (withDev) { tabMissing.dev = now; return readHead(mode, 0); }
+      throw e;
+    });
+  }
+
+  function ensureTab(name, head, mode) {
+    return api('GET', SHEETS + '/' + meta.sheetId + '?fields=' + encodeURIComponent('sheets.properties(sheetId,title)'), undefined, mode).then(function (info) {
+      var has = (info.sheets || []).some(function (x) { return x.properties.title === name; });
+      if (has) return null;
+      return api('POST', SHEETS + '/' + meta.sheetId + ':batchUpdate', { requests: [{ addSheet: { properties: { title: name } } }] }, mode).then(function () {
+        if (name === SHEET_DEV) tabMissing.dev = 0;
+        if (name === SHEET_REQ) tabMissing.req = 0;
+        if (!head) return null;
+        return api('PUT', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(name + '!A1') + '?valueInputOption=RAW', { values: [head] }, mode);
+      });
+    });
+  }
+
+  /* ---------- 요청 기기 ---------- */
+  function loadQ() { try { var q = JSON.parse(deps.storage.get(REQQ_KEY) || '[]'); return Array.isArray(q) ? q.filter(function (x) { return x && x.id && Array.isArray(x.ops); }) : []; } catch (e) { return []; } }
+  function saveQ(q) { deps.storage.set(REQQ_KEY, JSON.stringify(q)); }
+  var reqBaseline = null, reqTimer = null, flushing = false;
+  function withoutLog(d) { if (!isObj(d) || !('reqLog' in d)) return d; var o = {}; Object.keys(d).forEach(function (k) { if (k !== 'reqLog') o[k] = d[k]; }); return o; }
+  /* 시트 데이터 위에 아직 결과를 모르는 내 요청을 차례로 얹어 화면에 보여 줌 */
+  function showView(sheetData, q) {
+    var view = withoutLog(clone(sheetData));
+    q.forEach(function (it) { var r = applyOps(view, it.ops); if (r.ok) view = r.data; });
+    host.applyData(view);
+    reqBaseline = JSON.stringify(host.getData());
+  }
+  function requesterApply(remote) {
+    // 아직 요청으로 만들지 않은 화면 수정이 있으면 먼저 요청으로 (새로 받은 내용에 덮여 사라지지 않게)
+    if (reqTimer) { clearT(reqTimer); reqTimer = null; buildRequest(); }
+    meta.stamp = remote.stamp; meta.lineage = remote.lineage || [remote.stamp];
+    var log = (remote.data && remote.data.reqLog) || {};
+    meta.reqLog = isObj(log) ? log : null;
+    var applied = {}, rejected = {};
+    (log.applied || []).forEach(function (id) { applied[id] = true; });
+    (log.rejected || []).forEach(function (x) { if (x && x.id) rejected[x.id] = x.reason || ''; });
+    var keep = [];
+    loadQ().forEach(function (it) {
+      if (applied[it.id]) { if (host.onRequest) host.onRequest({ kind: 'applied', item: it }); return; }
+      if (rejected[it.id] !== undefined) { if (host.onRequest) host.onRequest({ kind: 'rejected', item: it, reason: rejected[it.id] }); return; }
+      keep.push(it);
+    });
+    saveQ(keep);
+    showView(remote.data, keep);
+    lastJson = JSON.stringify(remote.data);
+    saveBase(lastJson);
+    meta.dirty = false;
+    meta.lastSaved = deps.now();
+    writeMeta();
+    if (host.onDevice) host.onDevice(deviceInfo());
+    return flushRequests();
+  }
+  function scheduleRequest() {
+    if (reqTimer) clearT(reqTimer);
+    reqTimer = setT(function () { reqTimer = null; buildRequest(); }, 1500);
+  }
+  /* 화면에서 바뀐 곳을 계산해 요청 한 줄로 */
+  function buildRequest(note) {
+    if (role() !== 'requester' && !note) return null;
+    var base = reqBaseline || (lastJson ? JSON.stringify(withoutLog(JSON.parse(lastJson))) : null);
+    if (!base) return null;
+    var cur = clone(host.getData());
+    var ops = diffOps(JSON.parse(base), cur, [], [], !!note);   // 출퇴근 기기에서 넘어가는 경우엔 출퇴근 상태(근무 중 등)도 함께
+    if (!ops.length) return null;
+    var it = { id: 'r' + deps.now().toString(36) + Math.random().toString(36).slice(2, 7), ts: new Date(deps.now()).toISOString(), ops: ops, desc: host.describeOps ? String(host.describeOps(ops) || '') : '', sent: false };
+    if (note) it.note = note;
+    var q = loadQ();
+    q.push(it);
+    saveQ(q);
+    reqBaseline = JSON.stringify(cur);
+    if (host.onRequest) host.onRequest({ kind: 'queued', item: it });
+    if (host.onDevice) host.onDevice(deviceInfo());
+    flushRequests();
+    return it;
+  }
+  function tsLocal(ms) { var d = new Date(ms), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
+  function flushRequests() {
+    if (flushing || !meta.connected || !meta.sheetId) return Promise.resolve();
+    var q = loadQ().filter(function (x) { return !x.sent; });
+    if (!q.length) return Promise.resolve();
+    flushing = true;
+    var rows = q.map(function (it) {
+      var js = JSON.stringify(it.ops);
+      return [it.id, tsLocal(Date.parse(it.ts) || deps.now()), myId(), myName(), (it.note ? '[' + it.note + '] ' : '') + (it.desc || ''), js, '', '', ''];
+    });
+    var big = rows.filter(function (r) { return r[5].length > 45000; });
+    if (big.length) {   // 칸 하나에 못 넣는 큰 요청: 버리고 알림
+      var bad = {}; big.forEach(function (r) { bad[r[0]] = true; });
+      var q2 = loadQ().filter(function (x) { if (bad[x.id] && host.onRequest) host.onRequest({ kind: 'rejected', item: x, reason: tr('한 번에 바꾼 내용이 너무 많아요. 나눠서 고쳐 주세요.') }); return !bad[x.id]; });
+      saveQ(q2);
+      rows = rows.filter(function (r) { return !bad[r[0]]; });
+      if (!rows.length) { flushing = false; return Promise.resolve(); }
+    }
+    var url = SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(SHEET_REQ + '!A:I') + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+    var send = function () { return api('POST', url, { values: rows }, 'silent'); };
+    return send().catch(function (e) {
+      if (e && e.status === 400) return ensureTab(SHEET_REQ, REQ_HEAD, 'silent').then(send);
+      throw e;
+    }).then(function () {
+      var sent = {}; rows.forEach(function (r) { sent[r[0]] = true; });
+      saveQ(loadQ().map(function (x) { if (sent[x.id]) x.sent = true; return x; }));
+      if (host.onDevice) host.onDevice(deviceInfo());
+      return true;
+    }).catch(function () { return false; /* 다음 새로 받기 때 다시 */ }).then(function (ok) {
+      flushing = false;
+      if (ok && loadQ().some(function (x) { return !x.sent; })) return flushRequests();   // 보내는 사이 새로 생긴 요청
+    });
+  }
+
+  /* ---------- 출퇴근 기기 ---------- */
+  function processRequests(h) {
+    var rows = h && h.reqRows;
+    if (!rows || !rows.length) return Promise.resolve(false);
+    var log = isObj(meta.reqLog) ? clone(meta.reqLog) : {};
+    log.applied = Array.isArray(log.applied) ? log.applied : [];
+    log.rejected = Array.isArray(log.rejected) ? log.rejected : [];
+    var cursor = h.reqFrom;
+    var done = {};
+    log.applied.forEach(function (id) { done[id] = '적용됨'; });
+    log.rejected.forEach(function (x) { if (x && x.id) done[x.id] = '거절'; });
+    var data = clone(withoutLog(host.getData()));
+    var changed = false, any = false, writes = [];
+    var when = tsLocal(deps.now());
+    rows.forEach(function (row, i) {
+      var rowNo = cursor + i;
+      var id = String((row && row[0]) || '').trim();
+      if (!id || id === REQ_HEAD[0]) return;
+      if (done[id]) { if (!row[6]) { writes.push({ range: SHEET_REQ + '!G' + rowNo + ':I' + rowNo, values: [[done[id], when, '']] }); any = true; } return; }
+      var ops = null;
+      try { ops = JSON.parse(String(row[5] || '')); } catch (e) { ops = null; }
+      var res = Array.isArray(ops) ? applyOps(data, ops) : { ok: false, path: [] };
+      any = true;
+      if (res.ok) {
+        data = res.data; changed = true;
+        log.applied.push(id); done[id] = '적용됨';
+        writes.push({ range: SHEET_REQ + '!G' + rowNo + ':I' + rowNo, values: [['적용됨', when, '']] });
+      } else {
+        var reason = host.describeFail ? String(host.describeFail(res.path, data) || '') : '';
+        reason = reason || tr('그 사이 다른 곳에서 바뀌었어요');
+        log.rejected.push({ id: id, reason: reason }); done[id] = '거절';
+        writes.push({ range: SHEET_REQ + '!G' + rowNo + ':I' + rowNo, values: [['거절', when, reason]] });
+      }
+    });
+    log.cursor = cursor + rows.length;
+    log.applied = log.applied.slice(-300);
+    log.rejected = log.rejected.slice(-100);
+    var moved = !meta.reqLog || meta.reqLog.cursor !== log.cursor;
+    if (!any && !moved) return Promise.resolve(false);
+    meta.reqLog = log;
+    if (changed && host.onRequestsApplied) { try { host.onRequestsApplied(withoutLog(host.getData()), data); } catch (e) {} }
+    if (changed) host.applyData(data);
+    meta.pendWrites = pendWrites().concat(writes).slice(-500);
+    meta.dirty = true;
+    writeMeta();
+    return doSave('silent');
+  }
+  function heartbeat() {
+    if (role() !== 'writer' || deps.now() - (meta.lastBeat || 0) < 60000) return Promise.resolve();
+    meta.lastBeat = deps.now();
+    return api('PUT', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(SHEET_DEV + '!C1:D1') + '?valueInputOption=RAW',
+      { values: [[new Date(deps.now()).toISOString(), appVer()]] }, 'silent').catch(function () {});
+  }
+  /* 다른 기기가 출퇴근 기기로 지정됨 → 저장 못 한 내 변경은 요청으로 보내고 요청 기기로 */
+  function loseWriter() {
+    var it = null;
+    if (meta.dirty && lastJson) {
+      reqBaseline = JSON.stringify(withoutLog(JSON.parse(lastJson)));
+      it = buildRequest(tr('출퇴근 기기가 바뀌어 요청으로 보냄'));
+    }
+    meta.dirty = false;
+    writeMeta();
+    if (host.onDevice) host.onDevice(deviceInfo());
+    if (it && host.onRequest) host.onRequest({ kind: 'converted', item: it });
+    return pull('silent').then(function (remote) { if (remote) return requesterApply(remote); });
+  }
+  /* 이 기기를 출퇴근 기기로 지정 */
+  function designate(name) {
+    if (!meta.connected || !meta.sheetId) return Promise.resolve(false);
+    name = String(name || '').trim().slice(0, 30) || tr('매장 기기');
+    deps.storage.set(DEVNAME_KEY, name);
+    if (role() === 'requester' && reqTimer) { clearT(reqTimer); reqTimer = null; buildRequest(); }   // 아직 요청으로 안 만든 화면 수정부터
+    return getToken('user').then(function () {
+      return ensureTab(SHEET_DEV, null, 'user');
+    }).then(function () {
+      return pull('user');
+    }).then(function (remote) {
+      if (role() === 'requester' && remote) {
+        // 요청 기기였으면: 이미 결과가 난 내 요청은 정리하고, 아직 처리 안 된 내 요청은 이 기기가 직접 적용(또는 거절)한 것으로 기록
+        var log = remote.data && isObj(remote.data.reqLog) ? clone(remote.data.reqLog) : {};
+        log.applied = Array.isArray(log.applied) ? log.applied : [];
+        log.rejected = Array.isArray(log.rejected) ? log.rejected : [];
+        var known = {};
+        log.applied.forEach(function (id) { known[id] = 'a'; });
+        log.rejected.forEach(function (x) { if (x && x.id) known[x.id] = x.reason || ''; });
+        var view = withoutLog(clone(remote.data));
+        loadQ().forEach(function (it) {
+          if (known[it.id] === 'a') { if (host.onRequest) host.onRequest({ kind: 'applied', item: it }); return; }
+          if (known[it.id] !== undefined) { if (host.onRequest) host.onRequest({ kind: 'rejected', item: it, reason: known[it.id] }); return; }
+          var r = applyOps(view, it.ops);
+          if (r.ok) { view = r.data; if (it.sent) log.applied.push(it.id); }
+          else {
+            var why = tr('그 사이 다른 곳에서 바뀌었어요');
+            if (it.sent) log.rejected.push({ id: it.id, reason: why });
+            if (host.onRequest) host.onRequest({ kind: 'rejected', item: it, reason: why });
+          }
+        });
+        log.applied = log.applied.slice(-300); log.rejected = log.rejected.slice(-100);
+        meta.stamp = remote.stamp; meta.lineage = remote.lineage || [remote.stamp];
+        meta.reqLog = log;
+        host.applyData(view);
+        lastJson = JSON.stringify(remote.data);
+        saveBase(lastJson);
+        saveQ([]);
+      } else if (remote && remote.stamp !== meta.stamp) {
+        return applyRemote(remote);
+      }
+    }).then(function () {
+      return api('PUT', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(SHEET_DEV + '!A1:D1') + '?valueInputOption=RAW',
+        { values: [[myId(), name, new Date(deps.now()).toISOString(), appVer()]] }, 'user');
+    }).then(function () {
+      meta.lastBeat = deps.now();
+      updateDev({ id: myId(), name: name, beat: new Date(deps.now()).toISOString(), ver: appVer() });
+      meta.dirty = true;
+      writeMeta();
+      return doSave('user');
+    }).then(function () { return true; }, function (e) { setStatus('error', friendly(e)); return false; });
+  }
+  /* 지정 해제 (출퇴근 기기를 아무도 아닌 상태로) */
+  function undesignate() {
+    if (!meta.connected || !meta.sheetId) return Promise.resolve(false);
+    return api('PUT', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(SHEET_DEV + '!A1:D1') + '?valueInputOption=RAW',
+      { values: [['', '', '', '']] }, 'user').then(function () {
+      updateDev({ id: '', name: '', beat: '', ver: '' });
+      return true;
+    }, function () { return false; });
+  }
+
   /* ---------------- 공개 기능 ---------------- */
   function connect() {
     if (!deps.available()) {
@@ -577,12 +1010,20 @@
       return Promise.resolve(false);
     }
     setStatus('saving', tr('구글 연결 중…'));
+    var asRequester = false;
     return getToken(meta.connected ? 'user' : 'first').then(function () {
       return ensureSheet('user');
     }).then(function () {
+      // 이미 다른 기기가 출퇴근 기기로 지정돼 있으면 이 기기는 요청 기기: 시트를 덮어쓰지 않고 받아 오기만
+      return readHead('user', 0).then(function (h) {
+        meta.dev = h.dev ? { id: String(h.dev.id || ''), name: String(h.dev.name || ''), beat: String(h.dev.beat || ''), ver: String(h.dev.ver || '') } : meta.dev;
+        asRequester = !!(meta.dev && meta.dev.id && meta.dev.id !== myId());
+      }, function () {});
+    }).then(function () {
       return withSheetRetry(function () { return pull('user'); }, 'user');
     }).then(function (remote) {
-      var local = host.getData();
+      if (asRequester) { meta.connected = true; writeMeta(); return remote ? requesterApply(remote) : null; }
+      var local = dataOut();
       // 이미 연동돼 있던 기기가 다시 로그인한 경우: 묻지 않고 '앱을 열 때'와 같은 규칙으로 맞춘다
       // (이 기기에 저장 안 된 변경이 있으면 이 기기 우선 → 시트에 저장 / 다른 기기가 더 최근에 저장했으면 시트 내용 / 아니면 이 기기 내용 유지)
       if (meta.connected && meta.sheetId && remote && hasContent(remote.data)) {
@@ -615,6 +1056,12 @@
       meta.connected = true;
       if (!meta.lastSaved) meta.lastSaved = deps.now();
       writeMeta();
+      if (asRequester) { if (host.onDevice) host.onDevice(deviceInfo()); return null; }
+      return readHead('user', 0).then(function (h) {
+        updateDev(h.dev);
+        if (role() === 'requester') return pull('user').then(function (remote) { if (remote) return requesterApply(remote); });
+      }, function () {});
+    }).then(function () {
       setStatus('saved', '');
       return true;
     }).catch(function (e) {
@@ -629,11 +1076,14 @@
     if (!deps.available()) { setStatus('off'); return Promise.resolve(); }
     setStatus('saving', tr('구글 시트 확인 중…'));
     return getToken('silent').then(function () {
+      return readHead('silent', 0).then(function (h) { updateDev(h.dev); }, function () {});
+    }).then(function () {
       return withSheetRetry(function () { return pull('silent'); }, 'silent');
     }).then(function (remote) {
+      if (role() === 'requester') return remote ? requesterApply(remote) : flushRequests();
       if (meta.dirty) return push('silent');          // 이 기기에 저장 안 된 변경이 있으면 우선
       if (remote && remote.stamp !== (meta.stamp || '')) return applyRemote(remote);   // 시계 순서가 아니라 '내가 마지막으로 저장한 것과 다른가'로 판단
-      else { lastJson = JSON.stringify(host.getData()); saveBase(lastJson); return replayPending(); }
+      else { lastJson = JSON.stringify(dataOut()); saveBase(lastJson); return replayPending(); }
     }).then(function () {
       setStatus('saved', '');
     }).catch(function (e) {
@@ -643,6 +1093,7 @@
 
   function doSave(mode) {
     if (!meta.connected) return Promise.resolve(false);
+    if (role() === 'requester') return flushRequests().then(function () { return true; });
     if (saving) { again = true; return Promise.resolve(false); }
     saving = true;
     setStatus('saving', tr('저장 중…'));
@@ -676,18 +1127,29 @@
     if (!meta.connected || !meta.sheetId || !deps.available()) return Promise.resolve(false);
     if (saving || refreshing) return Promise.resolve(false);
     if (!token || tokenExp - deps.now() < 60000) return Promise.resolve(false);   // 토큰 갱신은 화면 터치 때 (팝업 차단 방지)
-    if (meta.dirty) { schedule(); return Promise.resolve(false); }
+    if (meta.dirty && role() !== 'requester') { schedule(); return Promise.resolve(false); }
     if (host.isBusy && host.isBusy()) return Promise.resolve(false);
     refreshing = true;
-    return pullStamp('silent').then(function (st) {
+    var wasWriter = role() === 'writer';
+    var cur = meta.reqLog && meta.reqLog.cursor ? meta.reqLog.cursor : 2;
+    return readHead('silent', wasWriter ? cur : 0).then(function (h) {
+      if (h.dev) updateDev(h.dev);
+      if (wasWriter && role() !== 'writer') return loseWriter().then(function () { return null; });
+      if (role() === 'requester') {
+        if (!h.stamp || h.stamp === (meta.stamp || '')) return flushRequests().then(function () { return null; });
+        return pull('silent');
+      }
+      var st = h.stamp;
       if (!st || st === (meta.stamp || '')) {   // 바뀐 게 없으면 데이터는 안 읽음 (지난번 장부 재생이 실패했으면 그것만 다시)
         if (st) confirmWritten();
-        if (st && meta.replayStamp) return replayPending().then(function () { return null; });
-        return null;
+        var p0 = st && meta.replayStamp ? replayPending() : Promise.resolve();
+        if (role() !== 'writer') return p0.then(function () { return null; });
+        return p0.then(function () { return processRequests(h); }).then(function () { return heartbeat(); }).then(function () { return null; });
       }
       return pull('silent');
     }).then(function (remote) {
-      if (!remote || remote.stamp === (meta.stamp || '') || meta.dirty || saving) return false;
+      if (!remote || remote.stamp === (meta.stamp || '') || saving) return false;
+      if (meta.dirty && role() !== 'requester') return false;
       if (host.isBusy && host.isBusy()) return false;
       return applyRemote(remote).then(function () { setStatus('saved', ''); return true; });
     }).catch(function () { return false; }).then(function (v) { refreshing = false; return v; });
@@ -696,7 +1158,8 @@
   /* 앱에서 저장할 내용이 바뀔 때마다 호출 */
   function markDirty() {
     if (!meta.connected || !host) return;
-    var json = JSON.stringify(host.getData());
+    if (role() === 'requester') { scheduleRequest(); return; }
+    var json = JSON.stringify(dataOut());
     if (json === lastJson) return;
     meta.dirty = true;
     writeMeta();
@@ -771,6 +1234,7 @@
 
   function saveNow() {
     if (saveTimer) { clearT(saveTimer); saveTimer = null; }
+    if (role() === 'requester') { if (reqTimer) { clearT(reqTimer); reqTimer = null; } buildRequest(); }
     return doSave('user');
   }
 
@@ -798,6 +1262,9 @@
     lastJson = null;
     lastTabs = {};
     punchHeaderOk = {};
+    if (reqTimer) { clearT(reqTimer); reqTimer = null; }
+    reqBaseline = null;
+    deps.storage.remove(REQQ_KEY);
     notice = '';
     setStatus('off');
   }
@@ -812,6 +1279,14 @@
     refresh: refresh,
     merge3: merge3,
     mergeData: mergeData,
+    diffOps: diffOps,
+    applyOps: applyOps,
+    designate: designate,
+    undesignate: undesignate,
+    deviceInfo: function () { return deviceInfo(); },
+    role: function () { return role(); },
+    setDeviceName: function (n) { deps.storage.set(DEVNAME_KEY, String(n || '').trim().slice(0, 30)); },
+    pendingRequests: function () { return loadQ(); },
     mergeCount: function () { return merges; },
     appendPunch: appendPunch,
     purgePunchLog: purgePunchLog,

@@ -2001,7 +2001,7 @@
     return t.length > 60 ? t.slice(0, 60) + '…' : t;
   }
   function conflictWhat(c) {
-    var p = c.path;
+    var p = (c.path || []).map(function (k) { return k && typeof k === 'object' && k.id ? k.id : k; });
     if (p[0] === 'workers') {
       var w = state.workers.filter(function (x) { return x.id === p[1]; })[0];
       var who = w ? w.name : tr('(삭제된 알바생)');
@@ -2016,7 +2016,7 @@
   }
   /* 덮인 값으로 되돌릴 수 있는 곳: 알바생 기록·설정 */
   function conflictTarget(c) {
-    var p = c.path, cur;
+    var p = (c.path || []).map(function (k) { return k && typeof k === 'object' && k.id ? k.id : k; }), cur;
     if (p[0] === 'workers') {
       cur = state.workers.filter(function (x) { return x.id === p[1]; })[0];
       if (!cur) return null;
@@ -2030,6 +2030,115 @@
     }
     return null;
   }
+  /* ---------- 출퇴근 기기(단일 저장) ---------- */
+  function devRole() { var C = window.AlbaCloud; return C && C.role ? C.role() : 'none'; }
+  function isRequester() { return devRole() === 'requester'; }
+  /* 수정 요청을 사람이 읽을 수 있게: "김알바 · 11월 16일 근무: 09:00~14:00 → 09:00~13:30" */
+  function opText(op) {
+    var p = (op.path || []).map(function (k) { return k && typeof k === 'object' && k.id ? k.id : k; });
+    if (op.add !== undefined || op.del !== undefined) {
+      var what = p[0] === 'archive' ? tr('점검 보관함') : p.join(' › ');
+      var it = op.add !== undefined ? op.add : op.del;
+      var label = it && typeof it === 'object' ? (it.date || it.store || '') : String(it);
+      return what + ' ' + (op.add !== undefined ? tr('추가') : tr('삭제')) + (label ? ' (' + label + ')' : '');
+    }
+    if (p[0] === 'workers' && p.length === 2) {
+      var w = op.after || op.before || {};
+      return (op.before === null ? tr('알바생 추가') : op.after === null ? tr('알바생 삭제') : tr('알바생 정보')) + ': ' + (w.name || '');
+    }
+    var c = { path: op.path };
+    var name = conflictWhat(c);
+    if (p[0] === 'workers' && !state.workers.some(function (x) { return x.id === p[1]; })) {
+      name = name.replace(tr('(삭제된 알바생)'), tr('새 알바생'));
+    }
+    return name + ': ' + cellText(op.before) + ' → ' + cellText(op.after);
+  }
+  function describeOps(ops) {
+    var list = (ops || []).map(opText);
+    return list.slice(0, 3).join(' / ') + (list.length > 3 ? ' ' + tr('외 {n}건', { n: list.length - 3 }) : '');
+  }
+  function ageText(iso) {
+    var t = Date.parse(iso || '');
+    if (!t) return '';
+    var m = Math.max(0, Math.round((Date.now() - t) / 60000));
+    return m < 1 ? tr('방금') : m < 60 ? tr('{n}분 전', { n: m }) : tr('{n}시간 전', { n: Math.floor(m / 60) });
+  }
+  function renderDevice() {
+    var C = window.AlbaCloud, bar = $('devBar');
+    if (!bar) return;
+    var info = C && C.deviceInfo ? C.deviceInfo() : null;
+    var st = C && C.getStatus ? C.getStatus() : null;
+    var conn = !!(st && st.connected);
+    var cls = 'dev-bar', txt = '';
+    if (info && conn) {
+      var dv = info.dev || {};
+      if (info.role === 'writer') { cls += ' ok'; txt = tr('✅ 이 기기가 출퇴근 기기예요 ({n})', { n: dv.name || info.myName || '' }); }
+      else if (info.role === 'requester') {
+        var mins = dv.beat ? (Date.now() - Date.parse(dv.beat)) / 60000 : 999;
+        var name = dv.name || tr('매장 기기');
+        if (mins > 5) { cls += ' warn'; txt = dv.beat ? tr('⚠️ 출퇴근 기기({n})가 {a}부터 응답이 없어요', { n: name, a: ageText(dv.beat) }) : tr('⚠️ 출퇴근 기기({n})의 응답 기록이 없어요', { n: name }); }
+        else txt = tr('📍 출퇴근 기기: {n} · {a} 응답', { n: name, a: ageText(dv.beat) });
+        if (info.queued) txt += ' · ' + tr('내 수정 요청 {q}건 대기 중', { q: info.queued });
+      } else { cls += ' warn'; txt = tr('⚠️ 출퇴근 기기가 지정되지 않았어요 · 설정 → 출퇴근 기기에서 매장 기기를 지정해 주세요'); }
+    }
+    bar.className = cls;
+    bar.textContent = txt;
+    bar.hidden = !txt;
+    // 설정 화면
+    var di = $('devInfo');
+    if (di) {
+      var role = info ? info.role : 'none';
+      var d = info ? info.dev || {} : {};
+      di.innerHTML = !conn ? escHtml(tr('구글 저장을 켜면 지정할 수 있어요.'))
+        : role === 'writer' ? escHtml(tr('이 기기가 출퇴근 기기예요. 다른 기기의 수정 요청을 받아 반영합니다.'))
+        : role === 'requester' ? escHtml(tr('출퇴근 기기: {n} (마지막 응답 {a}). 이 기기에서 고친 내용은 수정 요청으로 보내져요.', { n: d.name || '', a: ageText(d.beat) || '-' }))
+        : escHtml(tr('아직 지정되지 않았어요. 매장 기기에서 이름을 적고 아래 버튼을 눌러 주세요.'));
+      $('devState').textContent = role === 'writer' ? tr('· 이 기기') : role === 'requester' ? tr('· 다른 기기 지정됨') : tr('· 미지정');
+      $('btnDevSet').disabled = !conn;
+      $('btnDevSet').textContent = role === 'writer' ? tr('이름 바꾸기') : tr('이 기기를 출퇴근 기기로 지정');
+      $('btnDevClear').hidden = role !== 'writer';
+      if (info && document.activeElement !== $('sDevName') && !$('sDevName').value) $('sDevName').value = info.myName || '';
+    }
+  }
+  function onDevSet() {
+    var C = window.AlbaCloud;
+    if (!C || !C.isConnected()) { showToast(tr('구글 저장을 먼저 켜 주세요.')); return; }
+    if (!getPin()) { showToast(tr('관리자 비밀번호를 먼저 정해 주세요. 출퇴근 기기를 바꾸는 일을 막기 위해 필요해요.'), true); $('sAdminPin').focus(); return; }
+    var info = C.deviceInfo(), d = info.dev || {};
+    var name = $('sDevName').value.trim() || tr('매장 기기');
+    if (d.id && d.id !== info.myId) {
+      var mins = d.beat ? (Date.now() - Date.parse(d.beat)) / 60000 : 999;
+      var msg = mins < 3
+        ? tr('{n}이(가) 지금 켜져 있어요 ({a} 응답). 그래도 이 기기를 출퇴근 기기로 바꿀까요?\n바꾸면 {n}은(는) 저장을 멈추고 수정 요청만 보내요.', { n: d.name || tr('다른 기기'), a: ageText(d.beat) })
+        : tr('출퇴근 기기를 {n}에서 이 기기로 바꿀까요?', { n: d.name || tr('다른 기기') });
+      if (!window.confirm(msg)) return;
+    }
+    var btn = $('btnDevSet');
+    btn.disabled = true;
+    C.designate(name).then(function (ok) {
+      btn.disabled = false;
+      showToast(ok ? tr('✅ 이 기기({n})를 출퇴근 기기로 지정했어요.', { n: name }) : tr('지정하지 못했어요. 인터넷과 구글 로그인을 확인해 주세요.'), !ok);
+      renderDevice(); renderPunch();
+    });
+  }
+  function onDevClear() {
+    var C = window.AlbaCloud;
+    if (!C || !window.confirm(tr('출퇴근 기기 지정을 해제할까요? 해제하면 모든 기기가 예전처럼 직접 저장해요.'))) return;
+    C.undesignate().then(function (ok) { showToast(ok ? tr('지정을 해제했어요.') : tr('해제하지 못했어요. 인터넷을 확인해 주세요.'), !ok); renderDevice(); renderPunch(); });
+  }
+  var reqToastAt = 0;
+  function onRequestEvent(ev) {
+    if (!ev || !ev.item) return;
+    if (ev.kind === 'queued') {
+      if (Date.now() - reqToastAt > 8000) { reqToastAt = Date.now(); showToast(tr('📨 수정 요청을 보냈어요. 출퇴근 기기가 반영하면 확정돼요.')); }
+    } else if (ev.kind === 'rejected') {
+      showToast(tr('⚠️ 수정 요청이 반영되지 않았어요: {r}. 화면을 확인하고 다시 고쳐 주세요. ({d})', { r: ev.reason || '', d: ev.item.desc || '' }), true);
+    } else if (ev.kind === 'converted') {
+      showToast(tr('⚠️ 출퇴근 기기가 다른 기기로 바뀌어, 이 기기에서 저장 못 한 내용을 수정 요청으로 보냈어요. 반영되는지 확인해 주세요.'), true);
+    }
+    renderDevice();
+  }
+
   function renderConflicts() {
     var box = $('conflictBox');
     if (!box) return;
@@ -2193,6 +2302,23 @@
       confirm: function (m) { return window.confirm(m); },
       getAdminPin: function () { return getPin(); },
       isBusy: cloudBusy,
+      version: E.ENGINE_VERSION || '',
+      describeOps: describeOps,
+      describeFail: function (path) { return tr('그 사이 바뀜') + ' – ' + opText({ path: path, before: null, after: null }).split(':')[0]; },
+      onDevice: function () {
+        setTimeout(function () {
+          renderDevice(); renderPunch(); renderPunchCloud();
+          if (isRequester()) adoptSheetPin();
+        }, 0);
+      },
+      onRequest: function (ev) { setTimeout(function () { onRequestEvent(ev); }, 0); },
+      onRequestsApplied: function (before, after) {
+        // 요청으로 지워진 알바생은 출퇴근 장부에서도 지움 (출퇴근 기기에서만)
+        var keep = {};
+        ((after && after.workers) || []).forEach(function (w) { keep[w.code] = true; });
+        var gone = ((before && before.workers) || []).filter(function (w) { return w.code && !keep[w.code]; }).map(function (w) { return w.code; });
+        if (gone.length) setTimeout(function () { purgePunchRows(gone); }, 0);
+      },
       onConflicts: function (n) {
         setTimeout(function () {
           renderConflicts();
@@ -2201,6 +2327,7 @@
       },
       onStatus: function (st) {
         renderCloudUi(st);
+        renderDevice();
         if (st && st.kind === 'saved') {
           flushPunchQueue(); retryPurges();
           if (!firstSyncDone) { firstSyncDone = true; runAutoClose(); renderPunch(); renderWorkNow(); }   // 로그인이 풀려 있다 다시 연결돼 처음 동기화된 때
@@ -2333,6 +2460,7 @@
   }
   function saveQueue(q) { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); return true; } catch (e) { storageFull(); return false; } }
   function enqueuePunch(row) {
+    if (isRequester()) return;   // 출퇴근 장부는 출퇴근 기기만 씀
     var q = loadQueue();
     q.push({ id: queueId(), row: row });
     if (q.length > 500) showToast(tr('⚠️ 시트에 못 올린 출퇴근 기록이 500건을 넘어 가장 오래된 기록부터 지워져요. 구글 로그인을 확인해 주세요.'), true);
@@ -2358,6 +2486,7 @@
 
   /* 지운 알바생의 출퇴근 장부 줄도 지운다 (이 기기에 쌓인 대기분 + 구글 시트). codes가 null이면 전부 */
   function purgePunchRows(codes) {
+    if (isRequester()) return;   // 장부는 출퇴근 기기만 지움 (요청이 반영될 때 출퇴근 기기가 지움)
     var q = loadQueue().filter(function (x) { return codes && codes.indexOf(String(x.row[1])) < 0; });
     saveQueue(q);
     // 시트에서 지우는 일은 로그인이 풀려 있거나 실패하면 보관했다가, 다음에 저장이 성공할 때 다시 시도
@@ -2400,6 +2529,7 @@
   /* 자정까지 퇴근을 안 찍은 사람은 그날 출근을 무효(휴무)로 처리 */
   var firstSyncDone = false;   // 연동된 기기는 켜질 때 시트를 먼저 받은 뒤에 자동 퇴근을 판단 (오래 꺼 둔 기기의 옛 '근무 중'으로 잘못 처리하지 않게)
   function runAutoClose() {
+    if (isRequester()) return;   // 자동 퇴근은 출퇴근 기기만
     var C0 = window.AlbaCloud;
     if (!firstSyncDone && C0 && C0.getStatus && C0.getStatus().connected) return;
     var done = E.autoCloseOpen(state.workers, new Date(), autoOut());
@@ -2662,9 +2792,17 @@
     if (!box) return;
     var now = new Date();
     var allBtn = $('punchAllOut');
+    var remote = isRequester();
+    var rb = $('punchRemote');
+    if (rb) {
+      var dv = window.AlbaCloud && window.AlbaCloud.deviceInfo ? window.AlbaCloud.deviceInfo().dev : {};
+      rb.hidden = !remote;
+      if (remote) rb.innerHTML = tr('📍 출퇴근은 <b>{n}</b>에서 찍어요. 이 기기에서는 근무 현황만 볼 수 있어요.', { n: escHtml(dv.name || tr('매장 기기')) });
+      $('punchTitle').hidden = remote;
+    }
     if (allBtn) {
       var nOn = state.workers.filter(function (w) { return E.punchNext(w, now) === 'out'; }).length;
-      allBtn.hidden = nOn < 1;
+      allBtn.hidden = nOn < 1 || remote;
       allBtn.textContent = tr('🌙 근무 중인 {n}명 모두 퇴근', { n: nOn });
     }
     if (!state.workers.length) {
@@ -2680,6 +2818,7 @@
         ? '<span class="punch-chip on">' + tr('근무 중 · {t} 출근', { t: escHtml(w.punch.time) }) + '</span>'
         : '<span class="punch-chip">' + tr('퇴근 상태') + '</span>';
       var pend = (w.pending || []).length ? '<span class="punch-chip warn">' + tr('⚠️ 퇴근 확인 필요') + '</span>' : '';
+      if (remote) return '<div class="punch-row view' + (working ? ' on' : '') + '">' + '<span class="punch-name">' + escHtml(w.name) + '</span>' + pend + chip + '</div>';
       return '<button type="button" class="punch-row' + (working ? ' on' : '') + '" data-punch="' + escHtml(w.id) + '">' +
         '<span class="punch-name">' + escHtml(w.name) + '</span>' + pend + chip + '</button>';
     }).join('');
@@ -2714,6 +2853,7 @@
   function punchSubmit() {
     var w = punchState.target;
     if (!w) return;
+    if (isRequester()) { closePunchPw(); renderPunch(); return; }
     // 창이 열려 있는 사이 시트에서 불러오기가 일어나 사람 객체가 바뀌었을 수 있으니 같은 사람을 다시 찾는다
     w = state.workers.filter(function (x) { return x.id === w.id; })[0];
     if (!w) { closePunchPw(); renderPunch(); return; }
@@ -2833,6 +2973,7 @@
 
   /* ---------- 근무 중인 사람 일괄 퇴근 (마감할 때) ---------- */
   function askBulkOut() {
+    if (isRequester()) return;
     runAutoClose();
     var now = new Date();
     var on = state.workers.filter(function (w) { return E.punchNext(w, now) === 'out'; });
@@ -2846,6 +2987,7 @@
     else go();
   }
   function doBulkOut() {
+    if (isRequester()) return;
     runAutoClose();   // 자동 퇴근 시각이 지난 근무부터 정리 (그 사람에게 새 출근이 찍히지 않게)
     var now = new Date();
     var done = E.applyPunchAll(state.workers, now, punchOpts());
@@ -2946,7 +3088,7 @@
     initSaver();
     runAutoClose();
     tickClock();
-    setInterval(function () { tickClock(); runAutoClose(); renderPunch(); renderChips(); renderWorkNow(); renderPunchCloud(); }, 15000);
+    setInterval(function () { tickClock(); runAutoClose(); renderPunch(); renderChips(); renderWorkNow(); renderPunchCloud(); renderDevice(); }, 15000);
 
     $('punchList').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-punch]');
@@ -2999,6 +3141,9 @@
       if (!$('pinSetup').hidden) { $('pinSetup').hidden = true; try { localStorage.setItem(PIN_ASKED_KEY, '1'); } catch (e2) {} }
     });
 
+    $('btnDevSet').addEventListener('click', onDevSet);
+    $('btnDevClear').addEventListener('click', onDevClear);
+    $('sDevName').addEventListener('change', function () { var C = window.AlbaCloud; if (C && C.setDeviceName) C.setDeviceName($('sDevName').value); });
     $('btnPinSave').addEventListener('click', function () {
       var v = $('sAdminPin').value.trim();
       if (v.length < 4) { showToast(tr('관리자 비밀번호는 4자 이상으로 정해 주세요.')); return; }
