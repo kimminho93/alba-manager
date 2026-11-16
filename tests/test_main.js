@@ -1089,6 +1089,28 @@ test('2차 검토: 사장님이 처리한 퇴근 확인 필요는 다른 기기�
   assert.strictEqual(w.pending.length, 1);
 });
 
+test('4차 검증: 지난 달 근무를 고치거나 퇴근 확인을 처리해도 이번 달에 올린 시급이 되돌아가지 않음', () => {
+  const w = E.createWorker('김', 5, 10000);
+  E.setRecord(w, '2026-10', { wage: 10000, dailyShifts: E.emptyShifts('2026-10') });
+  E.setRecord(w, '2026-11', { wage: 11000, dailyShifts: E.emptyShifts('2026-11') });
+  w.pending = [{ date: '2026-10-31', start: '18:00' }];
+  assert.strictEqual(E.resolvePending(w, 0, '22:00').ok, true);
+  assert.strictEqual(w.months['2026-11'].wage, 11000);
+  assert.strictEqual(w.wage, 11000);
+  // 지난 달 근무 칸만 고쳐 다시 저장해도
+  const r = JSON.parse(JSON.stringify(w.months['2026-10'])); r.dailyShifts[3] = { off: false, start: '09:00', end: '12:00', breakMinutes: 0 };
+  E.setRecord(w, '2026-10', r);
+  assert.strictEqual(w.months['2026-11'].wage, 11000);
+  // 자정 넘긴 퇴근(10/31 → 11/1)도
+  E.applyPunch(w, new Date(2026, 9, 31, 20, 0, 0), { unit: 30, autoOut: '06:00' });
+  E.applyPunch(w, new Date(2026, 10, 1, 2, 0, 0), { unit: 30, autoOut: '06:00' });
+  assert.strictEqual(w.months['2026-11'].wage, 11000);
+  // 지난 달 시급을 직접 바꾸면 이후 달에도 반영(기존 동작)
+  const r2 = JSON.parse(JSON.stringify(w.months['2026-10'])); r2.wage = 10500;
+  E.setRecord(w, '2026-10', r2);
+  assert.strictEqual(w.months['2026-11'].wage, 10500);
+});
+
 test('버전: 엔진 번들의 ALBA_VERSION이 package.json 버전과 같다', () => {
   const fs = require('fs'), path = require('path');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));

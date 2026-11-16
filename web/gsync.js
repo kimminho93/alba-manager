@@ -255,7 +255,7 @@
     return d;
   }
   function toHost(d) {
-    if (d && isObj(d.reqLog)) meta.reqLog = d.reqLog;
+    meta.reqLog = d && isObj(d.reqLog) ? d.reqLog : null;   // 받은 데이터에 처리 기록이 없으면 처리 기록도 없는 것 (시트에서 다시 불러오기 등)
     host.applyData(d);
   }
 
@@ -265,11 +265,17 @@
     if (role() === 'requester') return flushRequests();
     if (force || !meta.stamp || !meta.sheetId) return pushNow(mode);
     // 출퇴근 기기는 쓰기 직전에 '아직 내가 지정 기기인지' 확인 (교체됐으면 쓰지 않고 요청 기기로)
-    var fence = role() === 'writer' ? readHead(mode, 0).then(function (h) { updateDev(h.dev); if (role() !== 'writer') throw LOST_WRITER; }) : Promise.resolve();
+    // 미지정 기기도 쓰기 직전에 확인: 그 사이 다른 기기가 출퇴근 기기로 지정됐으면 데이터 탭을 쓰지 않고 요청으로
+    var was = role();
+    var fence = readHead(mode, 0, true).then(function (h) {
+      if (h.dev) updateDev(h.dev);
+      if (role() === 'requester') throw LOST_WRITER;
+    }, function (e) { if (was === 'writer') throw e; });
+    if (meta.settle) fence = fence.then(function () { return settleIfNeeded(mode); });
     return fence.then(function () {
       if (meta.replayStamp) return replayPending().then(function () { return push2(mode); });
       return push2(mode);
-    }).catch(function (e) { if (e === LOST_WRITER) return loseWriter(); throw e; });
+    }).catch(function (e) { if (e === LOST_WRITER) return loseWriter().then(function () { return flushRequests(); }); throw e; });
   }
   function push2(mode) {
     // 내가 마지막으로 맞춘 뒤 다른 기기가 저장했으면 덮어쓰지 않고 합친 뒤 저장
@@ -399,14 +405,21 @@
       // 데이터 탭은 늘 300줄을 통째로 덮어쓰므로 지우지 않음 (지운 직후 끊기면 시트가 잠깐 비는 일 방지)
       var names = changed.filter(function (t) { return t.name !== SHEET_DATA; }).map(function (t) { return t.name; });
       var clear = names.length ? api('POST', SHEETS + '/' + id + '/values:batchClear', { ranges: names }, mode) : Promise.resolve();
-      var extra = pendWrites().slice(), nExtra = extra.length;
-      if (role() === 'writer') extra.push({ range: SHEET_DEV + '!C1:D1', values: [[new Date(deps.now()).toISOString(), appVer()]] });   // 응답 시각
-      return clear.then(function () {
+      var pend = role() === 'writer' ? pendWrites().slice() : [], nExtra = pendWrites().length, extra = [];
+      // 상태 칸은 요청ID로 지금 줄 위치를 다시 찾아 씀 (그 사이 사람이 줄을 지워 줄이 밀렸어도 다른 요청 줄에 쓰지 않게)
+      var locate2 = pend.length ? api('GET', SHEETS + '/' + id + '/values/' + encodeURIComponent(SHEET_REQ + '!A1:A'), undefined, mode).then(function (r) {
+        var at = {};
+        ((r && r.values) || []).forEach(function (v, i) { if (v && v[0]) at[String(v[0])] = i + 1; });
+        pend.forEach(function (w) { var n = w.id ? at[w.id] : w.row; if (n) extra.push({ range: SHEET_REQ + '!G' + n + ':I' + n, values: w.values }); });
+      }, function () { /* 못 찾으면 이번엔 상태 칸을 쓰지 않음 */ }) : Promise.resolve();
+      return clear.then(function () { return locate2; }).then(function () {
+        if (role() === 'writer') extra.push({ range: SHEET_DEV + '!C1:D1', values: [[new Date(deps.now()).toISOString(), appVer()]] });   // 응답 시각
         return api('POST', SHEETS + '/' + id + '/values:batchUpdate', {
           valueInputOption: 'RAW',
           data: changed.map(function (t) { return { range: t.name + '!A1', values: t.rows && t.rows.length ? t.rows : [['']] }; }).concat(extra)
         }, mode).then(function (r) {
           meta.pendWrites = pendWrites().slice(nExtra);
+          meta.unsaved = [];   // 적용한 요청이 데이터와 함께 저장됨
           if (role() === 'writer') meta.lastBeat = deps.now();
           return r;
         });
@@ -634,6 +647,34 @@
     if (isObj(k)) { if (!Array.isArray(cur)) return undefined; for (var j = 0; j < cur.length; j++) if (cur[j] && cur[j].id === k.id) return cur[j]; return undefined; }
     return cur[k];
   }
+  /* 기준 없이 양쪽이 만든 기록 합치기: 같으면 그대로, 한쪽에만 있으면 그 값, 날짜 칸은 휴무(기본값) 쪽을 근무가 덮음. 그 외 다르면 실패 */
+  var FAIL = { fail: true };
+  function fillNew(cur, add, path) {
+    if (ceq(cur, add)) return clone(cur);
+    if (cur === undefined || cur === null) return clone(add);
+    if (add === undefined || add === null) return clone(cur);
+    if (isObj(cur) && isObj(add)) {
+      var out = {}, ks = {};
+      Object.keys(cur).concat(Object.keys(add)).forEach(function (k) {
+        if (ks[k] || out === FAIL) return; ks[k] = 1;
+        var v = fillNew(cur[k], add[k], (path || []).concat([k]));
+        if (v === FAIL) out = FAIL; else if (v !== undefined) out[k] = v;
+      });
+      return out;
+    }
+    if (Array.isArray(cur) && Array.isArray(add) && cur.length === add.length && POSITIONAL[(path || [])[(path || []).length - 1]]) {
+      var arr = [];
+      for (var i = 0; i < cur.length; i++) {
+        var a = cur[i], b = add[i];
+        if (ceq(a, b)) arr.push(clone(a));
+        else if (isObj(a) && isObj(b) && a.off === true && b.off !== true) arr.push(clone(b));
+        else if (isObj(a) && isObj(b) && b.off === true && a.off !== true) arr.push(clone(a));
+        else return FAIL;
+      }
+      return arr;
+    }
+    return FAIL;
+  }
   function getAt(root, path) { if (!path.length) return root; var loc = locate(root, path); return loc ? step(loc.parent, loc.key) : undefined; }
   /* ops를 data에 적용 (data는 바꾸지 않고 새 사본 반환). 하나라도 지금 값이 before와 다르면 전부 취소 → {ok:false, path} */
   function applyOps(data, ops) {
@@ -659,7 +700,12 @@
       var loc = locate(d, op.path);
       if (!loc) return { ok: false, path: op.path };
       var cur = step(loc.parent, loc.key);
-      if (!ceq(cur, op.before)) return { ok: false, path: op.path };
+      if (!ceq(cur, op.before)) {
+        // 새로 만들려던 기록(달 기록 등)을 그 사이 다른 기기도 만들었으면: 서로 다른 날짜·칸만 바꿨을 땐 합쳐서 적용
+        var filled = (op.before === null || op.before === undefined) && isObj(cur) && isObj(op.after) ? fillNew(cur, op.after, op.path) : FAIL;
+        if (filled === FAIL) return { ok: false, path: op.path };
+        op = { path: op.path, before: cur, after: filled };
+      }
       var after = op.after === null || op.after === undefined ? undefined : clone(op.after);
       if (isObj(loc.key)) {   // id 목록의 항목
         if (!Array.isArray(loc.parent)) return { ok: false, path: op.path };
@@ -683,6 +729,7 @@
     // replace: 사용자가 '시트 기록으로 바꾸기'를 고른 경우 → 합치지 않고 그대로
     // 이 기기가 쓴 내용이 다른 기기의 동시 저장에 덮였을 수 있으니, 마지막으로 확인한 기준과 비교해 이 기기 변경이 빠졌으면 다시 합친다
     if (role() === 'requester') return requesterApply(r);
+    if (replace) meta.unsaved = [];
     var local = JSON.parse(JSON.stringify(dataOut()));
     if (!replace) settleWritten(r);
     var merged = replace ? r.data : mergeData(loadBase(), local, r.data);
@@ -735,7 +782,40 @@
     meta.dev = { id: String(d.id || ''), name: String(d.name || ''), beat: String(d.beat || ''), ver: String(d.ver || '') };
     writeMeta();
     var after = role();
+    if (after === 'writer' && before !== 'writer') {
+      // 출퇴근 기기가 됨: 아직 안 보낸 내 요청은 이미 화면(=이 기기 데이터)에 들어 있으니 버리고, 보낸 요청은 내가 처리할 때 정리
+      var q0 = loadQ(), keepSent = q0.filter(function (x) { return x.sent; });
+      if (keepSent.length !== q0.length) saveQ(keepSent);
+    }
+    if (before === 'requester' && after === 'none') {
+      // 지정이 해제됨: 먼저 시트의 처리 기록으로 내 요청을 정리한 뒤(거절된 건 되살리지 않음) 남은 것만 예전 방식으로 올림 → settleToNone
+      if (reqTimer) { clearT(reqTimer); reqTimer = null; buildRequest(null, true); }
+      if (loadQ().length) { meta.settle = true; writeMeta(); }
+      reqBaseline = null;
+    } else if (before !== 'requester' && after === 'requester' && meta.dirty && convertBase()) {
+      // 다른 기기가 출퇴근 기기로 지정됨 (앱이 꺼져 있던 사이 등): 저장 못 한 이 기기 변경은 출퇴근 상태까지 요청으로
+      reqBaseline = convertBase();
+      var it = buildRequest(tr('출퇴근 기기가 바뀌어 요청으로 보냄'));
+      meta.dirty = false; meta.unsaved = []; writeMeta();
+      if (it && host && host.onRequest) host.onRequest({ kind: 'converted', item: it });
+    }
     if (host && host.onDevice && (before !== after || prev.name !== meta.dev.name || prev.beat !== meta.dev.beat || prev.id !== meta.dev.id)) host.onDevice(deviceInfo());
+  }
+  /* 저장 못 한 이 기기 변경을 요청으로 바꿀 때의 기준: 마지막으로 시트와 맞춘 내용 + 여기서 적용만 하고 아직 저장 못 한 남의 요청
+     (남의 요청은 시트 '수정요청'에 그대로 있어 새 출퇴근 기기가 처리하므로, 내 요청으로 복제하면 두 번 적용됨) */
+  function convertBase() {
+    var j = lastSyncedJson();
+    if (!j) return null;
+    var b = withoutLog(JSON.parse(j));
+    (Array.isArray(meta.unsaved) ? meta.unsaved : []).forEach(function (u) { var r = applyOps(b, u.ops); if (r.ok) b = r.data; });
+    return JSON.stringify(b);
+  }
+  /* 이 기기가 마지막으로 시트와 맞춘 내용 (앱을 다시 켠 뒤에도: 마지막 저장분 또는 기준) */
+  function lastSyncedJson() {
+    if (lastJson) return lastJson;
+    var w = null;
+    try { w = deps.storage.get(WRITTEN_KEY) || deps.storage.get(BASE_KEY); } catch (e) {}
+    return w || null;
   }
   function deviceInfo() {
     var q = loadQ();
@@ -744,9 +824,9 @@
 
   /* 저장 표시 + 기기 탭 (+ 출퇴근 기기는 수정요청 줄) 을 한 번에 읽기. 탭이 아직 없으면 있는 것만 */
   var tabMissing = { dev: 0, req: 0 };   // 없던 탭: 5분마다 다시 확인
-  function readHead(mode, reqFrom) {
+  function readHead(mode, reqFrom, mustDev) {
     var now = deps.now();
-    var withDev = !(tabMissing.dev && now - tabMissing.dev < 300000);
+    var withDev = mustDev || !(tabMissing.dev && now - tabMissing.dev < 300000);
     var withReq = reqFrom && withDev && !(tabMissing.req && now - tabMissing.req < 300000);
     var ranges = [SHEET_DATA + '!A2'];
     if (withDev) ranges.push(SHEET_DEV + '!A1:D1');
@@ -758,10 +838,13 @@
       var dv = withDev && vr[1] && vr[1].values && vr[1].values[0] ? vr[1].values[0] : null;
       if (withDev) tabMissing.dev = 0;
       if (withReq) tabMissing.req = 0;
+      // 앞 50줄부터 읽었는데 하나도 없으면 누가 앞쪽 줄을 지운 것 → 처음부터 다시
+      if (withReq && reqFrom > 2 && !((vr[2] && vr[2].values) || []).length) return readHead(mode, 2, mustDev);
       return { stamp: st, dev: withDev ? { id: dv ? dv[0] : '', name: dv ? dv[1] : '', beat: dv ? dv[2] : '', ver: dv ? dv[3] : '' } : null, reqRows: withReq ? ((vr[2] && vr[2].values) || []) : null, reqFrom: reqFrom };
     }, function (e) {
       if (!e || e.status !== 400) throw e;
-      // 없는 탭이 섞여 있음 → 줄여서 다시
+      // 없는 탭이 섞여 있음 → 줄여서 다시. 수정요청 범위가 시트 줄 수를 넘었을 수도 있으니(사람이 줄을 지움) 처음부터 한 번 더
+      if (withReq && reqFrom > 2) return readHead(mode, 2);
       if (withReq) { tabMissing.req = now; return readHead(mode, reqFrom); }
       if (withDev) { tabMissing.dev = now; return readHead(mode, 0); }
       throw e;
@@ -784,7 +867,7 @@
   /* ---------- 요청 기기 ---------- */
   function loadQ() { try { var q = JSON.parse(deps.storage.get(REQQ_KEY) || '[]'); return Array.isArray(q) ? q.filter(function (x) { return x && x.id && Array.isArray(x.ops); }) : []; } catch (e) { return []; } }
   function saveQ(q) { deps.storage.set(REQQ_KEY, JSON.stringify(q)); }
-  var reqBaseline = null, reqTimer = null, flushing = false;
+  var reqBaseline = null, reqTimer = null, flushing = false, flushP = null;
   function withoutLog(d) { if (!isObj(d) || !('reqLog' in d)) return d; var o = {}; Object.keys(d).forEach(function (k) { if (k !== 'reqLog') o[k] = d[k]; }); return o; }
   /* 시트 데이터 위에 아직 결과를 모르는 내 요청을 차례로 얹어 화면에 보여 줌 */
   function showView(sheetData, q) {
@@ -803,9 +886,14 @@
     (log.applied || []).forEach(function (id) { applied[id] = true; });
     (log.rejected || []).forEach(function (x) { if (x && x.id) rejected[x.id] = x.reason || ''; });
     var keep = [];
-    loadQ().forEach(function (it) {
+    var q0 = loadQ();
+    // 출퇴근 기기가 이 기기의 요청을 어디까지 처리했는지: 그보다 앞서 보낸 요청인데 기록에 없으면(오래돼 밀려남 등) 대기에서 정리
+    var lastMine = log.last && log.last[myId()], cutAt = -1;
+    q0.forEach(function (it, i) { if (it.id === lastMine) cutAt = i; });
+    q0.forEach(function (it, i) {
       if (applied[it.id]) { if (host.onRequest) host.onRequest({ kind: 'applied', item: it }); return; }
       if (rejected[it.id] !== undefined) { if (host.onRequest) host.onRequest({ kind: 'rejected', item: it, reason: rejected[it.id] }); return; }
+      if (it.sent && i < cutAt) { if (host.onRequest) host.onRequest({ kind: 'rejected', item: it, reason: tr('처리 결과를 찾을 수 없어요') }); return; }
       keep.push(it);
     });
     saveQ(keep);
@@ -823,8 +911,8 @@
     reqTimer = setT(function () { reqTimer = null; buildRequest(); }, 1500);
   }
   /* 화면에서 바뀐 곳을 계산해 요청 한 줄로 */
-  function buildRequest(note) {
-    if (role() !== 'requester' && !note) return null;
+  function buildRequest(note, local) {
+    if (role() !== 'requester' && !note && !local) return null;
     var base = reqBaseline || (lastJson ? JSON.stringify(withoutLog(JSON.parse(lastJson))) : null);
     if (!base) return null;
     var cur = clone(host.getData());
@@ -836,6 +924,7 @@
     q.push(it);
     saveQ(q);
     reqBaseline = JSON.stringify(cur);
+    if (local) return it;   // 이 기기 안에서만 정리용 (보내지 않음)
     if (host.onRequest) host.onRequest({ kind: 'queued', item: it });
     if (host.onDevice) host.onDevice(deviceInfo());
     flushRequests();
@@ -843,9 +932,10 @@
   }
   function tsLocal(ms) { var d = new Date(ms), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
   function flushRequests() {
-    if (flushing || !meta.connected || !meta.sheetId) return Promise.resolve();
+    if (!meta.connected || !meta.sheetId) return Promise.resolve(false);
+    if (flushing) return flushP || Promise.resolve(true);   // 보내는 중이면 그 결과를 기다림
     var q = loadQ().filter(function (x) { return !x.sent; });
-    if (!q.length) return Promise.resolve();
+    if (!q.length) return Promise.resolve(true);
     flushing = true;
     var rows = q.map(function (it) {
       var js = JSON.stringify(it.ops);
@@ -857,11 +947,11 @@
       var q2 = loadQ().filter(function (x) { if (bad[x.id] && host.onRequest) host.onRequest({ kind: 'rejected', item: x, reason: tr('한 번에 바꾼 내용이 너무 많아요. 나눠서 고쳐 주세요.') }); return !bad[x.id]; });
       saveQ(q2);
       rows = rows.filter(function (r) { return !bad[r[0]]; });
-      if (!rows.length) { flushing = false; return Promise.resolve(); }
+      if (!rows.length) { flushing = false; return Promise.resolve(true); }
     }
     var url = SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(SHEET_REQ + '!A:I') + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
     var send = function () { return api('POST', url, { values: rows }, 'silent'); };
-    return send().catch(function (e) {
+    return (flushP = send().catch(function (e) {
       if (e && e.status === 400) return ensureTab(SHEET_REQ, REQ_HEAD, 'silent').then(send);
       throw e;
     }).then(function () {
@@ -871,14 +961,50 @@
       return true;
     }).catch(function () { return false; /* 다음 새로 받기 때 다시 */ }).then(function (ok) {
       flushing = false;
+      flushP = null;
       if (ok && loadQ().some(function (x) { return !x.sent; })) return flushRequests();   // 보내는 사이 새로 생긴 요청
+      return ok;
+    }));
+  }
+
+  /* 지정이 해제돼 요청 기기 → 미지정이 된 때: 시트 처리 기록으로 내 요청을 정리하고(적용·거절된 건 빼고)
+     아직 처리 안 된 내 요청만 시트 내용 위에 얹어 예전 방식(합쳐 저장)으로 올림 */
+  function settleToNone(remote) {
+    var log = (remote && remote.data && remote.data.reqLog) || {};
+    var known = {};
+    (log.applied || []).forEach(function (id) { known[id] = 'a'; });
+    (log.rejected || []).forEach(function (x) { if (x && x.id) known[x.id] = x.reason || ''; });
+    var view = withoutLog(clone(remote.data)), left = 0;
+    loadQ().forEach(function (it) {
+      if (known[it.id] === 'a') { if (host.onRequest) host.onRequest({ kind: 'applied', item: it }); return; }
+      if (known[it.id] !== undefined) { if (host.onRequest) host.onRequest({ kind: 'rejected', item: it, reason: known[it.id] }); return; }
+      var r = applyOps(view, it.ops);
+      if (r.ok) { view = r.data; left++; }
+      else if (host.onRequest) host.onRequest({ kind: 'rejected', item: it, reason: tr('그 사이 다른 곳에서 바뀌었어요') });
     });
+    meta.stamp = remote.stamp; meta.lineage = remote.lineage || [remote.stamp];
+    meta.reqLog = isObj(remote.data.reqLog) ? remote.data.reqLog : null;
+    lastJson = JSON.stringify(remote.data);
+    saveBase(lastJson);
+    host.applyData(view);
+    saveQ([]);
+    reqBaseline = null;
+    delete meta.settle;
+    if (left) { meta.dirty = true; writeMeta(); schedule(); } else writeMeta();
+    if (host.onDevice) host.onDevice(deviceInfo());
+  }
+  function settleIfNeeded(mode) {
+    if (!meta.settle || role() === 'requester') { if (meta.settle && role() === 'requester') { delete meta.settle; writeMeta(); } return Promise.resolve(false); }
+    return pull(mode || 'silent').then(function (remote) { if (remote) { settleToNone(remote); return true; } return false; });
   }
 
   /* ---------- 출퇴근 기기 ---------- */
   function processRequests(h) {
     var rows = h && h.reqRows;
-    if (!rows || !rows.length) return Promise.resolve(false);
+    if (!rows || !rows.length) {
+      if (rows && h.reqFrom === 2 && meta.reqLog && (meta.reqLog.cursor || 2) > 2) { meta.reqLog.cursor = 2; writeMeta(); }   // 줄이 모두 지워짐
+      return Promise.resolve(false);
+    }
     var log = isObj(meta.reqLog) ? clone(meta.reqLog) : {};
     log.applied = Array.isArray(log.applied) ? log.applied : [];
     log.rejected = Array.isArray(log.rejected) ? log.rejected : [];
@@ -893,7 +1019,8 @@
       var rowNo = cursor + i;
       var id = String((row && row[0]) || '').trim();
       if (!id || id === REQ_HEAD[0]) return;
-      if (done[id]) { if (!row[6]) { writes.push({ range: SHEET_REQ + '!G' + rowNo + ':I' + rowNo, values: [[done[id], when, '']] }); any = true; } return; }
+      if (row[2]) { log.last = isObj(log.last) ? log.last : {}; log.last[String(row[2])] = id; }
+      if (done[id]) { if (!row[6]) { writes.push({ id: id, row: rowNo, values: [[done[id], when, '']] }); any = true; } return; }
       var ops = null;
       try { ops = JSON.parse(String(row[5] || '')); } catch (e) { ops = null; }
       var res = Array.isArray(ops) ? applyOps(data, ops) : { ok: false, path: [] };
@@ -901,18 +1028,32 @@
       if (res.ok) {
         data = res.data; changed = true;
         log.applied.push(id); done[id] = '적용됨';
-        writes.push({ range: SHEET_REQ + '!G' + rowNo + ':I' + rowNo, values: [['적용됨', when, '']] });
+        meta.unsaved = (Array.isArray(meta.unsaved) ? meta.unsaved : []).concat([{ id: id, ops: ops }]).slice(-200);
+        writes.push({ id: id, row: rowNo, values: [['적용됨', when, '']] });
       } else {
         var reason = host.describeFail ? String(host.describeFail(res.path, data) || '') : '';
         reason = reason || tr('그 사이 다른 곳에서 바뀌었어요');
         log.rejected.push({ id: id, reason: reason }); done[id] = '거절';
-        writes.push({ range: SHEET_REQ + '!G' + rowNo + ':I' + rowNo, values: [['거절', when, reason]] });
+        writes.push({ id: id, row: rowNo, values: [['거절', when, reason]] });
       }
     });
     log.cursor = cursor + rows.length;
-    log.applied = log.applied.slice(-300);
-    log.rejected = log.rejected.slice(-100);
-    var moved = !meta.reqLog || meta.reqLog.cursor !== log.cursor;
+    // 이 기기가 요청 기기였을 때 보낸 요청이 지금 처리됐으면 내 대기열에서도 정리
+    var mine = loadQ();
+    if (mine.length) {
+      var left = mine.filter(function (it) {
+        if (done[it.id] === '적용됨') { if (host.onRequest) host.onRequest({ kind: 'applied', item: it }); return false; }
+        if (done[it.id] === '거절') { if (host.onRequest) host.onRequest({ kind: 'rejected', item: it, reason: (log.rejected.filter(function (x) { return x.id === it.id; })[0] || {}).reason || '' }); return false; }
+        return true;
+      });
+      if (left.length !== mine.length) saveQ(left);
+    }
+    log.applied = log.applied.slice(-1000);
+    log.rejected = log.rejected.slice(-300);
+    var oldCur = meta.reqLog ? (meta.reqLog.cursor || 2) : 2;
+    var moved = !meta.reqLog || log.cursor > oldCur;
+    // 처음부터 끝까지 읽었는데 옛 커서보다 줄이 적으면(사람이 줄을 지움) 커서를 실제 위치로 당김
+    if (!moved && cursor === 2 && rows.length < 200 && log.cursor < oldCur) { meta.reqLog.cursor = log.cursor; writeMeta(); }
     if (!any && !moved) return Promise.resolve(false);
     meta.reqLog = log;
     if (changed && host.onRequestsApplied) { try { host.onRequestsApplied(withoutLog(host.getData()), data); } catch (e) {} }
@@ -931,11 +1072,13 @@
   /* 다른 기기가 출퇴근 기기로 지정됨 → 저장 못 한 내 변경은 요청으로 보내고 요청 기기로 */
   function loseWriter() {
     var it = null;
-    if (meta.dirty && lastJson) {
-      reqBaseline = JSON.stringify(withoutLog(JSON.parse(lastJson)));
+    if (meta.dirty && convertBase()) {
+      reqBaseline = convertBase();
       it = buildRequest(tr('출퇴근 기기가 바뀌어 요청으로 보냄'));
     }
     meta.dirty = false;
+    meta.unsaved = [];
+    meta.pendWrites = [];   // 상태 칸은 새 출퇴근 기기가 씀
     writeMeta();
     if (host.onDevice) host.onDevice(deviceInfo());
     if (it && host.onRequest) host.onRequest({ kind: 'converted', item: it });
@@ -946,39 +1089,39 @@
     if (!meta.connected || !meta.sheetId) return Promise.resolve(false);
     name = String(name || '').trim().slice(0, 30) || tr('매장 기기');
     deps.storage.set(DEVNAME_KEY, name);
-    if (role() === 'requester' && reqTimer) { clearT(reqTimer); reqTimer = null; buildRequest(); }   // 아직 요청으로 안 만든 화면 수정부터
+    // 아직 요청으로 안 만든 화면 수정: 보내지 않고 이 기기 대기열에만 (지정되면 직접 반영, 실패하면 그때 보냄)
+    var heldEdit = null;
+    if (role() === 'requester' && reqTimer) { clearT(reqTimer); reqTimer = null; heldEdit = buildRequest(null, true); }
+    var plan = null;
     return getToken('user').then(function () {
       return ensureTab(SHEET_DEV, null, 'user');
     }).then(function () {
       return pull('user');
     }).then(function (remote) {
       if (role() === 'requester' && remote) {
-        // 요청 기기였으면: 이미 결과가 난 내 요청은 정리하고, 아직 처리 안 된 내 요청은 이 기기가 직접 적용(또는 거절)한 것으로 기록
+        // 요청 기기였으면: 결과 난 내 요청은 정리, 아직 처리 안 된 내 요청은 이 기기가 직접 적용/거절한 것으로 (보냈든 보내는 중이든)
+        // — 여기서는 계산만 하고, 기기 탭 쓰기가 성공한 뒤에 실제로 반영 (실패하면 아무것도 안 바뀜)
         var log = remote.data && isObj(remote.data.reqLog) ? clone(remote.data.reqLog) : {};
         log.applied = Array.isArray(log.applied) ? log.applied : [];
         log.rejected = Array.isArray(log.rejected) ? log.rejected : [];
         var known = {};
         log.applied.forEach(function (id) { known[id] = 'a'; });
         log.rejected.forEach(function (x) { if (x && x.id) known[x.id] = x.reason || ''; });
-        var view = withoutLog(clone(remote.data));
+        var view = withoutLog(clone(remote.data)), events = [], unsaved = [];
         loadQ().forEach(function (it) {
-          if (known[it.id] === 'a') { if (host.onRequest) host.onRequest({ kind: 'applied', item: it }); return; }
-          if (known[it.id] !== undefined) { if (host.onRequest) host.onRequest({ kind: 'rejected', item: it, reason: known[it.id] }); return; }
+          if (known[it.id] === 'a') { events.push({ kind: 'applied', item: it }); return; }
+          if (known[it.id] !== undefined) { events.push({ kind: 'rejected', item: it, reason: known[it.id] }); return; }
           var r = applyOps(view, it.ops);
-          if (r.ok) { view = r.data; if (it.sent) log.applied.push(it.id); }
+          // 시트에 올라간 요청만 '남의 요청'처럼 다룸 (아직 안 올라간 건 이 기기 변경 → 저장 전에 교체되면 내 요청으로 다시 보내야 함)
+          if (r.ok) { view = r.data; log.applied.push(it.id); if (it.sent) unsaved.push({ id: it.id, ops: it.ops }); }
           else {
             var why = tr('그 사이 다른 곳에서 바뀌었어요');
-            if (it.sent) log.rejected.push({ id: it.id, reason: why });
-            if (host.onRequest) host.onRequest({ kind: 'rejected', item: it, reason: why });
+            log.rejected.push({ id: it.id, reason: why });
+            events.push({ kind: 'rejected', item: it, reason: why });
           }
         });
-        log.applied = log.applied.slice(-300); log.rejected = log.rejected.slice(-100);
-        meta.stamp = remote.stamp; meta.lineage = remote.lineage || [remote.stamp];
-        meta.reqLog = log;
-        host.applyData(view);
-        lastJson = JSON.stringify(remote.data);
-        saveBase(lastJson);
-        saveQ([]);
+        log.applied = log.applied.slice(-1000); log.rejected = log.rejected.slice(-300);
+        plan = { remote: remote, log: log, view: view, events: events, unsaved: unsaved };
       } else if (remote && remote.stamp !== meta.stamp) {
         return applyRemote(remote);
       }
@@ -986,16 +1129,39 @@
       return api('PUT', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(SHEET_DEV + '!A1:D1') + '?valueInputOption=RAW',
         { values: [[myId(), name, new Date(deps.now()).toISOString(), appVer()]] }, 'user');
     }).then(function () {
+      if (plan) {
+        meta.stamp = plan.remote.stamp; meta.lineage = plan.remote.lineage || [plan.remote.stamp];
+        meta.reqLog = plan.log;
+        meta.unsaved = plan.unsaved;   // 시트 '수정요청'에 있는 내 요청: 데이터를 저장하기 전에 교체되면 복제하지 않게
+        host.applyData(plan.view);
+        lastJson = JSON.stringify(plan.remote.data);
+        saveBase(lastJson);
+        saveQ([]);
+        reqBaseline = null;
+        plan.events.forEach(function (ev) { if (host.onRequest) host.onRequest(ev); });
+      }
       meta.lastBeat = deps.now();
       updateDev({ id: myId(), name: name, beat: new Date(deps.now()).toISOString(), ver: appVer() });
       meta.dirty = true;
       writeMeta();
       return doSave('user');
-    }).then(function () { return true; }, function (e) { setStatus('error', friendly(e)); return false; });
+    }).then(function () { return true; }, function (e) {
+      setStatus('error', friendly(e));
+      if (heldEdit && role() === 'requester') flushRequests();   // 지정 실패: 붙잡아 둔 수정은 요청으로 보냄
+      return false;
+    });
   }
   /* 지정 해제 (출퇴근 기기를 아무도 아닌 상태로) */
   function undesignate() {
     if (!meta.connected || !meta.sheetId) return Promise.resolve(false);
+    // 지금도 내가 지정 기기일 때만 해제 (그 사이 다른 기기가 지정됐는데 옛 정보로 지우는 일 방지)
+    return readHead('user', 0).then(function (h) {
+      updateDev(h.dev);
+      if (role() !== 'writer') return false;
+      return undesignate2();
+    }, function () { return false; });
+  }
+  function undesignate2() {
     return api('PUT', SHEETS + '/' + meta.sheetId + '/values/' + encodeURIComponent(SHEET_DEV + '!A1:D1') + '?valueInputOption=RAW',
       { values: [['', '', '', '']] }, 'user').then(function () {
       updateDev({ id: '', name: '', beat: '', ver: '' });
@@ -1015,14 +1181,17 @@
       return ensureSheet('user');
     }).then(function () {
       // 이미 다른 기기가 출퇴근 기기로 지정돼 있으면 이 기기는 요청 기기: 시트를 덮어쓰지 않고 받아 오기만
-      return readHead('user', 0).then(function (h) {
-        meta.dev = h.dev ? { id: String(h.dev.id || ''), name: String(h.dev.name || ''), beat: String(h.dev.beat || ''), ver: String(h.dev.ver || '') } : meta.dev;
+      return readHead('user', 0, true).then(function (h) {
+        // 이미 연동돼 있던 기기의 다시 로그인: 역할이 바뀌었으면 updateDev가 저장 못 한 변경을 요청으로 바꾸거나(→요청 기기) 정리를 예약(→미지정)
+        if (meta.connected && h.dev) updateDev(h.dev);
+        else if (h.dev) meta.dev = { id: String(h.dev.id || ''), name: String(h.dev.name || ''), beat: String(h.dev.beat || ''), ver: String(h.dev.ver || '') };
         asRequester = !!(meta.dev && meta.dev.id && meta.dev.id !== myId());
       }, function () {});
     }).then(function () {
       return withSheetRetry(function () { return pull('user'); }, 'user');
     }).then(function (remote) {
       if (asRequester) { meta.connected = true; writeMeta(); return remote ? requesterApply(remote) : null; }
+      if (meta.connected && meta.settle && remote) { settleToNone(remote); return meta.dirty ? push('user') : null; }
       var local = dataOut();
       // 이미 연동돼 있던 기기가 다시 로그인한 경우: 묻지 않고 '앱을 열 때'와 같은 규칙으로 맞춘다
       // (이 기기에 저장 안 된 변경이 있으면 이 기기 우선 → 시트에 저장 / 다른 기기가 더 최근에 저장했으면 시트 내용 / 아니면 이 기기 내용 유지)
@@ -1081,6 +1250,7 @@
       return withSheetRetry(function () { return pull('silent'); }, 'silent');
     }).then(function (remote) {
       if (role() === 'requester') return remote ? requesterApply(remote) : flushRequests();
+      if (meta.settle && remote) { settleToNone(remote); return meta.dirty ? push('silent') : null; }
       if (meta.dirty) return push('silent');          // 이 기기에 저장 안 된 변경이 있으면 우선
       if (remote && remote.stamp !== (meta.stamp || '')) return applyRemote(remote);   // 시계 순서가 아니라 '내가 마지막으로 저장한 것과 다른가'로 판단
       else { lastJson = JSON.stringify(dataOut()); saveBase(lastJson); return replayPending(); }
@@ -1093,7 +1263,7 @@
 
   function doSave(mode) {
     if (!meta.connected) return Promise.resolve(false);
-    if (role() === 'requester') return flushRequests().then(function () { return true; });
+    if (role() === 'requester') return flushRequests().then(function (ok) { return ok !== false; });
     if (saving) { again = true; return Promise.resolve(false); }
     saving = true;
     setStatus('saving', tr('저장 중…'));
@@ -1128,12 +1298,14 @@
     if (saving || refreshing) return Promise.resolve(false);
     if (!token || tokenExp - deps.now() < 60000) return Promise.resolve(false);   // 토큰 갱신은 화면 터치 때 (팝업 차단 방지)
     if (meta.dirty && role() !== 'requester') { schedule(); return Promise.resolve(false); }
-    if (host.isBusy && host.isBusy()) return Promise.resolve(false);
+    if (host.isBusy && host.isBusy()) { if (role() === 'writer') heartbeat(); return Promise.resolve(false); }   // 입력 중이어도 응답 시각은 보냄
     refreshing = true;
     var wasWriter = role() === 'writer';
-    var cur = meta.reqLog && meta.reqLog.cursor ? meta.reqLog.cursor : 2;
+    // 앞쪽 50줄도 다시 읽음 (처리한 줄은 기록으로 건너뜀): 사람이 시트에서 줄을 지우거나 끼워 넣어 줄이 밀려도 요청을 놓치지 않게
+    var cur = Math.max(2, (meta.reqLog && meta.reqLog.cursor ? meta.reqLog.cursor : 2) - 50);
     return readHead('silent', wasWriter ? cur : 0).then(function (h) {
       if (h.dev) updateDev(h.dev);
+      if (meta.settle) return settleIfNeeded('silent').then(function () { return null; });
       if (wasWriter && role() !== 'writer') return loseWriter().then(function () { return null; });
       if (role() === 'requester') {
         if (!h.stamp || h.stamp === (meta.stamp || '')) return flushRequests().then(function () { return null; });

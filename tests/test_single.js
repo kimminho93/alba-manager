@@ -13,7 +13,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { createRequire } = require('module');
-const src = fs.readFileSync(path.join(__dirname, 'test_cloud.js'), 'utf8');
+const src = fs.readFileSync(path.join(__dirname, 'test_cloud.js'), 'utf8').replace(/\r\n/g, '\n');   // Windows 줄바꿈으로 받아도
 const cut = src.indexOf("(async () => {\n  console.log('=== [4]");
 const H = new Function('require', 'process', 'console', src.slice(0, cut) + '\nreturn { makeGoogle, makeDevice, worker };')(
   createRequire(path.join(__dirname, 'x.js')), process, console);
@@ -117,7 +117,7 @@ async function roundSwap(seed) {
   assert.ok(await devs[0].cloud.designate('A'));
   await devs[1].cloud.connect(); await devs[2].cloud.connect();
   const sid = JSON.parse(devs[0].store['alba.cloud.v1']).sheetId;
-  const sent = new Set();
+  const sent = new Set(), exempt = new Set();
   const dataRows = () => JSON.stringify(g.rows(sid, '데이터'));
   const note = () => devs.forEach(d => d.cloud.pendingRequests().forEach(x => sent.add(x.id)));
   const steps = 30 + Math.floor(R() * 30);
@@ -133,18 +133,36 @@ async function roundSwap(seed) {
       if (R() < 0.15) g.failDataWrite = 1;
       d.cloud.markDirty(); await d.cloud.saveNow();
     } else if (r < 0.8) {
+      if (R() < 0.15) g.failDataWrite = 1;
       d.clock.t += 31000; await d.cloud.refresh();
     } else if (r < 0.92) {
       const keep = JSON.parse(JSON.stringify(d.data)), clock = d.clock.t;
       d = devs[k] = H.makeDevice(g, { store: d.store });
       d.data = keep; d.clock.t = clock + 5000;
       await d.cloud.resume();
-    } else {
+    } else if (r < 0.96) {
       note();
+      if (R() < 0.3) g.failDataWrite = 1;      // 지정 뒤 첫 저장 실패
+      else if (R() < 0.2) g.failDevPut = 1;    // 기기 탭 쓰기 실패 → 지정 실패
       await d.cloud.designate(String.fromCharCode(65 + k));
+      g.failDevPut = 0;
+    } else if (r < 0.98) {   // 지정 해제: 그때 대기 중이던 요청은 예전 방식(합쳐 저장)으로 넘어가므로 처리 기록에 없어도 됨
+      note();
+      devs.forEach(x => x.cloud.pendingRequests().forEach(q => exempt.add(q.id)));
+      if (d.cloud.role() === 'writer') await d.cloud.undesignate();
+    } else {   // 사람이 시트에서 이미 처리된 수정요청 줄을 지움
+      const rows = g.rows(sid, '수정요청') || [];
+      if (R() < 0.5) { const idx = rows.findIndex((row, i) => i > 0 && row && row[6]); if (idx > 0) rows.splice(idx, 1); }
+      else for (let i = rows.length - 1; i > 0; i--) if (rows[i] && rows[i][6]) rows.splice(i, 1);   // 처리된 줄 모두 정리
     }
     note();
     if (wasReq && d.cloud.role() === 'requester' && r < 0.92) assert.strictEqual(dataRows(), before, '시드 ' + seed + ': 요청 기기가 데이터 탭을 씀');
+  }
+  // 지정 해제 상태로 끝나면 해제된 기기들이 합쳐 저장한 뒤 다시 지정
+  for (let q = 0; q < 2; q++) for (const d of devs) { d.clock.t += 31000; if (JSON.parse(d.store['alba.cloud.v1']).dirty) await d.cloud.saveNow(); await d.cloud.refresh(); }
+  if (!devs.some(d => d.cloud.role() === 'writer')) {
+    for (let q = 0; q < 3; q++) for (const d of devs) { d.clock.t += 31000; await d.cloud.refresh(); if (JSON.parse(d.store['alba.cloud.v1']).dirty) { d.clock.t += 1000; await d.cloud.saveNow(); } }
+    await devs[0].cloud.designate('A');
   }
   for (let q = 0; q < 10; q++) {
     for (const d of devs) { d.clock.t += 31000; await d.cloud.refresh(); if (d.cloud.role() === 'writer' && JSON.parse(d.store['alba.cloud.v1']).dirty) await d.cloud.saveNow(); }
@@ -157,7 +175,7 @@ async function roundSwap(seed) {
   const log = sheet.reqLog || { applied: [], rejected: [] };
   const applied = log.applied || [], rejected = (log.rejected || []).map(x => x.id);
   assert.strictEqual(new Set(applied).size, applied.length, '시드 ' + seed + ': 같은 요청이 두 번 적용됨');
-  sent.forEach(id => assert.ok(applied.indexOf(id) >= 0 || rejected.indexOf(id) >= 0, '시드 ' + seed + ': 처리 안 된 요청 ' + id));
+  sent.forEach(id => assert.ok(exempt.has(id) || applied.indexOf(id) >= 0 || rejected.indexOf(id) >= 0, '시드 ' + seed + ': 처리 안 된 요청 ' + id));
   devs.forEach(d => {
     assert.strictEqual(d.cloud.pendingRequests().length, 0, '시드 ' + seed + ': 대기 요청이 남음');
     assert.strictEqual(canon(d.data), canon(w.data), '시드 ' + seed + ': 기기끼리 다름');

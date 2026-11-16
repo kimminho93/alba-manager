@@ -1959,7 +1959,7 @@
       if (Array.isArray(d.conflicts)) saveJson(KEYS.conflicts, cleanConflicts(d.conflicts));
       saveWorkers();
       saveJson(KEYS.archive, state.archive);
-      if (Array.isArray(d.presets) && d.presets.length) {
+      if (Array.isArray(d.presets)) {   // 빈 목록(모두 지움)도 반영
         saveJson(KEYS.presets, d.presets);
         loadPresets();
         renderPresets();

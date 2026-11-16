@@ -14,7 +14,7 @@ const path = require('path');
 const { createRequire } = require('module');
 
 // test_cloud.js 의 가짜 구글/가짜 기기 도구를 그대로 가져다 씀 (본문 테스트는 실행하지 않음)
-const src = fs.readFileSync(path.join(__dirname, 'test_cloud.js'), 'utf8');
+const src = fs.readFileSync(path.join(__dirname, 'test_cloud.js'), 'utf8').replace(/\r\n/g, '\n');   // Windows 줄바꿈으로 받아도
 const cut = src.indexOf("(async () => {\n  console.log('=== [4]");
 if (cut < 0) throw new Error('test_cloud.js 구조가 바뀌어 도구를 못 가져옴');
 const H = new Function('require', 'process', 'console',

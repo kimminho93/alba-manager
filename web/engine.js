@@ -354,7 +354,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var ENGINE_VERSION = '1.5.0';
+  var ENGINE_VERSION = '1.5.1';
 
   /** "10,000원", " 62 " 같은 값을 숫자로 변환. 실패 시 def 반환 */
   function toNumber(v, def) {
@@ -2256,13 +2256,20 @@
   function setRecord(worker, payMonth, raw) {
     var rec = normalizeRecord(raw, payMonth);
     worker.months = worker.months || {};
+    var prev = worker.months[payMonth];
     worker.months[payMonth] = rec;
-    Object.keys(worker.months).forEach(function (k) {
-      if (k > payMonth) worker.months[k].wage = rec.wage;
-    });
-    worker.wage = rec.wage;
-    worker.contractDays = rec.contractDays;
-    worker.defaults = cleanDefaults(rec);
+    var later = Object.keys(worker.months).filter(function (k) { return k > payMonth; });
+    if (!later.length) {
+      // 가장 최근 달: 알바생 기본값(시급·근무일·설정)도 이 달 기준으로
+      worker.wage = rec.wage;
+      worker.contractDays = rec.contractDays;
+      worker.defaults = cleanDefaults(rec);
+    } else if (prev && prev.wage !== rec.wage) {
+      // 지난 달의 시급을 직접 바꾼 경우에만 이후 달·기본 시급에도 반영
+      // (지난 달 근무 칸 수정·퇴근 확인·자정 넘긴 퇴근 등으로 다시 저장할 때 이번 달 인상분을 옛 시급으로 덮지 않게)
+      later.forEach(function (k) { worker.months[k].wage = rec.wage; });
+      worker.wage = rec.wage;
+    }
     return rec;
   }
 
@@ -3398,4 +3405,4 @@
 });
 
 /* ===== 버전 (package.json 의 version) ===== */
-;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.5.0';
+;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.5.1';

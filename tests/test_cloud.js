@@ -112,6 +112,7 @@ function makeGoogle() {
       if (gp && opt.method === 'PUT' && /![A-Z]+\d+(:[A-Z]+\d+)?$/.test(gp[1]) && !/!A2$|!B1$/.test(gp[1])) {
         const t = tab(gp[1].split('!')[0]);
         if (!t) return res(400, {});
+        if (g.failDevPut > 0 && gp[1].indexOf('A1:D1') >= 0) { g.failDevPut--; return res(503, {}); }
         writeAt(t, gp[1], JSON.parse(opt.body).values);
         return res(200, {});
       }
@@ -150,6 +151,12 @@ function makeGoogle() {
       const vm = /^\/values\/(.+)!A1:A300$/.exec(rest);
       if (vm) g.fullReads = (g.fullReads || 0) + 1;
       if (vm) { const t = tab(vm[1]); return res(200, { values: t ? t.rows : [] }); }
+      const og = /^\/values\/(.+)!([A-Z]+)(\d+):([A-Z]+)$/.exec(decodeURIComponent(rest.split('?')[0]));   // 열 끝까지 (예: A1:A)
+      if (og && (opt.method || 'GET') === 'GET') {
+        const t = tab(og[1]);
+        if (!t) return res(400, {});
+        return res(200, { values: readAt(t, og[1] + '!' + og[2] + og[3] + ':' + og[4] + Math.max(1, t.rows.length)) });
+      }
     }
     return res(404, {});
   };
@@ -924,6 +931,188 @@ function makeDevice(google, opts) {
     await tick(tab);
     assert.strictEqual(W(tab, '김').wage, 12345);
     assert.strictEqual(W(tab, '이').wage, 11111, '남의 변경을 되돌리지 않음');
+  });
+
+  await test('4차 검증: 사람이 시트에서 수정요청 줄을 지워 줄이 밀려도 다음 요청을 놓치지 않음', async () => {
+    const { g, tab, ph, sid, tick } = await shop();
+    W(ph, '김').wage = 11000; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    await tick(tab);
+    W(ph, '김').wage = 12000; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    g.rows(sid, '수정요청').splice(1, 1);   // 처리된 첫 요청 줄을 사람이 지움
+    await tick(tab);
+    assert.strictEqual(W(tab, '김').wage, 12000);
+    // 이미 처리한 줄을 다시 읽어도 두 번 적용하지 않음
+    W(tab, '김').wage = 13000; tab.cloud.markDirty(); await tab.cloud.saveNow();
+    await tick(tab);
+    assert.strictEqual(W(tab, '김').wage, 13000);
+  });
+
+  await test('4차 검증: 지정을 해제하면 요청 기기의 반영 안 된 요청은 예전 방식(합쳐 저장)으로 올라감', async () => {
+    const { tab, ph, tick } = await shop();
+    W(ph, '김').wage = 11000; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    await tab.cloud.undesignate();
+    await tick(ph); await ph.cloud.saveNow();
+    assert.strictEqual(ph.cloud.role(), 'none');
+    assert.strictEqual(ph.cloud.pendingRequests().length, 0);
+    await tick(tab);
+    assert.strictEqual(W(tab, '김').wage, 11000);
+  });
+
+  await test('4차 검증: 꺼져 있던 사이 다른 기기가 출퇴근 기기가 되면, 켤 때 저장 못 한 변경은 요청으로 넘어감', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g); a.data.workers = [worker('김', {})]; await a.cloud.connect();
+    a.data.workers[0].wage = 15000; a.data.workers[0].punch = { date: '2026-11-16', time: '09:00', at: '09:00' };
+    const meta = JSON.parse(a.store['alba.cloud.v1']); meta.dirty = true; a.store['alba.cloud.v1'] = JSON.stringify(meta);   // 저장 전에 꺼짐
+    const b = makeDevice(g); await b.cloud.connect(); await b.cloud.designate('B');
+    const a2 = makeDevice(g, { store: a.store }); a2.data = JSON.parse(JSON.stringify(a.data)); a2.clock.t = a.clock.t + 60000;
+    await a2.cloud.resume();
+    assert.strictEqual(a2.cloud.role(), 'requester');
+    assert.strictEqual(a2.data.workers[0].wage, 15000, '화면에서 사라지지 않음');
+    assert.strictEqual(a2.cloud.pendingRequests().length, 1);
+    b.clock.t += 60000; await b.cloud.refresh();
+    assert.strictEqual(b.data.workers[0].wage, 15000);
+    assert.deepStrictEqual(b.data.workers[0].punch, { date: '2026-11-16', time: '09:00', at: '09:00' });
+  });
+
+  await test('4차 검증: 옛 출퇴근 기기가 모르고 [지정 해제]를 눌러도 새로 지정된 기기를 지우지 않음', async () => {
+    const { g, tab, ph, sid } = await shop();
+    await ph.cloud.designate('사장님 PC');
+    assert.strictEqual(tab.cloud.role(), 'writer');   // 아직 모름
+    assert.strictEqual(await tab.cloud.undesignate(), false);
+    assert.strictEqual(g.rows(sid, '기기')[0][1], '사장님 PC');
+    assert.strictEqual(tab.cloud.role(), 'requester');
+  });
+
+  await test('4차(아르곤): 출퇴근 기기가 요청을 처리했지만 저장 실패한 채 교체돼도, 그 요청을 복제해 두 번 적용하지 않음', async () => {
+    const g = makeGoogle();
+    const tab = makeDevice(g); tab.data.workers = [worker('김', {})]; await tab.cloud.connect(); await tab.cloud.designate('태블릿');
+    const ph = makeDevice(g); await ph.cloud.connect();
+    const pc = makeDevice(g); await pc.cloud.connect();
+    pc.data.workers[0].wage = 12000; pc.cloud.markDirty(); await pc.cloud.saveNow();
+    g.failDataWrite = 1; tab.clock.t += 31000; await tab.cloud.refresh();
+    await ph.cloud.designate('점장폰'); ph.clock.t += 31000; await ph.cloud.refresh();
+    assert.strictEqual(ph.data.workers[0].wage, 12000);
+    ph.data.workers[0].wage = 10320; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    await tab.cloud.saveNow();   // 옛 기기가 밀린 저장 → 요청 기기로 전환
+    ph.clock.t += 31000; await ph.cloud.refresh();
+    assert.strictEqual(ph.data.workers[0].wage, 10320, '사장님이 되돌린 값 유지');
+  });
+
+  await test('4차(아르곤): 지정 중에 요청 전송이 늦게 끝나도 내 요청을 두 번 적용하지 않음', async () => {
+    const g = makeGoogle();
+    const orig = g.fetch; let release = null;
+    const tab = makeDevice(g); tab.data.workers = [worker('김', {})]; await tab.cloud.connect(); await tab.cloud.designate('태블릿');
+    const ph = makeDevice(g); await ph.cloud.connect();
+    g.fetch = async (url, opt) => { if (url.includes(':append') && !release) await new Promise(r => { release = r; }); return orig(url, opt); };
+    // 요청이 이미 전송 중(sent 전)인 상태에서 지정
+    ph.data.workers[0].wage = 12000; ph.cloud.markDirty();
+    const sending = ph.cloud.saveNow();
+    await new Promise(r => setTimeout(r, 5));
+    const d = ph.cloud.designate('점장폰');
+    await new Promise(r => setTimeout(r, 5));
+    if (release) release();
+    await sending; await d;
+    g.fetch = orig;
+    ph.data.workers[0].wage = 10320; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    ph.clock.t += 31000; await ph.cloud.refresh();
+    ph.clock.t += 31000; await ph.cloud.refresh();
+    assert.strictEqual(ph.data.workers[0].wage, 10320);
+  });
+
+  await test('4차(아르곤): 지정이 실패하면(기기 탭 쓰기 실패) 보내지 못한 요청이 그대로 남음', async () => {
+    const g = makeGoogle();
+    const orig = g.fetch; let failDev = false;
+    g.fetch = async (url, opt) => { if (failDev && opt && opt.method === 'PUT' && decodeURIComponent(url).includes('기기!A1:D1')) return { ok: false, status: 503, json: async () => ({}), text: async () => '' }; return orig(url, opt); };
+    const tab = makeDevice(g); tab.data.workers = [worker('김', {})]; await tab.cloud.connect(); await tab.cloud.designate('태블릿');
+    const ph = makeDevice(g); await ph.cloud.connect();
+    g.failReqAppend = 1;
+    ph.data.workers[0].wage = 12000; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    failDev = true;
+    assert.strictEqual(await ph.cloud.designate('점장폰'), false);
+    failDev = false;
+    assert.strictEqual(ph.cloud.role(), 'requester');
+    assert.strictEqual(ph.cloud.pendingRequests().length, 1);
+    ph.clock.t += 31000; await ph.cloud.refresh();
+    tab.clock.t += 31000; await tab.cloud.refresh();
+    assert.strictEqual(tab.data.workers[0].wage, 12000);
+  });
+
+  await test('4차(아르곤): 거절된 요청이 있는 채로 지정이 해제돼도 그 요청이 되살아나지 않음', async () => {
+    const g = makeGoogle();
+    const tab = makeDevice(g); tab.data.workers = [worker('김', {})]; await tab.cloud.connect(); await tab.cloud.designate('태블릿');
+    const ph = makeDevice(g); await ph.cloud.connect();
+    ph.data.workers[0].wage = 12000; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    tab.data.workers[0].wage = 15000; tab.cloud.markDirty(); await tab.cloud.saveNow();
+    tab.clock.t += 31000; await tab.cloud.refresh();   // 거절
+    await tab.cloud.undesignate();
+    ph.clock.t += 31000; await ph.cloud.refresh(); await ph.cloud.saveNow();
+    tab.clock.t += 31000; await tab.cloud.refresh();
+    assert.strictEqual(ph.data.workers[0].wage, 15000);
+    assert.strictEqual(tab.data.workers[0].wage, 15000);
+  });
+
+  await test('4차(아르곤): 지정된 걸 아직 모르는 기기(30초 전)가 저장해도 데이터 탭을 쓰지 않고 요청으로', async () => {
+    const g = makeGoogle();
+    const tab = makeDevice(g); tab.data.workers = [worker('김', {})]; await tab.cloud.connect();
+    const ph = makeDevice(g); await ph.cloud.connect();
+    await tab.cloud.designate('태블릿');
+    const sid = JSON.parse(tab.store['alba.cloud.v1']).sheetId;
+    const before = JSON.stringify(g.rows(sid, '데이터'));
+    ph.data.workers[0].wage = 99999; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    assert.strictEqual(JSON.stringify(g.rows(sid, '데이터')), before);
+    assert.strictEqual(ph.cloud.role(), 'requester');
+    tab.clock.t += 31000; await tab.cloud.refresh();
+    assert.strictEqual(tab.data.workers[0].wage, 99999);
+  });
+
+  await test('4차(아르곤): 요청 처리 후 저장 실패 → 시트에서 다시 불러오기 해도 그 요청을 잃지 않음', async () => {
+    const g = makeGoogle();
+    const tab = makeDevice(g); tab.data.workers = [worker('김', {})]; await tab.cloud.connect(); await tab.cloud.designate('태블릿');
+    const ph = makeDevice(g); await ph.cloud.connect();
+    ph.data.workers[0].wage = 12000; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    g.failDataWrite = 1; tab.clock.t += 31000; await tab.cloud.refresh();
+    await tab.cloud.loadFromSheet();
+    tab.data.workers.push(worker('이', {})); tab.cloud.markDirty(); await tab.cloud.saveNow();
+    tab.clock.t += 31000; await tab.cloud.refresh();
+    assert.strictEqual(tab.data.workers[0].wage, 12000);
+    ph.clock.t += 31000; await ph.cloud.refresh();
+    assert.strictEqual(ph.cloud.pendingRequests().length, 0);
+    assert.strictEqual(ph.data.workers[0].wage, 12000);
+  });
+
+  await test('4차(아르곤): 요청 기기의 [지금 저장]은 전송 실패를 성공으로 알리지 않음', async () => {
+    const { g, ph } = await shop();
+    g.failReqAppend = 1;
+    W(ph, '김').wage = 12000; ph.cloud.markDirty();
+    assert.strictEqual(await ph.cloud.saveNow(), false);
+  });
+
+  await test('4차(아르곤 2): 디바운스 중 지정 → 데이터 저장 실패 → 다른 기기로 교체돼도 그 수정이 사라지지 않음', async () => {
+    const g = makeGoogle();
+    const tab = makeDevice(g); tab.data.workers = [worker('김', {})]; await tab.cloud.connect(); await tab.cloud.designate('태블릿');
+    const ph = makeDevice(g); await ph.cloud.connect();
+    ph.data.workers[0].wage = 12000; ph.cloud.markDirty();   // 1.5초 대기 중
+    g.failDataWrite = 1;
+    await ph.cloud.designate('점장폰');                       // 기기 탭은 썼지만 데이터 저장 실패
+    await tab.cloud.designate('태블릿');
+    await ph.cloud.saveNow();
+    ph.clock.t += 31000; await ph.cloud.refresh();
+    tab.clock.t += 31000; await tab.cloud.refresh();
+    assert.strictEqual(tab.data.workers[0].wage, 12000);
+  });
+
+  await test('4차(아르곤 2): 50줄 넘게 처리한 뒤 시트에서 옛 요청 줄을 모두 지워도 새 요청을 처리', async () => {
+    const { g, tab, ph, sid, tick } = await shop();
+    for (let i = 0; i < 55; i++) { W(ph, '김').wage = 10000 + i; ph.cloud.markDirty(); await ph.cloud.saveNow(); }
+    await tick(tab); await tick(ph);
+    assert.strictEqual(W(tab, '김').wage, 10054);
+    const rows = g.rows(sid, '수정요청'); rows.splice(1, rows.length - 1);   // 머리글만 남기고 지움
+    W(ph, '김').wage = 20000; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    await tick(tab);
+    assert.strictEqual(W(tab, '김').wage, 20000);
+    W(ph, '김').wage = 20001; ph.cloud.markDirty(); await ph.cloud.saveNow();
+    await tick(tab);
+    assert.strictEqual(W(tab, '김').wage, 20001);
   });
 
   await test('3차 단일 저장: 지정 전에는 예전처럼 모든 기기가 저장(합치기)', async () => {
