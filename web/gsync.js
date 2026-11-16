@@ -239,7 +239,27 @@
   function colorFmt() { return { textFormat: { bold: true }, backgroundColor: { red: 0.88, green: 0.92, blue: 1 } }; }
 
   /* 시트의 탭 구성을 맞추고(추가/삭제/순서), 바뀐 탭만 다시 쓴다 */
-  function push(mode) {
+  function push(mode, force) {
+    if (force || !meta.stamp || !meta.sheetId) return pushNow(mode);
+    // 내가 마지막으로 맞춘 뒤 다른 기기가 저장했으면 덮어쓰지 않고 합친 뒤 저장
+    return pull(mode).then(function (remote) {
+      if (!remote || remote.stamp === meta.stamp || !hasContent(remote.data)) return pushNow(mode);
+      var merged = merge3(loadBase(), JSON.parse(JSON.stringify(host.getData())), remote.data);
+      host.applyData(merged);
+      merges++;
+      return replayAfter(remote.stamp).then(function () { return pushNow(mode); });
+    });
+  }
+  function replayAfter(stamp) {
+    if (!host.replayPunchLog || !meta.sheetId) return Promise.resolve();
+    var rng = encodeURIComponent(SHEET_PUNCH + '!A2:G5000');
+    return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + rng, undefined, 'silent').then(function (res) {
+      host.replayPunchLog((res && res.values) || [], Date.parse(stamp) || 0);
+    }).catch(function () {});
+  }
+  var merges = 0;
+
+  function pushNow(mode) {
     var data = host.getData();
     var json = JSON.stringify(data);
     var stamp = new Date(deps.now()).toISOString();
@@ -352,6 +372,7 @@
       });
     }).then(function () {
       lastJson = json;
+      saveBase(json);
       meta.stamp = stamp;
       meta.dirty = false;
       meta.lastSaved = deps.now();
@@ -360,6 +381,61 @@
     });
   }
 
+  /* ---------- 세 갈래 합치기 ----------
+     base: 이 기기가 마지막으로 시트와 맞췄을 때 내용, local: 지금 이 기기, remote: 지금 시트(다른 기기가 저장).
+     양쪽에서 바뀐 부분을 모두 살린다. 알바생·목록은 id(없으면 내용)로 맞추고, 같은 길이 배열(날짜별 근무)은 칸별로 합친다.
+     같은 칸을 양쪽이 다르게 바꾼 경우만 이 기기 쪽을 남긴다. */
+  function jeq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function isObj(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
+  function keyedArr(a) { return Array.isArray(a) && a.length > 0 && a.every(function (x) { return isObj(x) && typeof x.id === 'string' && x.id; }); }
+  function merge3(b, l, r) {
+    if (jeq(l, r)) return l;
+    if (b !== undefined && jeq(l, b)) return r;
+    if (b !== undefined && jeq(r, b)) return l;
+    if (l === undefined) return b === undefined ? r : undefined;   // 이 기기가 지움(시트는 그대로면 위에서 처리) / 새로 생긴 건 살림
+    if (r === undefined) return b === undefined ? l : undefined;
+    if (isObj(l) && isObj(r)) {
+      var bo = isObj(b) ? b : {}, out = {}, seen = {};
+      Object.keys(l).concat(Object.keys(r)).forEach(function (k) {
+        if (seen[k]) return;
+        seen[k] = true;
+        var v = merge3(bo[k], l[k], r[k]);
+        if (v !== undefined) out[k] = v;
+      });
+      return out;
+    }
+    if (Array.isArray(l) && Array.isArray(r)) {
+      var ba = Array.isArray(b) ? b : [];
+      if ((keyedArr(l) || l.length === 0) && (keyedArr(r) || r.length === 0) && (keyedArr(l) || keyedArr(r))) {
+        var idx = function (a) { var m = {}; a.forEach(function (x) { m[x.id] = x; }); return m; };
+        var bm = keyedArr(ba) ? idx(ba) : {}, lm = idx(l), rm = idx(r), res = [], done = {};
+        l.concat(r).forEach(function (x) {
+          if (done[x.id]) return;
+          done[x.id] = true;
+          var v = merge3(bm[x.id], lm[x.id], rm[x.id]);
+          if (v !== undefined) res.push(v);
+        });
+        return res;
+      }
+      if (l.length === r.length && (ba.length === l.length || !Array.isArray(b))) {
+        return l.map(function (x, i) { var v = merge3(ba[i], x, r[i]); return v === undefined ? null : v; });
+      }
+      // 내용으로 맞추는 목록 (점검 보관함 등): 이 기기 목록 + 시트에서 새로 생긴 것 − 시트에서 지운 것
+      var key = function (x) { return JSON.stringify(x); };
+      var inB = {}, inL = {}, inR = {};
+      ba.forEach(function (x) { inB[key(x)] = true; });
+      l.forEach(function (x) { inL[key(x)] = true; });
+      r.forEach(function (x) { inR[key(x)] = true; });
+      var res2 = l.filter(function (x) { return !(inB[key(x)] && !inR[key(x)]); });
+      r.forEach(function (x) { if (!inB[key(x)] && !inL[key(x)]) res2.push(x); });
+      return res2;
+    }
+    return l;   // 같은 칸을 양쪽이 다르게 바꿈 → 이 기기 쪽
+  }
+  var BASE_KEY = 'alba.cloud.base';
+  function saveBase(json) { try { deps.storage.set(BASE_KEY, json); } catch (e) {} }
+  function loadBase() { try { var t = deps.storage.get(BASE_KEY); return t ? JSON.parse(t) : undefined; } catch (e) { return undefined; } }
+
   function hasContent(d) {
     return !!d && ((d.workers && d.workers.length) || (d.roster && d.roster.length) || (d.archive && d.archive.length));
   }
@@ -367,6 +443,7 @@
   function applyRemote(r) {
     host.applyData(r.data);
     lastJson = JSON.stringify(host.getData());
+    saveBase(JSON.stringify(r.data));
     meta.stamp = r.stamp;
     meta.dirty = false;
     meta.lastSaved = deps.now();
@@ -411,6 +488,7 @@
         if (remote.stamp !== (meta.stamp || '')) return applyRemote(remote);   // 저장 때마다 시각이 달라지므로 '다르면 다른 기기가 저장한 것' (기기 시계가 어긋나도 안전)
         if (JSON.stringify(remote.data) !== JSON.stringify(local)) return push('user');
         lastJson = JSON.stringify(local);
+        saveBase(lastJson);
         return null;
       }
       if (remote && hasContent(remote.data)) {
@@ -418,11 +496,12 @@
         if (!same && hasContent(local)) {
           var useRemote = host.confirm(tr('이 구글 계정에 저장된 기록이 이미 있습니다.\n\n[확인] 구글 시트에 저장된 기록을 불러옵니다 (이 기기의 기록은 대체됩니다)\n[취소] 이 기기의 기록을 구글 시트에 저장합니다 (시트의 기존 기록은 대체됩니다)'));
           if (useRemote) return applyRemote(remote);
-          else return push('user');
+          else return push('user', true);   // 사용자가 '이 기기 기록으로' 고름 → 합치지 않고 그대로 저장
         } else if (!same) {
           return applyRemote(remote);
         } else {
           lastJson = JSON.stringify(local);
+          saveBase(lastJson);
           meta.stamp = remote.stamp;
           meta.dirty = false;
         }
@@ -451,7 +530,7 @@
     }).then(function (remote) {
       if (meta.dirty) return push('silent');          // 이 기기에 저장 안 된 변경이 있으면 우선
       if (remote && remote.stamp !== (meta.stamp || '')) return applyRemote(remote);   // 시계 순서가 아니라 '내가 마지막으로 저장한 것과 다른가'로 판단
-      else lastJson = JSON.stringify(host.getData());
+      else { lastJson = JSON.stringify(host.getData()); saveBase(lastJson); }
     }).then(function () {
       setStatus('saved', '');
     }).catch(function (e) {
@@ -485,6 +564,23 @@
   function schedule() {
     if (saveTimer) clearT(saveTimer);
     saveTimer = setT(function () { saveTimer = null; doSave('silent'); }, SAVE_DELAY);
+  }
+
+  /* 다른 기기가 저장한 내용을 주기적으로 받아오기 (앱이 화면에 떠 있을 때 30초마다·화면으로 돌아올 때)
+     이 기기에 저장 안 된 변경이 있으면 받아오지 않고 저장(→ 합치기)을 먼저 한다. 입력·팝업 중이면 다음 기회로 미룸 */
+  var refreshing = false;
+  function refresh() {
+    if (!meta.connected || !meta.sheetId || !deps.available()) return Promise.resolve(false);
+    if (saving || refreshing) return Promise.resolve(false);
+    if (!token || tokenExp - deps.now() < 60000) return Promise.resolve(false);   // 토큰 갱신은 화면 터치 때 (팝업 차단 방지)
+    if (meta.dirty) { schedule(); return Promise.resolve(false); }
+    if (host.isBusy && host.isBusy()) return Promise.resolve(false);
+    refreshing = true;
+    return pull('silent').then(function (remote) {
+      if (!remote || remote.stamp === (meta.stamp || '') || meta.dirty || saving) return false;
+      if (host.isBusy && host.isBusy()) return false;
+      return applyRemote(remote).then(function () { setStatus('saved', ''); return true; });
+    }).catch(function () { return false; }).then(function (v) { refreshing = false; return v; });
   }
 
   /* 앱에서 저장할 내용이 바뀔 때마다 호출 */
@@ -603,6 +699,9 @@
     markDirty: markDirty,
     saveNow: saveNow,
     renewOnGesture: renewOnGesture,
+    refresh: refresh,
+    merge3: merge3,
+    mergeCount: function () { return merges; },
     appendPunch: appendPunch,
     purgePunchLog: purgePunchLog,
     readAdminPin: readAdminPin,

@@ -1871,6 +1871,14 @@
     return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
+  /* 지금 받아온 내용을 화면에 바로 반영하면 곤란한 순간(입력 중·창이 열려 있음) */
+  function cloudBusy() {
+    var ids = ['punchPw', 'punchResult', 'adminPin', 'dayModal', 'sheetBackdrop'];   // sheetBackdrop: 폰에서 정산 설정·알바생 추가 창이 열려 있음
+    for (var i = 0; i < ids.length; i++) { var el = $(ids[i]); if (el && !el.hidden) return true; }
+    var a = document.activeElement;
+    return !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.id !== 'guideSearch');
+  }
+
   function cloudData() {
     return {
       workers: state.workers,
@@ -2082,8 +2090,13 @@
       replayPunchLog: replayPunchLog,
       confirm: function (m) { return window.confirm(m); },
       getAdminPin: function () { return getPin(); },
+      isBusy: cloudBusy,
       onStatus: function (st) { renderCloudUi(st); if (st && st.kind === 'saved') { flushPunchQueue(); retryPurges(); } }
     });
+    // 다른 기기(갤럭시·아이패드 등)가 저장한 내용을 30초마다, 화면으로 돌아올 때 받아옴
+    setInterval(function () { if (!document.hidden && C.refresh) C.refresh(); }, 30000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && C.refresh) C.refresh(); });
+    window.addEventListener('focus', function () { if (C.refresh) C.refresh(); });
     // 화면을 누르는 순간(사용자 동작)에 구글 로그인을 조용히 갱신: 타이머 갱신은 브라우저가 막아서 1시간쯤 뒤 풀리는 문제 대응
     document.addEventListener('click', function (ev) { if (ev && ev.isTrusted && C.renewOnGesture) C.renewOnGesture(); }, true);   // 실제 손가락·마우스 클릭만 (코드가 누른 클릭은 팝업이 막혀 시도만 낭비)
 

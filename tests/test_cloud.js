@@ -553,6 +553,103 @@ function makeDevice(google, opts) {
     assert.strictEqual(saved.workers[0].password, '1234');   // 시트에도 반영됨
   });
 
+  await test('합치기(merge3): 양쪽 변경 모두 살림 · 지운 것은 지움 · 같은 칸 충돌만 이 기기 우선', async () => {
+    const m = makeDevice(makeGoogle()).cloud.merge3;
+    const b = { workers: [{ id: 'a', name: '가', wage: 1, months: { '2026-11': { d: [1, 2, 3] } } }, { id: 'b', name: '나', wage: 1 }, { id: 'c', name: '다' }], archive: [{ x: 1 }], settings: { u: 30, g: 0 } };
+    const l = JSON.parse(JSON.stringify(b)), r = JSON.parse(JSON.stringify(b));
+    l.workers[0].wage = 2;                          // 이 기기: 가 시급
+    l.workers[0].months['2026-11'].d[0] = 9;        // 이 기기: 가 1일
+    r.workers[0].punch = { date: '2026-11-16', time: '09:00' };   // 다른 기기: 가 출근
+    r.workers[0].months['2026-11'].d[2] = 7;        // 다른 기기: 가 3일
+    r.workers[1].wage = 5;                          // 다른 기기: 나 시급
+    l.workers.push({ id: 'd', name: '라' });         // 이 기기: 새 알바생
+    r.workers.push({ id: 'e', name: '마' });         // 다른 기기: 새 알바생
+    l.workers = l.workers.filter(w => w.id !== 'c'); // 이 기기: 다 삭제
+    l.archive.push({ x: 2 }); r.archive.push({ x: 3 });   // 양쪽 보관함 추가
+    r.settings.g = 5; l.settings.u = 15;
+    const o = m(b, l, r);
+    const by = id => o.workers.find(w => w.id === id);
+    assert.strictEqual(by('a').wage, 2);
+    assert.deepStrictEqual(by('a').punch, { date: '2026-11-16', time: '09:00' });
+    assert.deepStrictEqual(by('a').months['2026-11'].d, [9, 2, 7]);
+    assert.strictEqual(by('b').wage, 5);
+    assert.ok(by('d') && by('e'));
+    assert.strictEqual(by('c'), undefined);
+    assert.deepStrictEqual(o.archive, [{ x: 1 }, { x: 2 }, { x: 3 }]);
+    assert.deepStrictEqual(o.settings, { u: 15, g: 5 });
+    // 같은 칸 충돌 → 이 기기
+    const l2 = JSON.parse(JSON.stringify(b)), r2 = JSON.parse(JSON.stringify(b));
+    l2.workers[1].wage = 7; r2.workers[1].wage = 8;
+    assert.strictEqual(m(b, l2, r2).workers.find(w => w.id === 'b').wage, 7);
+    // 다른 기기가 지운 알바생을 이 기기가 안 건드렸으면 지움 / 다른 기기가 퇴근 처리(punch 삭제)한 것도 반영
+    const l3 = JSON.parse(JSON.stringify(r)), r3 = JSON.parse(JSON.stringify(r));
+    r3.workers = r3.workers.filter(w => w.id !== 'e'); delete r3.workers[0].punch;
+    const o3 = m(r, l3, r3);
+    assert.strictEqual(o3.workers.find(w => w.id === 'e'), undefined);
+    assert.strictEqual(o3.workers[0].punch, undefined);
+    // 기준이 없으면(업데이트 직후) 지운 건 못 알아보지만 양쪽 추가·변경은 살림
+    const o4 = m(undefined, l, r);
+    assert.ok(o4.workers.find(w => w.id === 'd') && o4.workers.find(w => w.id === 'e'));
+  });
+
+  await test('갤럭시에서 출근 → 옛 화면의 아이패드가 다른 걸 고쳐 저장해도 출근이 사라지지 않음', async () => {
+    const g = makeGoogle();
+    const galaxy = makeDevice(g);
+    galaxy.data.workers = [worker('철수', { '2026-11': { net: 1 } }), worker('영희', {})];
+    await galaxy.cloud.connect();
+    const ipad = makeDevice(g);
+    await ipad.cloud.connect();                         // 아이패드: 이때 내용을 받아 둠 (이후 새로고침 안 함)
+    galaxy.clock.t += 60000; ipad.clock.t += 60000;
+    galaxy.data.workers[0].punch = { date: '2026-11-16', time: '09:00', at: '08:58' };   // 갤럭시: 철수 출근
+    galaxy.cloud.markDirty(); await galaxy.cloud.saveNow();
+    galaxy.clock.t += 60000; ipad.clock.t += 60000;
+    ipad.data.workers[1].wage = 11000;                  // 아이패드(옛 화면): 영희 시급 수정
+    ipad.cloud.markDirty(); await ipad.cloud.saveNow();
+    const sid = JSON.parse(galaxy.store['alba.cloud.v1']).sheetId;
+    const sheet = JSON.parse(g.rows(sid, '데이터').slice(2).map(r => r[0]).join(''));
+    assert.deepStrictEqual(sheet.workers[0].punch, { date: '2026-11-16', time: '09:00', at: '08:58' }, '갤럭시 출근이 사라짐');
+    assert.strictEqual(sheet.workers[1].wage, 11000);
+    assert.deepStrictEqual(ipad.data, sheet);           // 아이패드 화면에도 출근이 보임
+    assert.strictEqual(ipad.cloud.mergeCount(), 1);
+    // 갤럭시가 30초 새로 받기 → 영희 시급도 보임
+    galaxy.clock.t += 30000;
+    assert.strictEqual(await galaxy.cloud.refresh(), true);
+    assert.deepStrictEqual(galaxy.data, sheet);
+    assert.strictEqual(await galaxy.cloud.refresh(), false);   // 바뀐 게 없으면 그대로
+  });
+
+  await test('30초 새로 받기: 다른 기기 변경을 받아 옴, 저장 안 된 변경이 있거나 입력 중이면 덮어쓰지 않음', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', {})];
+    await a.cloud.connect();
+    const b = makeDevice(g);
+    await b.cloud.connect();
+    a.clock.t += 60000; b.clock.t += 60000;
+    a.data.workers[0].punch = { date: '2026-11-16', time: '09:00' }; a.cloud.markDirty(); await a.cloud.saveNow();
+    b.busy = true;
+    b.cloud.init && null;
+    // 입력 중(isBusy)이면 미룸
+    const hostBusy = b.cloud;   // isBusy 는 host 에서 읽음: init 다시 해서 흉내
+    b.cloud.init({ getAdminPin: () => '', getData: () => JSON.parse(JSON.stringify(b.data)), getTables: () => tablesFor(b.data),
+      applyData: d => { b.data = JSON.parse(JSON.stringify(d)); }, replayPunchLog: () => {}, confirm: () => true,
+      onStatus: s => { b.lastStatus = s; }, isBusy: () => b.busy });
+    assert.strictEqual(await b.cloud.refresh(), false);
+    assert.strictEqual(b.data.workers[0].punch, undefined);
+    b.busy = false;
+    // 저장 안 된 변경이 있으면 받아오지 않고 저장(합치기)으로
+    b.data.workers.push(worker('영희', {})); b.cloud.markDirty();
+    assert.strictEqual(await b.cloud.refresh(), false);
+    await b.cloud.saveNow();
+    assert.deepStrictEqual(b.data.workers.map(w => w.name), ['철수', '영희']);
+    assert.deepStrictEqual(b.data.workers[0].punch, { date: '2026-11-16', time: '09:00' });
+    // 토큰이 만료됐으면 조용히 건너뜀 (팝업 시도 없음)
+    const t0 = b.tokens;
+    b.clock.t += 2 * 3600000;
+    assert.strictEqual(await b.cloud.refresh(), false);
+    assert.strictEqual(b.tokens, t0);
+  });
+
   await test('화면을 누를 때 토큰이 곧 만료되거나 풀렸으면 조용히 갱신하고, 밀린 변경을 저장', async () => {
     const g = makeGoogle();
     const a = makeDevice(g);

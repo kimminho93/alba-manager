@@ -151,6 +151,67 @@ async function scenarioTwo(seed, skewMs) {
   scenarios++;
 }
 
+
+/* 옛 화면 두 기기: 서로 새로 받지 않은 채 각자 고치고 저장 (갤럭시·아이패드 상황)
+   기기마다 자기 칸만 고치므로 충돌은 없음 → 어떤 순서로 섞여도 양쪽 변경이 모두 남아야 한다 */
+async function scenarioStale(seed) {
+  const R = rng(seed * 104729 + 7);
+  const g = H.makeGoogle();
+  const a = H.makeDevice(g), b = H.makeDevice(g);
+  a.data.workers = [H.worker('기본', {})];
+  await a.cloud.connect();
+  await b.cloud.connect();
+  const devs = { A: a, B: b };
+  const exp = { 'id-기본': { name: '기본' } };   // 기대하는 최종 상태: id → 칸
+  const dead = {};
+  let n = 0;
+  const tick = () => { const t = Math.max(a.clock.t, b.clock.t) + 1000 + Math.floor(R() * 40000); a.clock.t = t; b.clock.t = t; };
+  for (let i = 0; i < 60; i++) {
+    tick();
+    const k = R() < 0.5 ? 'A' : 'B', d = devs[k];
+    const r = R();
+    if (r < 0.25) {                                       // 새 알바생
+      const id = 'w-' + k + '-' + (++n);
+      d.data.workers.push({ id, name: id, by: k, months: {} });
+      exp[id] = { name: id };
+    } else if (r < 0.65) {                                // 아무 알바생의 '내 칸' 수정 (출근·시급 등을 흉내)
+      const ws = d.data.workers; if (!ws.length) continue;
+      const w = ws[Math.floor(R() * ws.length)];
+      const v = k + (++n);
+      w['f' + k] = v;
+      if (!dead[w.id] && exp[w.id]) exp[w.id]['f' + k] = v;
+    } else if (r < 0.72) {                                // 내가 만든 알바생 삭제
+      const mine = d.data.workers.filter(w => w.by === k);
+      if (!mine.length) continue;
+      const w = mine[Math.floor(R() * mine.length)];
+      d.data.workers = d.data.workers.filter(x => x.id !== w.id);
+      dead[w.id] = true; delete exp[w.id];
+    } else if (r < 0.80) {                                // 30초 새로 받기
+      await d.cloud.refresh();
+      continue;
+    } else if (r < 0.85) {                                // 로그인 풀림 중 저장 실패 → 보관
+      d.cloud.markDirty(); d.tokenFail = true; d.clock.t += 2 * 3600000; await d.cloud.saveNow().catch(() => {}); d.tokenFail = false;
+      continue;
+    }
+    d.cloud.markDirty();
+    if (R() < 0.6) { if (R() < 0.15) g.fail401Once = true; await d.cloud.saveNow().catch(() => {}); }   // 바로 저장 또는 나중에
+  }
+  // 마무리: 둘 다 저장하고 서로 받아오기
+  for (let i = 0; i < 3; i++) for (const d of [a, b]) {
+    tick(); d.tokenFail = false;
+    await d.cloud.resume().catch(() => {});
+    d.cloud.markDirty(); await d.cloud.saveNow().catch(() => {});
+    await d.cloud.refresh();
+  }
+  const sid = JSON.parse(a.store['alba.cloud.v1']).sheetId;
+  const sheet = JSON.parse(g.rows(sid, '데이터').slice(2).map(r => r[0]).join(''));
+  const norm = ws => { const o = {}; ws.forEach(w => { const x = { name: w.name }; if (w.fA !== undefined) x.fA = w.fA; if (w.fB !== undefined) x.fB = w.fB; o[w.id] = x; }); return o; };
+  assert.deepStrictEqual(norm(sheet.workers), exp, '시드 ' + seed + ': 시트에 변경이 빠지거나 지운 알바생이 살아남');
+  assert.deepStrictEqual(a.data, sheet, '시드 ' + seed + ': A 화면이 시트와 다름');
+  assert.deepStrictEqual(b.data, sheet, '시드 ' + seed + ': B 화면이 시트와 다름');
+  scenarios++;
+}
+
 (async () => {
   console.log('=== [5] 저장·동기화 무작위 반복 검증 (' + ROUNDS + '회 × 2종) ===');
   for (let i = 1; i <= ROUNDS; i++) {
@@ -158,7 +219,8 @@ async function scenarioTwo(seed, skewMs) {
       await scenarioSingle(i);
       await scenarioTwo(i);
       if (process.env.SKEW) await scenarioTwo(i, Number(process.env.SKEW));
-      console.log('  ✓ ' + i + '회차 통과 (한 기기: 로그인 풀림·오프라인·새로고침 / 두 기기 번갈아 저장)');
+      await scenarioStale(i);
+      console.log('  ✓ ' + i + '회차 통과 (한 기기: 로그인 풀림·오프라인·새로고침 / 두 기기 번갈아 저장 / 옛 화면 두 기기 동시 수정)');
     } catch (e) {
       console.error('  ✗ ' + i + '회차 실패\n    ' + (e && e.stack || e));
       process.exit(1);
