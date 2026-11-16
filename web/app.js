@@ -2268,7 +2268,10 @@
   }
 
   /* 자정까지 퇴근을 안 찍은 사람은 그날 출근을 무효(휴무)로 처리 */
+  var firstSyncDone = false;   // 연동된 기기는 켜질 때 시트를 먼저 받은 뒤에 자동 퇴근을 판단 (오래 꺼 둔 기기의 옛 '근무 중'으로 잘못 처리하지 않게)
   function runAutoClose() {
+    var C0 = window.AlbaCloud;
+    if (!firstSyncDone && C0 && C0.getStatus && C0.getStatus().connected) return;
     var done = E.autoCloseOpen(state.workers, new Date(), autoOut());
     if (!done.length) return;
     saveWorkers();
@@ -2967,5 +2970,8 @@
   checkServerHealth();
   initCloud();
   initPunch();
-  if (window.AlbaCloud) window.AlbaCloud.resume();
+  if (window.AlbaCloud) {
+    setTimeout(function () { if (!firstSyncDone) { firstSyncDone = true; runAutoClose(); } }, 20000);   // 인터넷이 아주 느려도 20초 뒤엔 자동 퇴근 판단
+    window.AlbaCloud.resume().then(function () {}, function () {}).then(function () { firstSyncDone = true; runAutoClose(); renderPunch(); renderWorkNow(); });
+  } else firstSyncDone = true;
 })();

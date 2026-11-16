@@ -618,6 +618,22 @@ function makeDevice(google, opts) {
     assert.strictEqual(await galaxy.cloud.refresh(), false);   // 바뀐 게 없으면 그대로
   });
 
+  await test('오래 꺼 둔 기기: 옛 출근을 퇴근 처리한 변경과 다른 기기의 오늘 출근이 겹쳐도 오늘 출근을 지우지 않음', async () => {
+    const m = makeDevice(makeGoogle()).cloud.merge3;
+    const old = { date: '2026-11-12', time: '18:00', at: '17:55' }, today = { date: '2026-11-16', time: '09:00', at: '08:58' };
+    const b = { workers: [{ id: 'a', name: '철수', punch: old, months: {} }] };
+    const l = { workers: [{ id: 'a', name: '철수', pending: [{ date: '2026-11-12', start: '18:00' }], months: {} }] };   // 옛 기기: 자동 퇴근
+    const r = { workers: [{ id: 'a', name: '철수', punch: today, months: { '2026-11': { d: 1 } } }] };                // 다른 기기: 그사이 퇴근·오늘 출근
+    const o = m(b, l, r).workers[0];
+    assert.deepStrictEqual(o.punch, today);
+    assert.deepStrictEqual(o.months, { '2026-11': { d: 1 } });
+    // 반대 방향도 같음
+    assert.deepStrictEqual(m(b, r, l).workers[0].punch, today);
+    // 둘 다 지웠으면 지움 / 한쪽만 지우고 다른 쪽 그대로면 지움
+    assert.strictEqual(m(b, l, l).workers[0].punch, undefined);
+    assert.strictEqual(m(b, l, b).workers[0].punch, undefined);
+  });
+
   await test('30초 새로 받기: 다른 기기 변경을 받아 옴, 저장 안 된 변경이 있거나 입력 중이면 덮어쓰지 않음', async () => {
     const g = makeGoogle();
     const a = makeDevice(g);

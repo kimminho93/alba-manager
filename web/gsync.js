@@ -400,6 +400,11 @@
         if (seen[k]) return;
         seen[k] = true;
         var v = merge3(bo[k], l[k], r[k]);
+        // 한쪽은 칸을 지웠는데 다른 쪽은 그 칸을 새로 바꿨으면 새 값을 남김 (예: 옛 기기가 지난 출근을 퇴근 처리 ↔ 다른 기기에서 오늘 새로 출근)
+        if (v === undefined && bo[k] !== undefined) {
+          if (l[k] === undefined && r[k] !== undefined && !jeq(r[k], bo[k])) v = r[k];
+          else if (r[k] === undefined && l[k] !== undefined && !jeq(l[k], bo[k])) v = l[k];
+        }
         if (v !== undefined) out[k] = v;
       });
       return out;
