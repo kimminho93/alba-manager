@@ -26,11 +26,12 @@
     settings: 'alba.settings.v1',
     archive: 'alba.archive.v1',
     store: 'alba.store.v1',
-    presets: 'alba.timePresets.v1'
+    presets: 'alba.timePresets.v1',
+    conflicts: 'alba.conflicts.v1'   // 다른 기기와 같은 칸을 동시에 고친 기록 (모든 기기에 공유, 사장님이 고르면 지움)
   };
 
   var SYNC_KEYS = {};
-  SYNC_KEYS[KEYS.settings] = SYNC_KEYS[KEYS.workers] = SYNC_KEYS[KEYS.archive] = SYNC_KEYS[KEYS.store] = SYNC_KEYS[KEYS.presets] = true;
+  SYNC_KEYS[KEYS.settings] = SYNC_KEYS[KEYS.workers] = SYNC_KEYS[KEYS.archive] = SYNC_KEYS[KEYS.store] = SYNC_KEYS[KEYS.presets] = SYNC_KEYS[KEYS.conflicts] = true;
 
   function loadSettings() {
     var st = E.sanitizeSettings(loadJson(KEYS.settings, {}));
@@ -1094,6 +1095,7 @@
     renderChips();
     renderWorkNow();
     renderPending();
+    renderConflicts();
     renderPunch();
 
     var ord = workingFirstOrder();
@@ -1888,6 +1890,7 @@
 
   function cloudData() {
     return {
+      conflicts: loadConflicts(),
       workers: state.workers,
       archive: state.archive,
       presets: presetState.list,
@@ -1953,6 +1956,7 @@
       // 새 형식(workers) 또는 예전 형식(정산 명단 roster)을 받아 알바생별 기록으로 정리
       state.workers = Array.isArray(d.workers) ? E.normalizeWorkers(d.workers) : E.migrateRoster(d.roster);
       state.archive = Array.isArray(d.archive) ? d.archive : [];
+      if (Array.isArray(d.conflicts)) saveJson(KEYS.conflicts, cleanConflicts(d.conflicts));
       saveWorkers();
       saveJson(KEYS.archive, state.archive);
       if (Array.isArray(d.presets) && d.presets.length) {
@@ -1972,9 +1976,100 @@
       renderRoster();
       renderArchive();
       recalcChecklist();
+      renderConflicts();
     } finally {
       syncSuspended = false;
     }
+  }
+
+  /* ---------- 다른 기기와 수정이 겹친 곳 (같은 칸을 두 기기가 서로 다르게 고침) ----------
+     저장은 먼저 정해진 값(저장된 값)으로 하되 조용히 덮이지 않게 목록으로 남겨, 사장님이 [유지] 또는 [덮인 값으로 되돌리기]를 고른다 */
+  function cleanConflicts(list) {
+    return (Array.isArray(list) ? list : []).filter(function (c) { return c && typeof c.id === 'string' && Array.isArray(c.path); }).slice(-30);
+  }
+  function loadConflicts() { return cleanConflicts(loadJson(KEYS.conflicts, [])); }
+  var FIELD_LABEL = { wage: '시급', contractDays: '주 근무일', name: '이름', password: '비밀번호', includeWeekly: '주휴수당', includeMeal: '식대', mealAmount: '식대 금액', mealMinHours: '식대 기준 시간', tax: '세금', weekExcuse: '주휴 예외', breakMinutes: '휴게' };
+  function cellText(v) {
+    if (v === null || v === undefined) return tr('없음');
+    if (typeof v === 'object' && !Array.isArray(v) && ('off' in v || 'start' in v)) {
+      if (v.off || !v.start || !v.end) return tr('휴무');
+      return v.start + '~' + v.end + (v.breakMinutes ? ' (' + tr('휴게 {n}분', { n: v.breakMinutes }) + ')' : '');
+    }
+    if (typeof v === 'number' && v >= 1000) return E.formatWon ? E.formatWon(v) + (E.getLang() === 'en' ? '' : '원') : String(v);
+    if (typeof v === 'boolean') return v ? tr('예') : tr('아니오');
+    var t = typeof v === 'string' ? v : JSON.stringify(v);
+    return t.length > 60 ? t.slice(0, 60) + '…' : t;
+  }
+  function conflictWhat(c) {
+    var p = c.path;
+    if (p[0] === 'workers') {
+      var w = state.workers.filter(function (x) { return x.id === p[1]; })[0];
+      var who = w ? w.name : tr('(삭제된 알바생)');
+      if (p[2] === 'months' && p[4] === 'dailyShifts' && typeof p[5] === 'number') {
+        return who + ' · ' + tr('{m}월 {d}일 근무', { m: Number(String(p[3]).slice(5, 7)), d: p[5] + 1 });
+      }
+      if (p[2] === 'months' && p[4]) return who + ' · ' + tr('{m}월', { m: Number(String(p[3]).slice(5, 7)) }) + ' ' + tr(FIELD_LABEL[p[4]] || p[4]);
+      return who + ' · ' + tr(FIELD_LABEL[p[2]] || String(p[2] || ''));
+    }
+    if (p[0] === 'settings') return tr('설정') + ' · ' + p.slice(1).join(' › ');
+    return p.join(' › ');
+  }
+  /* 덮인 값으로 되돌릴 수 있는 곳: 알바생 기록·설정 */
+  function conflictTarget(c) {
+    var p = c.path, cur;
+    if (p[0] === 'workers') {
+      cur = state.workers.filter(function (x) { return x.id === p[1]; })[0];
+      if (!cur) return null;
+      for (var i = 2; i < p.length - 1; i++) { cur = cur[p[i]]; if (!cur || typeof cur !== 'object') return null; }
+      return p.length > 2 ? { obj: cur, key: p[p.length - 1], kind: 'workers' } : null;
+    }
+    if (p[0] === 'settings' && p.length > 1) {
+      cur = state.settings;
+      for (var j = 1; j < p.length - 1; j++) { cur = cur[p[j]]; if (!cur || typeof cur !== 'object') return null; }
+      return { obj: cur, key: p[p.length - 1], kind: 'settings' };
+    }
+    return null;
+  }
+  function renderConflicts() {
+    var box = $('conflictBox');
+    if (!box) return;
+    var list = loadConflicts();
+    if (!list.length) { box.hidden = true; box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="pending-head">' + tr('⚠️ 다른 기기와 수정이 겹쳤어요 {n}건', { n: list.length }) + '</div>' +
+      '<p class="pending-note">' + tr('두 기기에서 같은 곳을 거의 동시에 고쳤어요. 지금은 [저장된 값]으로 되어 있어요. 맞는 값을 골라 주세요.') + '</p>' +
+      list.map(function (c) {
+        var can = !!conflictTarget(c);
+        var id = escHtml(c.id);
+        return '<div class="pending-row">' +
+          '<div class="pending-who"><b>' + escHtml(conflictWhat(c)) + '</b></div>' +
+          '<div class="conflict-vals"><span>' + tr('저장된 값') + ': <b>' + escHtml(cellText(c.local)) + '</b></span><span>' + tr('덮인 값') + ': <b>' + escHtml(cellText(c.remote)) + '</b></span></div>' +
+          '<div class="pending-act">' +
+            '<button type="button" class="btn btn-primary" data-conflict-keep="' + id + '">' + tr('저장된 값 유지') + '</button>' +
+            (can ? '<button type="button" class="btn" data-conflict-undo="' + id + '">' + tr('덮인 값으로 되돌리기') + '</button>' : '') +
+          '</div></div>';
+      }).join('');
+    box.hidden = false;
+  }
+  function onConflictClick(ev) {
+    var keep = ev.target.closest('[data-conflict-keep]'), undo = ev.target.closest('[data-conflict-undo]');
+    if (!keep && !undo) return;
+    var id = (keep || undo).getAttribute(keep ? 'data-conflict-keep' : 'data-conflict-undo');
+    var list = loadConflicts(), c = list.filter(function (x) { return x.id === id; })[0];
+    if (!c) { renderConflicts(); return; }
+    if (undo) {
+      var t = conflictTarget(c);
+      if (!t) { showToast(tr('되돌릴 곳을 찾지 못했어요. 직접 고쳐 주세요.')); return; }
+      var now = t.obj[t.key];
+      if (JSON.stringify(now === undefined ? null : now) !== JSON.stringify(c.local === undefined ? null : c.local) &&
+          !window.confirm(tr('그 뒤에 이 값이 또 바뀌었어요 (지금: {v}). 그래도 덮인 값({o})으로 되돌릴까요?', { v: cellText(now), o: cellText(c.remote) }))) return;
+      if (c.remote === null || c.remote === undefined) delete t.obj[t.key]; else t.obj[t.key] = JSON.parse(JSON.stringify(c.remote));
+      if (t.kind === 'workers') { state.workers = E.normalizeWorkers(state.workers); saveWorkers(); }
+      else { state.settings = E.sanitizeSettings(state.settings); saveJson(KEYS.settings, state.settings); applySettings(); }
+      loadSelected(); recalcPayroll(); renderRoster();
+      showToast(tr('덮인 값으로 되돌렸어요.'));
+    } else showToast(tr('저장된 값으로 확정했어요.'));
+    saveJson(KEYS.conflicts, list.filter(function (x) { return x.id !== id; }));
+    renderConflicts();
   }
 
   var shownNotice = '';
@@ -2098,7 +2193,19 @@
       confirm: function (m) { return window.confirm(m); },
       getAdminPin: function () { return getPin(); },
       isBusy: cloudBusy,
-      onStatus: function (st) { renderCloudUi(st); if (st && st.kind === 'saved') { flushPunchQueue(); retryPurges(); } }
+      onConflicts: function (n) {
+        setTimeout(function () {
+          renderConflicts();
+          showToast(tr('⚠️ 다른 기기와 수정이 겹친 곳이 {n}건 있어요. 급여 계산 탭 맨 위에서 확인해 주세요.', { n: n }), true);
+        }, 0);
+      },
+      onStatus: function (st) {
+        renderCloudUi(st);
+        if (st && st.kind === 'saved') {
+          flushPunchQueue(); retryPurges();
+          if (!firstSyncDone) { firstSyncDone = true; runAutoClose(); renderPunch(); renderWorkNow(); }   // 로그인이 풀려 있다 다시 연결돼 처음 동기화된 때
+        }
+      }
     });
     // 다른 기기(갤럭시·아이패드 등)가 저장한 내용을 30초마다, 화면으로 돌아올 때 받아옴
     setInterval(function () { if (!document.hidden && C.refresh) C.refresh(); }, 30000);
@@ -2854,6 +2961,7 @@
     initUpdate();
     $('punchAllOut').addEventListener('click', askBulkOut);
     $('pendingBox').addEventListener('click', onPendingClick);
+    $('conflictBox').addEventListener('click', onConflictClick);
     $('punchPwForm').addEventListener('submit', function (ev) { ev.preventDefault(); punchSubmit(); });
     $('punchPw').addEventListener('click', function (ev) { if (ev.target.closest('[data-punch-close]')) closePunchPw(); });
     $('punchResult').addEventListener('click', function (ev) { if (ev.target.closest('[data-punch-result-close]')) closePunchResult(); });
@@ -3013,7 +3121,11 @@
   initCloud();
   initPunch();
   if (window.AlbaCloud) {
-    setTimeout(function () { if (!firstSyncDone) { firstSyncDone = true; runAutoClose(); } }, 20000);   // 인터넷이 아주 느려도 20초 뒤엔 자동 퇴근 판단
-    window.AlbaCloud.resume().then(function () {}, function () {}).then(function () { firstSyncDone = true; runAutoClose(); renderPunch(); renderWorkNow(); });
+    // 연동된 기기는 시트와 한 번 맞춘 뒤에 자동 퇴근을 판단. 로그인이 풀려 맞추지 못했으면 다시 연결될 때까지 기다림(최대 10분)
+    var syncBlocked = function () { var st = window.AlbaCloud.getStatus ? window.AlbaCloud.getStatus() : null; return !!(st && st.connected && (st.kind === 'needLogin' || st.kind === 'error')); };
+    var startAuto = function () { if (!firstSyncDone) { firstSyncDone = true; runAutoClose(); renderPunch(); renderWorkNow(); } };
+    setTimeout(function () { if (!syncBlocked()) startAuto(); }, 20000);   // 인터넷이 아주 느려도 20초 뒤엔 판단
+    setTimeout(startAuto, 600000);
+    window.AlbaCloud.resume().then(function () {}, function () {}).then(function () { if (!syncBlocked()) startAuto(); else { renderPunch(); renderWorkNow(); } });
   } else firstSyncDone = true;
 })();

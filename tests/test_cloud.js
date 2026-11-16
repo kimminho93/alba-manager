@@ -95,6 +95,7 @@ function makeGoogle() {
       const hm = /^\/values\/(.+)!A1:Z1$/.exec(rest);
       if (hm) { const t = tab(hm[1]); return res(200, t && t.rows[0] ? { values: [t.rows[0]] } : {}); }
       const lm = /^\/values\/(.+)!A2:G$/.exec(decodeURIComponent(rest));
+      if (lm && (opt.method || 'GET') === 'GET' && g.failPunchGet > 0) { g.failPunchGet--; return res(503, {}); }
       if (lm) { const t = tab(lm[1]); return res(200, { values: t ? t.rows.slice(1) : [] }); }
       const sm = /^\/values\/(.+)!A2$/.exec(decodeURIComponent(rest));
       if (sm) { const t = tab(sm[1]); g.stampReads = (g.stampReads || 0) + 1; return res(200, t && t.rows[1] ? { values: [[t.rows[1][0]]] } : {}); }
@@ -562,6 +563,9 @@ function makeDevice(google, opts) {
     // 기준엔 없음, 두 기기가 각각 다른 항목 추가 → 둘 다
     assert.deepStrictEqual(m({ pending: [] }, { pending: [P1] }, { pending: [P2] }).pending, [P1, P2]);
     assert.deepStrictEqual(m(undefined, { pending: [P1] }, { pending: [P2] }).pending, [P1, P2]);
+    // 묘비 목록은 합집합 (길이가 같아도 칸별로 합치지 않음)
+    assert.deepStrictEqual(m(undefined, { pendingDone: ['2026-11-15 18:00'] }, { pendingDone: ['2026-11-15 19:00'] }).pendingDone, ['2026-11-15 18:00', '2026-11-15 19:00']);
+    assert.deepStrictEqual(m({ pendingDone: ['2026-11-01 09:00'] }, { pendingDone: ['2026-11-15 19:00'] }, { pendingDone: ['2026-11-15 18:00'] }).pendingDone, ['2026-11-15 18:00', '2026-11-15 19:00']);
     // 이 기기가 P1 확인(빈 목록), 다른 기기는 P2 추가 → P2만
     assert.deepStrictEqual(m({ pending: [P1] }, { pending: [] }, { pending: [P1, P2] }).pending, [P2]);
     // 반대 방향
@@ -652,6 +656,80 @@ function makeDevice(google, opts) {
     // 둘 다 지웠으면 지움 / 한쪽만 지우고 다른 쪽 그대로면 지움
     assert.strictEqual(m(b, l, l).workers[0].punch, undefined);
     assert.strictEqual(m(b, l, b).workers[0].punch, undefined);
+  });
+
+  await test('2차 검토: 같은 날 근무 칸을 두 기기가 다르게 고치면 섞지 않고, 겹친 수정 목록(conflicts)에 덮인 값을 남김', async () => {
+    const md = makeDevice(makeGoogle()).cloud.mergeData;
+    const cell = (s, e, b) => ({ off: false, start: s, end: e, breakMinutes: b || 0 });
+    const off = { off: true, start: '', end: '', breakMinutes: 0 };
+    const mk = sh => ({ workers: [{ id: 'a', name: '김', months: { '2026-11': { wage: 10320, dailyShifts: sh } } }] });
+    // 점장(이 기기): 출근을 08:30으로, 태블릿(시트): 퇴근 14:00 기록
+    const base = mk([off, cell('09:00', '12:00')]);
+    const l = mk([off, cell('08:30', '12:00')]);
+    const r = mk([off, cell('09:00', '14:00')]);
+    const m = md(base, l, r);
+    assert.deepStrictEqual(m.workers[0].months['2026-11'].dailyShifts[1], cell('08:30', '12:00'));   // 섞이지 않음 (08:30~14:00 같은 제3의 값 없음)
+    assert.strictEqual(m.conflicts.length, 1);
+    assert.deepStrictEqual(m.conflicts[0].path, ['workers', 'a', 'months', '2026-11', 'dailyShifts', 1]);
+    assert.deepStrictEqual(m.conflicts[0].remote, cell('09:00', '14:00'));
+    // 다른 칸만 바꾼 정상 경우엔 충돌 없음
+    const m2 = md(base, mk([cell('10:00', '11:00'), cell('09:00', '12:00')]), mk([off, cell('09:00', '14:00')]));
+    assert.strictEqual(m2.conflicts, undefined);
+    assert.deepStrictEqual(m2.workers[0].months['2026-11'].dailyShifts, [cell('10:00', '11:00'), cell('09:00', '14:00')]);
+    // 첫 달 기록을 양쪽이 만들며 시급이 다름 → 겹친 수정으로 남음
+    const m3 = md({ workers: [{ id: 'a', months: {} }] }, { workers: [{ id: 'a', months: { '2026-11': { wage: 10000 } } }] }, { workers: [{ id: 'a', months: { '2026-11': { wage: 12000 } } }] });
+    assert.strictEqual(m3.workers[0].months['2026-11'].wage, 10000);
+    assert.deepStrictEqual(m3.conflicts.map(c => [c.path.join('/'), c.remote]), [['workers/a/months/2026-11/wage', 12000]]);
+    // 첫 달 기록을 양쪽이 만들 때: 태블릿 퇴근 칸(근무)과 점장 쪽 기본 휴무 칸 → 근무가 살아남음, 충돌 아님
+    const m6 = md({ workers: [{ id: 'a', months: {} }] }, { workers: [{ id: 'a', months: { '2026-11': { wage: 12000, dailyShifts: [off, off] } } }] }, { workers: [{ id: 'a', months: { '2026-11': { wage: 12000, dailyShifts: [off, cell('09:00', '14:00')] } } }] });
+    assert.deepStrictEqual(m6.workers[0].months['2026-11'].dailyShifts, [off, cell('09:00', '14:00')]);
+    assert.strictEqual(m6.conflicts, undefined);
+    // 같은 충돌은 한 번만, 출퇴근 내부 상태(lastTs 등)는 알리지 않음
+    const m4 = md(Object.assign(base, { conflicts: [] }), Object.assign(l, { conflicts: m.conflicts }), r);
+    assert.strictEqual(m4.conflicts.length, 1);
+    const m5 = md({ workers: [{ id: 'a', lastTs: '1' }] }, { workers: [{ id: 'a', lastTs: '2' }] }, { workers: [{ id: 'a', lastTs: '3' }] });
+    assert.strictEqual(m5.conflicts, undefined);
+  });
+
+  await test('2차 검토: 장부 읽기가 잠깐 실패해도 다음 새로 받기 때 다시 재생', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', {})];
+    await a.cloud.connect();
+    const b = makeDevice(g);
+    await b.cloud.connect();
+    a.data.workers.push(worker('영희', {})); a.cloud.markDirty(); a.clock.t += 60000; await a.cloud.saveNow();
+    b.replayed = null; g.failPunchGet = 1; b.clock.t += 60000;
+    assert.strictEqual(await b.cloud.refresh(), true);
+    assert.strictEqual(b.replayed, null);   // 이번엔 실패
+    b.clock.t += 30000;
+    await b.cloud.refresh();
+    assert.ok(b.replayed && Array.isArray(b.replayed.rows), '다음 새로 받기에서 재생');
+    b.replayed = null; b.clock.t += 30000;
+    await b.cloud.refresh();
+    assert.strictEqual(b.replayed, null);   // 성공한 뒤엔 다시 안 읽음
+  });
+
+  await test('2차 검토: 장부 재생이 실패한 채로 저장하면 저장 전에 먼저 재생 (빠진 출퇴근이 새 저장에 묻히지 않게)', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.data.workers = [worker('철수', {})];
+    await a.cloud.connect();
+    const b = makeDevice(g);
+    await b.cloud.connect();
+    a.data.workers.push(worker('영희', {})); a.cloud.markDirty(); a.clock.t += 60000; await a.cloud.saveNow();
+    g.failPunchGet = 1; b.clock.t += 60000;
+    await b.cloud.refresh();
+    assert.ok(JSON.parse(b.store['alba.cloud.v1']).replayStamp, '실패를 기억 (앱을 껐다 켜도)');
+    const order = [];
+    b.replayed = null;
+    const orig = g.fetch;
+    g.fetch = async (url, opt) => { if (/데이터|%EB%8D%B0/.test(url) && opt && opt.method === 'POST') order.push('write'); if (/!A2:G$/.test(decodeURIComponent(url))) order.push('replay'); return orig(url, opt); };
+    b.data.workers.push(worker('민수', {})); b.cloud.markDirty(); b.clock.t += 10000; await b.cloud.saveNow();
+    g.fetch = orig;
+    assert.ok(b.replayed, '저장 전에 재생');
+    assert.ok(order.indexOf('replay') >= 0 && order.indexOf('replay') < Math.max(0, order.indexOf('write')) || order.indexOf('write') < 0, order.join(','));
+    assert.ok(!JSON.parse(b.store['alba.cloud.v1']).replayStamp, '성공하면 지움');
   });
 
   await test('새로 받기는 저장 표시만 먼저 읽고, 바뀌었을 때만 전체를 읽음 · 예전 형식 저장 표시도 그대로 동작', async () => {

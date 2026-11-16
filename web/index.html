@@ -20,7 +20,7 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="./style.css?v=202611162130">
+  <link rel="stylesheet" href="./style.css?v=202611162300">
 </head>
 <body>
   <header class="app-header">
@@ -70,6 +70,7 @@
       <!-- 출퇴근 탭에서 출근 중인 사람 표시 -->
       <div id="workNow" class="work-now" hidden role="status"></div>
       <!-- 퇴근을 안 찍어 자동 퇴근된 근무: 사장님이 퇴근 시각 입력 -->
+      <div id="conflictBox" class="pending-box conflict-box" hidden></div>
       <div id="pendingBox" class="pending-box" hidden></div>
       <!-- 폰 전용: 알바생이 없을 때 안내 -->
       <div id="emptyCard" class="empty-card">
@@ -436,7 +437,7 @@
         <div class="set-note">처음에는 휴대폰·브라우저 언어를 따라갑니다. 영어로 바꾸면 화면, 사용 방법, 점검표, 카톡 명세서·엑셀 파일도 영어로 나옵니다.</div>
 
         <h3 class="set-title">앱 정보</h3>
-        <div class="set-note">사장님 도우미 <b class="ver-text">v1.4.5</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
+        <div class="set-note">사장님 도우미 <b class="ver-text">v1.4.6</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
         <div class="share-box">
           <img class="share-qr" src="./img/share-qr.svg" alt="사장님 도우미 주소 QR 코드" width="160" height="160">
           <div class="share-text">
@@ -764,7 +765,7 @@
 
   <footer class="app-footer">
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
-    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.4.5</span></div>
+    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.4.6</span></div>
   </footer>
 
   <!-- 출퇴근: 비밀번호 입력 -->
@@ -992,10 +993,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611162130"></script>
-  <script src="./lang_web.js?v=202611162130"></script>
-  <script src="./i18n.js?v=202611162130"></script>
-  <script src="./gsync.js?v=202611162130"></script>
-  <script src="./app.js?v=202611162130"></script>
+  <script src="./engine.js?v=202611162300"></script>
+  <script src="./lang_web.js?v=202611162300"></script>
+  <script src="./i18n.js?v=202611162300"></script>
+  <script src="./gsync.js?v=202611162300"></script>
+  <script src="./app.js?v=202611162300"></script>
 </body>
 </html>

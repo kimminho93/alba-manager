@@ -157,7 +157,8 @@
       if (dflt) item.defaults = dflt;
       var pn = cleanPunch(raw.punch);
       if (pn) item.punch = pn;
-      if (Array.isArray(raw.pending)) item.pending = cleanPending(raw.pending);   // 빈 목록도 남김 (다른 기기와 합칠 때 '확인 끝남'을 알 수 있게)
+      if (Array.isArray(raw.pendingDone)) item.pendingDone = cleanDone(raw.pendingDone);
+      if (Array.isArray(raw.pending)) item.pending = notDone(item, cleanPending(raw.pending));   // 빈 목록도 남김 (다른 기기와 합칠 때 '확인 끝남'을 알 수 있게)
       if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(raw.lastTs))) { item.lastTs = raw.lastTs; if (/^(in|out|auto)$/.test(String(raw.lastKind))) item.lastKind = raw.lastKind; }
       out.push(item);
     });
@@ -198,6 +199,24 @@
       out.push(o);
     });
     return out.slice(-30);
+  }
+  /* 사장님이 이미 처리한(퇴근 기록·근무 없음) 확인 필요 항목의 id 목록. 다른 기기가 늦게 같은 자동 퇴근을 만들어도 되살아나지 않게 */
+  var PEND_ID_RE = /^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d$/;
+  function cleanDone(raw) {
+    if (!Array.isArray(raw)) return [];
+    var out = [], seen = {};
+    raw.forEach(function (x) { x = String(x); if (PEND_ID_RE.test(x) && !seen[x]) { seen[x] = true; out.push(x); } });
+    out.sort();   // 날짜·시각 순 (기기마다 같은 순서)
+    return out.slice(-200);
+  }
+  function markDone(w, id) {
+    var d = cleanDone(w.pendingDone);
+    if (d.indexOf(id) < 0) d.push(id);
+    w.pendingDone = cleanDone(d);
+  }
+  function notDone(w, list) {
+    var d = cleanDone(w.pendingDone);
+    return list.filter(function (p) { return d.indexOf(p.id) < 0; });
   }
 
   /* 자동 퇴근(영업 마감) 시각: 이 시각까지 퇴근을 안 찍으면 퇴근 처리하고 '확인 필요'로 남김. 기본 자정 */
@@ -318,7 +337,7 @@
           delete worker.punch;
           var pp = cleanPending(worker.pending);
           pp.push({ date: open.date, start: open.time, at: open.at || open.time, end: endT, cut: today + ' ' + time });
-          worker.pending = cleanPending(pp);
+          worker.pending = notDone(worker, cleanPending(pp));
           return { kind: 'out', date: open.date, start: open.time, end: endT, empty: true, held: true, note: P.t('같은 날 다른 근무와 합칠 수 없어 확인 필요로 남겼어요') };
         }
         return co;
@@ -380,7 +399,7 @@
     markTs(w, ts, 'auto');
     var p = cleanPending(w.pending);
     p.push({ date: open.date, start: open.time, at: open.at || open.time, cut: ymdOf(ts) + ' ' + hmOf(ts) });
-    w.pending = cleanPending(p);
+    w.pending = notDone(w, cleanPending(p));
     return { worker: w, date: open.date, start: open.time, ts: ts };
   }
   /**
@@ -411,6 +430,7 @@
     if (keep) worker.punch = keep; else delete worker.punch;
     if (r.unmerged) return { ok: false, error: P.t('이 날에 이미 다른 근무가 있어 합치면 24시간이 넘어요. 달력에서 직접 고치거나 [근무 없음]으로 정리해 주세요.') };
     p.splice(i, 1);
+    markDone(worker, item.id);
     worker.pending = p;
     return { ok: true, result: r };
   }
@@ -418,6 +438,7 @@
   function dismissPending(worker, i) {
     var p = cleanPending(worker.pending);
     if (!p[i]) return false;
+    markDone(worker, p[i].id);
     p.splice(i, 1);
     worker.pending = p;
     return true;

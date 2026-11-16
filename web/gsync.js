@@ -248,6 +248,10 @@
   /* 시트의 탭 구성을 맞추고(추가/삭제/순서), 바뀐 탭만 다시 쓴다 */
   function push(mode, force) {
     if (force || !meta.stamp || !meta.sheetId) return pushNow(mode);
+    if (meta.replayStamp) return replayPending().then(function () { return push2(mode); });
+    return push2(mode);
+  }
+  function push2(mode) {
     // 내가 마지막으로 맞춘 뒤 다른 기기가 저장했으면 덮어쓰지 않고 합친 뒤 저장
     return pull(mode).then(function (remote) {
       if (remote && remote.stamp === meta.stamp) confirmWritten();
@@ -261,13 +265,17 @@
       return replayAfter(remote.stamp).then(function () { return pushNow(mode); });
     });
   }
+  /* 장부 재생: 실패하면(일시 네트워크 오류 등) 기억해 두었다가 다음 새로 받기 때 다시 시도 */
+  //    (meta.replayStamp에 남겨 앱을 껐다 켜도 이어서, 저장하기 전에도 먼저 재생 → 빠진 출퇴근이 새 저장에 묻히지 않게)
   function replayAfter(stamp) {
     if (!host.replayPunchLog || !meta.sheetId) return Promise.resolve();
     var rng = encodeURIComponent(SHEET_PUNCH + '!A2:G');
     return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + rng, undefined, 'silent').then(function (res) {
       host.replayPunchLog((res && res.values) || [], stampMs(stamp));
-    }).catch(function () {});
+      if (meta.replayStamp) { delete meta.replayStamp; writeMeta(); }
+    }).catch(function () { if (!meta.replayStamp || stampMs(stamp) < stampMs(meta.replayStamp)) { meta.replayStamp = stamp; writeMeta(); } });
   }
+  function replayPending() { return meta.replayStamp ? replayAfter(meta.replayStamp) : Promise.resolve(); }
   var merges = 0;
 
   function pushNow(mode) {
@@ -408,7 +416,18 @@
   function jeq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
   function isObj(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
   function keyedArr(a) { return Array.isArray(a) && a.length > 0 && a.every(function (x) { return isObj(x) && typeof x.id === 'string' && x.id; }); }
-  function merge3(b, l, r) {
+  /* 합치는 중 '같은 칸을 양쪽이 서로 다르게 바꿔 이 기기 값으로 정한 곳'을 모음 → 화면에서 알림 */
+  var conflictSink = null;
+  function noteConflict(path, l, r) { if (conflictSink) conflictSink.push({ path: path.slice(), local: l, remote: r }); }
+  /* 처리 끝 표시(묘비)처럼 늘어나기만 하는 목록: 양쪽 합집합 (최근 200개) */
+  function unionList(a, b) {
+    var out = [], seen = {};
+    (Array.isArray(a) ? a : []).concat(Array.isArray(b) ? b : []).forEach(function (x) { var k = JSON.stringify(x); if (!seen[k]) { seen[k] = true; out.push(x); } });
+    out.sort(function (x, y) { x = String(x); y = String(y); return x < y ? -1 : x > y ? 1 : 0; });   // 어느 기기에서 합쳐도 같은 순서
+    return out.slice(-200);
+  }
+  function merge3(b, l, r, path) {
+    path = path || [];
     if (jeq(l, r)) return l;
     if (b !== undefined && jeq(l, b)) return r;
     if (b !== undefined && jeq(r, b)) return l;
@@ -419,7 +438,7 @@
       Object.keys(l).concat(Object.keys(r)).forEach(function (k) {
         if (seen[k]) return;
         seen[k] = true;
-        var v = merge3(bo[k], l[k], r[k]);
+        var v = k === 'pendingDone' && (Array.isArray(l[k]) || Array.isArray(r[k])) ? unionList(l[k], r[k]) : merge3(bo[k], l[k], r[k], path.concat([k]));
         // 한쪽은 칸을 지웠는데 다른 쪽은 그 칸을 새로 바꿨으면 새 값을 남김 (예: 옛 기기가 지난 출근을 퇴근 처리 ↔ 다른 기기에서 오늘 새로 출근)
         if (v === undefined && bo[k] !== undefined) {
           if (l[k] === undefined && r[k] !== undefined && !jeq(r[k], bo[k])) v = r[k];
@@ -437,13 +456,23 @@
         l.concat(r).forEach(function (x) {
           if (done[x.id]) return;
           done[x.id] = true;
-          var v = merge3(bm[x.id], lm[x.id], rm[x.id]);
+          var v = merge3(bm[x.id], lm[x.id], rm[x.id], path.concat([x.id]));
           if (v !== undefined) res.push(v);
         });
         return res;
       }
       if (l.length === r.length && (ba.length === l.length || !Array.isArray(b))) {
-        return l.map(function (x, i) { var v = merge3(ba[i], x, r[i]); return v === undefined ? null : v; });
+        return l.map(function (x, i) {
+          // 날짜별 근무 칸처럼 자리로 맞추는 객체는 통째 단위로 비교 (출근은 이 기기, 퇴근은 저 기기 값이 섞인 근무가 생기지 않게)
+          if (isObj(x) && isObj(r[i]) && !jeq(x, r[i]) && !jeq(x, ba[i]) && !jeq(r[i], ba[i])) {
+            // 기준이 없는 칸(양쪽이 같은 달 기록을 새로 만듦): 한쪽만 근무를 넣었으면 그 근무를 살림 (휴무 칸은 기본값)
+            if (ba[i] === undefined && x.off === true && r[i].off !== true) return r[i];
+            if (ba[i] === undefined && r[i].off === true && x.off !== true) return x;
+            noteConflict(path.concat([i]), x, r[i]);
+            return x;
+          }
+          var v = merge3(ba[i], x, r[i], path.concat([i])); return v === undefined ? null : v;
+        });
       }
       // 내용으로 맞추는 목록 (점검 보관함 등): 이 기기 목록 + 시트에서 새로 생긴 것 − 시트에서 지운 것
       var key = function (x) { return JSON.stringify(x); };
@@ -455,7 +484,8 @@
       r.forEach(function (x) { if (!inB[key(x)] && !inL[key(x)]) res2.push(x); });
       return res2;
     }
-    return l;   // 같은 칸을 양쪽이 다르게 바꿈 → 이 기기 쪽
+    noteConflict(path, l, r);
+    return l;   // 같은 칸을 양쪽이 다르게 바꿈 → 이 기기 쪽 (화면에 알림)
   }
   /* 예전 버전이 저장한 '퇴근 확인 필요' 항목에는 id가 없음 → 합치기 전에 붙여서 항목끼리 맞출 수 있게 */
   function fixPend(d) {
@@ -464,7 +494,30 @@
     });
     return d;
   }
-  function mergeData(b, l, r) { return merge3(fixPend(b), fixPend(l), fixPend(r)); }
+  /* 겹친 수정 기록: 데이터의 conflicts 목록(모든 기기에 공유)에 남겨 사장님이 고르게 함. 출퇴근 내부 상태(근무 중·마지막 기록 등)는 제외 */
+  var SKIP_CONFLICT = { lastTs: 1, lastKind: 1, punch: 1, pending: 1, pendingDone: 1, code: 1, conflicts: 1 };
+  function hashStr(t) { var h = 5381; for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+  function mergeData(b, l, r) {
+    conflictSink = [];
+    try {
+      var m = merge3(fixPend(b), fixPend(l), fixPend(r), []);
+      var found = conflictSink.filter(function (c) { return !c.path.some(function (k) { return SKIP_CONFLICT[k]; }); });
+      if (found.length && isObj(m)) {
+        var list = Array.isArray(m.conflicts) ? m.conflicts.slice() : [];
+        var have = {};
+        list.forEach(function (c) { if (c && c.id) have[c.id] = true; });
+        found.forEach(function (c) {
+          var id = 'c' + hashStr(JSON.stringify([c.path, c.local, c.remote]));
+          if (have[id]) return;
+          have[id] = true;
+          list.push({ id: id, at: new Date(deps.now()).toISOString(), path: c.path, local: c.local === undefined ? null : c.local, remote: c.remote === undefined ? null : c.remote });
+        });
+        m.conflicts = list.slice(-30);
+        if (host && host.onConflicts) { try { host.onConflicts(found.length); } catch (e) {} }
+      }
+      return m;
+    } finally { conflictSink = null; }
+  }
   var BASE_KEY = 'alba.cloud.base', WRITTEN_KEY = 'alba.cloud.written';
   function saveBase(json) { try { deps.storage.set(BASE_KEY, json); deps.storage.remove(WRITTEN_KEY); } catch (e) {} }
   /* 방금 시트에 쓴 내용: 거의 동시에 다른 기기가 덮어썼을 수 있으므로, 시트에 내 저장 표시가 그대로 있는 걸 다시 확인한 뒤에 기준으로 삼는다 */
@@ -501,12 +554,8 @@
     if (!lost) meta.dirty = false;
     meta.lastSaved = deps.now();
     writeMeta();
-    // 저장 이후에 찍힌 출퇴근은 '출퇴근기록' 장부로 다시 맞춘다 (실패해도 불러오기는 그대로 성공)
-    if (!host.replayPunchLog || !meta.sheetId) return Promise.resolve();
-    var rng = encodeURIComponent(SHEET_PUNCH + '!A2:G');
-    return api('GET', SHEETS + '/' + meta.sheetId + '/values/' + rng, undefined, 'silent').then(function (res) {
-      host.replayPunchLog((res && res.values) || [], stampMs(r.stamp));
-    }).catch(function () {});
+    // 저장 이후에 찍힌 출퇴근은 '출퇴근기록' 장부로 다시 맞춘다 (실패해도 불러오기는 그대로 성공, 다음 새로 받기 때 재시도)
+    return replayAfter(r.stamp);
   }
 
   /* 시트가 사라졌을 때(사용자가 삭제) 새로 연결 */
@@ -584,7 +633,7 @@
     }).then(function (remote) {
       if (meta.dirty) return push('silent');          // 이 기기에 저장 안 된 변경이 있으면 우선
       if (remote && remote.stamp !== (meta.stamp || '')) return applyRemote(remote);   // 시계 순서가 아니라 '내가 마지막으로 저장한 것과 다른가'로 판단
-      else { lastJson = JSON.stringify(host.getData()); saveBase(lastJson); }
+      else { lastJson = JSON.stringify(host.getData()); saveBase(lastJson); return replayPending(); }
     }).then(function () {
       setStatus('saved', '');
     }).catch(function (e) {
@@ -631,7 +680,11 @@
     if (host.isBusy && host.isBusy()) return Promise.resolve(false);
     refreshing = true;
     return pullStamp('silent').then(function (st) {
-      if (!st || st === (meta.stamp || '')) { if (st) confirmWritten(); return null; }   // 바뀐 게 없으면 데이터는 안 읽음
+      if (!st || st === (meta.stamp || '')) {   // 바뀐 게 없으면 데이터는 안 읽음 (지난번 장부 재생이 실패했으면 그것만 다시)
+        if (st) confirmWritten();
+        if (st && meta.replayStamp) return replayPending().then(function () { return null; });
+        return null;
+      }
       return pull('silent');
     }).then(function (remote) {
       if (!remote || remote.stamp === (meta.stamp || '') || meta.dirty || saving) return false;

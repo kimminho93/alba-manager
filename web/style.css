@@ -2449,3 +2449,8 @@ html[data-theme="dark"] .pending-head, .dark .pending-head { color: #ffb050; }
 .share-url { font-weight: 700; color: var(--text) !important; word-break: break-all; }
 .share-btns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .share-btns [hidden] { display: none; }
+
+/* 다른 기기와 수정이 겹친 곳 */
+.conflict-box { border-color: rgba(240,68,82,.55); background: rgba(240,68,82,.08); }
+.conflict-vals { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted, #6b7684); margin: 2px 0 6px; }
+.conflict-vals b { color: inherit; font-weight: 700; }

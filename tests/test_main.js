@@ -1062,6 +1062,33 @@ test('검토 반영: 자동 퇴근 시각이 지난 뒤 [모두 퇴근]을 눌�
   assert.strictEqual(w.pending.length, 1);
 });
 
+test('2차 검토: 사장님이 처리한 퇴근 확인 필요는 다른 기기가 늦게 자동 퇴근해도 되살아나지 않음', () => {
+  const D = (d, h, m) => new Date(2026, 10, d, h, m, 0);
+  const phone = E.createWorker('김', 5, 10320);
+  E.applyPunch(phone, D(15, 18, 0), { unit: 30 });
+  const tablet = JSON.parse(JSON.stringify(phone));                 // 태블릿은 아직 출근 중 상태
+  E.autoCloseOpen([phone], D(16, 0, 0), '00:00');
+  assert.strictEqual(E.resolvePending(phone, 0, '22:00').ok, true);
+  assert.deepStrictEqual(phone.pending, []);
+  assert.deepStrictEqual(phone.pendingDone, ['2026-11-15 18:00']);
+  // 늦게 켜진 태블릿이 같은 근무를 자동 퇴근 → 처리 기록(묘비)을 받은 뒤엔 목록에 안 생김
+  tablet.pendingDone = phone.pendingDone.slice();
+  E.autoCloseOpen([tablet], D(16, 9, 0), '00:00');
+  assert.deepStrictEqual(tablet.pending || [], []);
+  assert.strictEqual(E.punchIsOpen(tablet), false);
+  // 합친 데이터에 항목이 남아 있어도 정리할 때 빠짐
+  const merged = Object.assign({}, phone, { pending: [{ date: '2026-11-15', start: '18:00', at: '18:00' }] });
+  assert.deepStrictEqual(E.normalizeWorkers([merged])[0].pending, []);
+  // 근무 없음 처리도 묘비
+  const w = E.createWorker('이', 5, 10320);
+  E.applyPunch(w, D(15, 20, 0)); E.autoCloseOpen([w], D(16, 0, 1));
+  E.dismissPending(w, 0);
+  assert.deepStrictEqual(w.pendingDone, ['2026-11-15 20:00']);
+  // 다른 날 같은 시각 출근은 영향 없음
+  E.applyPunch(w, D(16, 20, 0)); E.autoCloseOpen([w], D(17, 0, 1));
+  assert.strictEqual(w.pending.length, 1);
+});
+
 test('버전: 엔진 번들의 ALBA_VERSION이 package.json 버전과 같다', () => {
   const fs = require('fs'), path = require('path');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
