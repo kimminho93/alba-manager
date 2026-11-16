@@ -85,8 +85,12 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
+
+  /* 사람이 적은 이름·매장명: 영어 모드에서 사전 단어로 바뀌지 않게 감쌈 */
+  function escName(s) { return '<span data-no-i18n>' + escHtml(s) + '</span>'; }
 
   function loadJson(key, fallback) {
     try {
@@ -1032,7 +1036,7 @@
     var html = '<button type="button" class="wchip wchip-add" id="chipAdd" aria-label="' + tr('알바생 추가') + '">＋</button>' +
       workingFirstOrder().map(function (i) {
         var w = state.workers[i];
-        return '<button type="button" class="wchip' + (w.id === state.selId ? ' on' : '') + '" data-chip="' + escHtml(w.id) + '">' + (E.punchNext(w, new Date()) === 'out' ? '<i class="wdot" aria-hidden="true"></i>' : '') + escHtml(w.name) + '</button>';
+        return '<button type="button" class="wchip' + (w.id === state.selId ? ' on' : '') + '" data-chip="' + escHtml(w.id) + '">' + (E.punchNext(w, new Date()) === 'out' ? '<i class="wdot" aria-hidden="true"></i>' : '') + escName(w.name) + '</button>';
       }).join('');
     var keep = box.scrollLeft;
     box.innerHTML = html;
@@ -1106,7 +1110,7 @@
       var sel = w.id === state.selId;
       return '<div class="rcard' + (sel ? ' on' : '') + '">' +
         '<button type="button" class="rcard-main" data-pick-worker="' + escHtml(w.id) + '">' +
-          '<span class="rcard-name">' + escHtml(r.name) + (sel ? ' <em>' + tr('보는 중') + '</em>' : '') + workingBadge(w) + '</span>' +
+          '<span class="rcard-name">' + escName(r.name) + (sel ? ' <em>' + tr('보는 중') + '</em>' : '') + workingBadge(w) + '</span>' +
           '<span class="rcard-sub">' + (hasRec ? tr('{h}시간 · 식대 {m}', { h: E.formatNum(r.totalHours, 2), m: r.includeMeal ? tr('{n}회', { n: r.mealDays }) : tr('없음') }) : tr('기록 없음')) + '</span>' +
         '</button>' +
         '<b class="rcard-amt m-amt">' + E.moneyText(r.net) + '</b>' +
@@ -1127,7 +1131,7 @@
       var sel = w.id === state.selId;
       return '<tr class="roster-row' + (sel ? ' selected' : '') + '" data-wid="' + escHtml(w.id) + '">' +
         '<td>' + (pos + 1) + '</td>' +
-        '<td><button type="button" class="worker-link" data-pick-worker="' + escHtml(w.id) + '"><b>' + escHtml(r.name) + '</b></button>' +
+        '<td><button type="button" class="worker-link" data-pick-worker="' + escHtml(w.id) + '"><b>' + escName(r.name) + '</b></button>' +
           (sel ? ' <span class="pill pill-ok">' + tr('보는 중') + '</span>' : '') + workingBadge(w) + '</td>' +
         '<td>' + escHtml(r.payMonthLabel) + '</td>' +
         '<td class="num">' + (hasRec ? E.formatNum(r.totalHours, 2) + 'h' : '<small class="muted">' + tr('기록 없음') + '</small>') + '</td>' +
@@ -1277,8 +1281,8 @@
       return '<tr>' +
         '<td>' + (idx + 1) + '</td>' +
         '<td>' + escHtml(c.date || '-') + '</td>' +
-        '<td><b>' + escHtml(c.store) + '</b></td>' +
-        '<td>' + escHtml(c.inspector) + '</td>' +
+        '<td><b>' + escName(c.store) + '</b></td>' +
+        '<td>' + escName(c.inspector) + '</td>' +
         '<td class="num">' + (c.fridgeTemp === null ? '-' : E.formatNum(c.fridgeTemp, 1) + '°C') + '</td>' +
         '<td class="num">' + (c.freezerTemp === null ? '-' : E.formatNum(c.freezerTemp, 1) + '°C') + '</td>' +
         '<td>' + c.passCount + '/' + c.total + '</td>' +
@@ -1783,7 +1787,7 @@
       $('exportList').innerHTML = state.workers.map(function (w) {
         var n = Object.keys(w.months).length;
         return '<label class="export-row' + (n ? '' : ' off') + '"><input type="checkbox" value="' + escHtml(w.id) + '"' + (n ? ' checked' : ' disabled') + '>' +
-          '<span class="export-name">' + escHtml(w.name) + '</span><small>' + (n ? tr('{n}개월 기록', { n: n }) : tr('기록 없음')) + '</small></label>';
+          '<span class="export-name">' + escName(w.name) + '</span><small>' + (n ? tr('{n}개월 기록', { n: n }) : tr('기록 없음')) + '</small></label>';
       }).join('');
       document.body.classList.remove('set-open', 'add-open', 'slip-open');
       $('exportAllToggle').textContent = tr('전체 해제');
@@ -1955,16 +1959,18 @@
     try {
       // 새 형식(workers) 또는 예전 형식(정산 명단 roster)을 받아 알바생별 기록으로 정리
       state.workers = Array.isArray(d.workers) ? E.normalizeWorkers(d.workers) : E.migrateRoster(d.roster);
-      state.archive = Array.isArray(d.archive) ? d.archive : [];
+      state.archive = Array.isArray(d.archive) ? d.archive.filter(function (x) { return x && typeof x === 'object' && !Array.isArray(x); }) : [];
       if (Array.isArray(d.conflicts)) saveJson(KEYS.conflicts, cleanConflicts(d.conflicts));
       saveWorkers();
       saveJson(KEYS.archive, state.archive);
       if (Array.isArray(d.presets)) {   // 빈 목록(모두 지움)도 반영
         saveJson(KEYS.presets, d.presets);
         loadPresets();
+        savePresets();   // 이름 길이·개수를 정리한 목록으로 저장
         renderPresets();
       }
       if (d.store && typeof d.store === 'object') {
+        d.store = { store: typeof d.store.store === 'string' ? d.store.store.slice(0, 40) : '', inspector: typeof d.store.inspector === 'string' ? d.store.inspector.slice(0, 20) : '' };
         saveJson(KEYS.store, d.store);
         if (d.store.store) $('cStore').value = d.store.store;
         if (d.store.inspector) $('cInspector').value = d.store.inspector;
@@ -2017,6 +2023,7 @@
   /* 덮인 값으로 되돌릴 수 있는 곳: 알바생 기록·설정 */
   function conflictTarget(c) {
     var p = (c.path || []).map(function (k) { return k && typeof k === 'object' && k.id ? k.id : k; }), cur;
+    if (p.some(function (k) { return k === '__proto__' || k === 'constructor' || k === 'prototype'; })) return null;   // 원형 오염 방지
     if (p[0] === 'workers') {
       cur = state.workers.filter(function (x) { return x.id === p[1]; })[0];
       if (!cur) return null;
@@ -2388,7 +2395,7 @@
   var QUEUE_KEY = 'alba.punchQueue';      // 구글 시트 '출퇴근기록' 탭에 아직 못 올린 기록
   var IDLE_LOCK_MS = 10 * 60 * 1000;
   var RESULT_MS = 5000;
-  var punchState = { unlocked: false, target: null, fails: 0, lockUntil: 0, resultTimer: null, idleTimer: null };
+  var punchState = { unlocked: false, target: null, resultTimer: null, idleTimer: null };
 
   function getPin() { try { return localStorage.getItem(PIN_KEY) || ''; } catch (e) { return ''; } }
   function isLocked() { return !!getPin() && !punchState.unlocked; }
@@ -2429,7 +2436,25 @@
     applyLockUi();
   }
 
-  function bumpIdle() {
+  /* 비밀번호 연속 실패 잠금: 새로고침해도 풀리지 않게 이 기기에 기억 */
+  function pinLock(kind) {
+    var v = loadJson('alba.pinLock.' + kind, null);
+    return v && typeof v === 'object' ? { fails: Number(v.fails) || 0, until: Number(v.until) || 0 } : { fails: 0, until: 0 };
+  }
+  function lockLeft(kind) { var l = pinLock(kind), left = l.until - Date.now(); return left > 0 && left < 3600000 ? Math.ceil(left / 1000) : 0; }
+  function noteFail(kind, ms) {   // → 이번 실패로 잠겼으면 true
+    var l = pinLock(kind);
+    l.fails++;
+    var locked = l.fails >= 5;
+    if (locked) { l.until = Date.now() + ms; l.fails = 0; }
+    try { localStorage.setItem('alba.pinLock.' + kind, JSON.stringify(l)); } catch (e) {}
+    return { locked: locked, n: locked ? 5 : l.fails };
+  }
+  function clearFails(kind) { try { localStorage.removeItem('alba.pinLock.' + kind); } catch (e) {} }
+
+  function bumpIdle(ev) {
+    // 출퇴근 화면·화면 보호기에서의 터치(알바생)는 사장님 잠금 해제 시간을 늘리지 않음
+    if (ev && ev.target && ev.target.closest && ev.target.closest('#tab-punch, #saver, #punchPw, #punchResult')) return;
     if (punchState.unlocked) markUnlocked(true);
     if (punchState.idleTimer) clearTimeout(punchState.idleTimer);
     punchState.idleTimer = (getPin() && punchState.unlocked) ? setTimeout(lockNow, IDLE_LOCK_MS) : null;
@@ -2462,6 +2487,11 @@
   function enqueuePunch(row) {
     if (isRequester()) return;   // 출퇴근 장부는 출퇴근 기기만 씀
     var q = loadQueue();
+    // 비밀번호 오류 기록은 최근 50건만 대기 (오프라인 중 마구 틀려도 실제 출퇴근 기록이 밀려나지 않게)
+    if (row && row[5] === '비밀번호 오류') {
+      var fails = q.filter(function (x) { return x.row && x.row[5] === '비밀번호 오류'; });
+      if (fails.length >= 50) { var drop = fails[0]; q = q.filter(function (x) { return x !== drop; }); }
+    }
     q.push({ id: queueId(), row: row });
     if (q.length > 500) showToast(tr('⚠️ 시트에 못 올린 출퇴근 기록이 500건을 넘어 가장 오래된 기록부터 지워져요. 구글 로그인을 확인해 주세요.'), true);
     saveQueue(q.slice(-500));
@@ -2689,7 +2719,7 @@
         var key = escHtml(rawKey);
         var val = typed[rawKey] || x.p.end || '';
         return '<div class="pending-row">' +
-          '<div class="pending-who"><b>' + escHtml(x.w.name) + '</b> · ' + tr('{m}월 {d}일 ({w}) {t} 출근', { m: Number(d.slice(5, 7)), d: Number(d.slice(8)), w: wd, t: escHtml(x.p.start) }) + '</div>' +
+          '<div class="pending-who"><b>' + escName(x.w.name) + '</b> · ' + tr('{m}월 {d}일 ({w}) {t} 출근', { m: Number(d.slice(5, 7)), d: Number(d.slice(8)), w: wd, t: escHtml(x.p.start) }) + '</div>' +
           '<div class="pending-act">' +
             '<input type="time" class="pending-time" data-pending-time="' + key + '" value="' + escHtml(val) + '" aria-label="' + escHtml(tr('퇴근 시각')) + '">' +
             '<button type="button" class="btn btn-primary" data-pending-ok="' + key + '">' + tr('퇴근 기록') + '</button>' +
@@ -2818,9 +2848,9 @@
         ? '<span class="punch-chip on">' + tr('근무 중 · {t} 출근', { t: escHtml(w.punch.time) }) + '</span>'
         : '<span class="punch-chip">' + tr('퇴근 상태') + '</span>';
       var pend = (w.pending || []).length ? '<span class="punch-chip warn">' + tr('⚠️ 퇴근 확인 필요') + '</span>' : '';
-      if (remote) return '<div class="punch-row view' + (working ? ' on' : '') + '">' + '<span class="punch-name">' + escHtml(w.name) + '</span>' + pend + chip + '</div>';
+      if (remote) return '<div class="punch-row view' + (working ? ' on' : '') + '">' + '<span class="punch-name">' + escName(w.name) + '</span>' + pend + chip + '</div>';
       return '<button type="button" class="punch-row' + (working ? ' on' : '') + '" data-punch="' + escHtml(w.id) + '">' +
-        '<span class="punch-name">' + escHtml(w.name) + '</span>' + pend + chip + '</button>';
+        '<span class="punch-name">' + escName(w.name) + '</span>' + pend + chip + '</button>';
     }).join('');
   }
 
@@ -2859,18 +2889,16 @@
     if (!w) { closePunchPw(); renderPunch(); return; }
     punchState.target = w;
     var now = new Date();
-    if (punchState.lockUntil > now.getTime()) {
-      $('punchPwErr').textContent = tr('잠시 후에 다시 해 주세요. ({n}초)', { n: Math.ceil((punchState.lockUntil - now.getTime()) / 1000) });
+    if (lockLeft('punch')) {
+      $('punchPwErr').textContent = tr('잠시 후에 다시 해 주세요. ({n}초)', { n: lockLeft('punch') });
       return;
     }
     var typed = $('punchPwInput').value.trim();
     if (!w.password) { $('punchPwErr').textContent = tr('이 알바생은 아직 비밀번호가 없어요. 사장님께 알려 주세요. (급여 계산 → 설정에서 정할 수 있어요)'); return; }
     if (!typed || typed !== w.password) {
-      punchState.fails++;
-      enqueuePunch([tsOf(now), w.code, w.name, '', '이름+비밀번호', '비밀번호 오류', punchState.fails + '번째 연속 실패']);
-      if (punchState.fails >= 5) {
-        punchState.lockUntil = now.getTime() + 30000;
-        punchState.fails = 0;
+      var nf = noteFail('punch', 30000);
+      enqueuePunch([tsOf(now), w.code, w.name, '', '이름+비밀번호', '비밀번호 오류', nf.n + '번째 연속 실패']);
+      if (nf.locked) {
         $('punchPwErr').textContent = tr('여러 번 틀렸어요. 30초 뒤에 다시 해 주세요.');
       } else {
         $('punchPwErr').textContent = tr('비밀번호가 맞지 않아요.');
@@ -2879,7 +2907,7 @@
       $('punchPwInput').focus();
       return;
     }
-    punchState.fails = 0;
+    clearFails('punch');
     runAutoClose();   // 어제 퇴근 안 찍은 사람이 있으면 먼저 자정 퇴근으로 정리
     var r = E.applyPunch(w, now, punchOpts());
     closePunchPw();
@@ -3005,7 +3033,7 @@
       var r = d.result, w = d.worker;
       var sh = r.empty ? null : E.workerShifts(w, r.date.slice(0, 7))[Number(r.date.slice(8)) - 1];
       var hrs = sh && !sh.off ? fmtHM(E.calcShiftHours(sh.start, sh.end, sh.breakMinutes)) : fmtHM(0);
-      return '<div>' + escHtml(w.name) + ' · ' + (r.held ? tr('확인 필요') : r.empty ? tr('근무 0시간') : escHtml(r.start + '~' + r.end) + ' (' + hrs + ')') + '</div>';
+      return '<div>' + escName(w.name) + ' · ' + (r.held ? tr('확인 필요') : r.empty ? tr('근무 0시간') : escHtml(r.start + '~' + r.end) + ' (' + hrs + ')') + '</div>';
     }).join('');
     var bar = $('punchTimerBar');
     bar.style.animation = 'none'; void bar.offsetWidth;
@@ -3026,7 +3054,7 @@
     var lines = [];
     if (!isIn) {
       var sh = r.empty ? null : E.workerShifts(w, pm)[Number(r.date.slice(8)) - 1];
-      if (sh && !sh.off) lines.push('<div>' + tr('오늘 <b>{h}</b> 일했어요 ({s}~{e})', { h: fmtHM(E.calcShiftHours(sh.start, sh.end, sh.breakMinutes)), s: sh.start, e: sh.end }) + '</div>');
+      if (sh && !sh.off) lines.push('<div>' + tr('오늘 <b>{h}</b> 일했어요 ({s}~{e})', { h: fmtHM(E.calcShiftHours(sh.start, sh.end, sh.breakMinutes)), s: escHtml(sh.start), e: escHtml(sh.end) }) + '</div>');
     }
     lines.push('<div>' + tr('이번 달 <b>{d}일</b> · 누적 <b>{h}</b>', { d: sum.workDays, h: fmtHM(sum.totalHours) }) + '</div>');
     if (isIn) lines.push('<small>' + tr('오늘 근무는 퇴근을 찍으면 더해져요') + '</small>');
@@ -3114,6 +3142,12 @@
     $('adminPin').addEventListener('click', function (ev) { if (ev.target.closest('[data-admin-close]')) closeAdminPin(); });
     $('adminPinForm').addEventListener('submit', function (ev) {
       ev.preventDefault();
+      if (lockLeft('admin')) {
+        $('adminPinErr').textContent = tr('잠시 후에 다시 해 주세요. ({n}초)', { n: lockLeft('admin') });
+        $('adminPinInput').value = '';
+        return;
+      }
+      if ($('adminPinInput').value === getPin()) clearFails('admin');
       if ($('adminPinInput').value === getPin() && punchState.afterPin) {   // 일괄 퇴근 등: 비밀번호만 확인하고 잠금은 그대로
         var fn = punchState.afterPin;
         closeAdminPin();
@@ -3127,7 +3161,9 @@
         openTab('payroll');
         bumpIdle();
       } else {
-        $('adminPinErr').textContent = tr('비밀번호가 맞지 않아요.');
+        var af = noteFail('admin', 60000);
+        enqueuePunch([tsOf(new Date()), '', '관리자', '', '관리자 비밀번호', '비밀번호 오류', af.n + '번째 연속 실패']);
+        $('adminPinErr').textContent = af.locked ? tr('여러 번 틀렸어요. 1분 뒤에 다시 해 주세요.') : tr('비밀번호가 맞지 않아요.');
         $('adminPinInput').value = '';
         $('adminPinInput').focus();
       }
@@ -3151,17 +3187,22 @@
         ? tr('관리자 비밀번호를 바꿉니다. 계속할까요?')
         : tr('정하면 지금 바로 잠기고, 출퇴근 화면만 보이게 됩니다.\n다시 열 때는 위의 [🔒 관리자]를 눌러 이 비밀번호를 입력하세요.\n\n계속할까요?');
       if (!window.confirm(msg)) return;
-      $('sAdminPin').value = '';
-      commitPin(v);
+      var go = function () { $('sAdminPin').value = ''; commitPin(v); };
+      if (getPin()) { punchState.afterPin = go; openAdminPin(); $('adminPinErr').textContent = tr('지금 쓰는 관리자 비밀번호를 입력해 주세요.'); }   // 바꿀 때는 지금 비밀번호 확인
+      else go();
     });
     $('btnPinClear').addEventListener('click', function () {
       if (!getPin()) { showToast(tr('정해 둔 관리자 비밀번호가 없어요.')); return; }
       if (!window.confirm(tr('관리자 비밀번호를 없앨까요?\n없애면 누구나 급여 화면을 볼 수 있어요.'))) return;
-      try { localStorage.removeItem(PIN_KEY); } catch (e) {}
-      if (window.AlbaCloud) window.AlbaCloud.setAdminPin('');
-      applyLockUi();
-      bumpIdle();
-      showToast(tr('관리자 비밀번호를 없앴어요.'));
+      punchState.afterPin = function () {
+        try { localStorage.removeItem(PIN_KEY); } catch (e) {}
+        if (window.AlbaCloud) window.AlbaCloud.setAdminPin('');
+        applyLockUi();
+        bumpIdle();
+        showToast(tr('관리자 비밀번호를 없앴어요.'));
+      };
+      openAdminPin();
+      $('adminPinErr').textContent = tr('지금 쓰는 관리자 비밀번호를 입력해 주세요.');
     });
 
     // 처음 안내 창
@@ -3184,6 +3225,10 @@
       var C = window.AlbaCloud, err = $('adminPinErr');
       if (!C || !C.isConnected()) {
         err.textContent = tr('구글 저장이 연결되어 있지 않아 시트에서 복구할 수 없어요.');
+        return;
+      }
+      if (C.pinPending && C.pinPending()) {   // 이 기기에서 바꾼 비밀번호가 아직 시트에 안 올라감 → 시트의 옛 값으로 덮지 않음
+        err.textContent = tr('이 기기에서 바꾼 비밀번호가 아직 구글 시트에 올라가지 않았어요. 인터넷·구글 로그인을 확인하고 잠시 뒤 다시 눌러 주세요.');
         return;
       }
       err.textContent = tr('시트에서 확인하는 중…');

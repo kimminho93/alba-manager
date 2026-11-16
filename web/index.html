@@ -2,6 +2,7 @@
 <html lang="ko" data-theme="light">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: blob: https:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="사장님 도우미 — 알바 급여·주휴수당·식대 자동 계산, 급여명세서, 매장 위생 점검표(41개 항목)를 휴대폰·PC에서 바로. 회원가입 없이 무료.">
   <meta property="og:type" content="website">
@@ -10,17 +11,8 @@
   <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-  <script>
-    (function () {
-      try {
-        if (localStorage.getItem('alba.bigFont') === '1') document.documentElement.setAttribute('data-fs', 'large');
-        var t = localStorage.getItem('alba.theme');
-        if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', t);
-      } catch (e) {}
-    })();
-  </script>
-  <link rel="stylesheet" href="./style.css?v=202611170300">
+  <script src="./boot.js?v=202611171000"></script>
+  <link rel="stylesheet" href="./style.css?v=202611171000">
 </head>
 <body>
   <header class="app-header">
@@ -84,7 +76,7 @@
         <button id="emptyGuide" type="button" class="btn-link">사용 방법 보기</button>
       </div>
       <div class="grid">
-        <form id="payForm" class="card input-card" autocomplete="off" onsubmit="return false">
+        <form id="payForm" class="card input-card" autocomplete="off">
           <h2 class="card-title">근무 정보</h2>
 
           <div id="setSheet" class="set-sheet">
@@ -244,7 +236,7 @@
               
             </div>
             <table class="doc-info">
-              <tr><th>성명</th><td id="slipName">-</td><th>지급월</th><td id="slipMonth">-</td></tr>
+              <tr><th>성명</th><td id="slipName" data-no-i18n>-</td><th>지급월</th><td id="slipMonth">-</td></tr>
               <tr><th>시급</th><td id="slipWage">-</td><th>총 근무시간</th><td id="slipHours">-</td></tr>
               <tr><th>주휴 / 식대</th><td id="slipWeekly">-</td><th>세금 방식</th><td id="slipTax">-</td></tr>
             </table>
@@ -275,7 +267,7 @@
             <button id="btnRosterClear" type="button" class="btn btn-ghost">전체 지우기</button>
           </div>
         </div>
-        <form id="addWorkerForm" class="add-worker" autocomplete="off" onsubmit="return false">
+        <form id="addWorkerForm" class="add-worker" autocomplete="off">
           <div class="sheet-head">
             <b>알바생 추가</b>
             <button type="button" id="addSheetClose" class="sheet-done">닫기</button>
@@ -314,7 +306,7 @@
     <!-- ======================= 탭 2: 위생 점검 ======================= -->
     <section id="tab-checklist" class="tab-panel" role="tabpanel">
       <div class="grid">
-        <form id="chkForm" class="card input-card" autocomplete="off" onsubmit="return false">
+        <form id="chkForm" class="card input-card" autocomplete="off">
           <h2 class="card-title">점검 정보</h2>
           <label class="field"><span>매장명 (상호)</span>
             <input id="cStore" type="text" placeholder="예) 행복분식 강남점" maxlength="40">
@@ -359,8 +351,8 @@
               <span class="doc-law">위생 점검 41개 항목</span>
             </div>
             <table class="doc-info">
-              <tr><th>매장명</th><td id="chkStore">-</td><th>점검일자</th><td id="chkDate">-</td></tr>
-              <tr><th>점검자</th><td id="chkInspector">-</td><th>종합 결과</th><td id="chkVerdict">-</td></tr>
+              <tr><th>매장명</th><td id="chkStore" data-no-i18n>-</td><th>점검일자</th><td id="chkDate">-</td></tr>
+              <tr><th>점검자</th><td id="chkInspector" data-no-i18n>-</td><th>종합 결과</th><td id="chkVerdict">-</td></tr>
               <tr><th>냉장 온도</th><td id="chkFridge">-</td><th>냉동 온도</th><td id="chkFreezer">-</td></tr>
             </table>
             <div class="table-wrap chk-table-view">
@@ -372,7 +364,7 @@
             <!-- 휴대폰용: 항목 카드 목록 (문서 영역 폭 560px 이하에서만 표시, 인쇄 시에는 위 표 사용) -->
             <div id="chkCards" class="chk-cards-view" aria-label="점검 항목 목록"></div>
             <div class="memo-box"><b>특이사항</b><p id="chkMemo">-</p></div>
-            <p class="doc-foot">점검자 : <span id="chkSign">________</span> (서명)</p>
+            <p class="doc-foot">점검자 : <span id="chkSign" data-no-i18n>________</span> (서명)</p>
           </div>
 
           <div class="actions">
@@ -449,7 +441,7 @@
         <div class="set-note">처음에는 휴대폰·브라우저 언어를 따라갑니다. 영어로 바꾸면 화면, 사용 방법, 점검표, 카톡 명세서·엑셀 파일도 영어로 나옵니다.</div>
 
         <h3 class="set-title">앱 정보</h3>
-        <div class="set-note">사장님 도우미 <b class="ver-text">v1.5.2</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
+        <div class="set-note">사장님 도우미 <b class="ver-text">v1.5.3</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
         <div class="share-box">
           <img class="share-qr" src="./img/share-qr.svg" alt="사장님 도우미 주소 QR 코드" width="160" height="160">
           <div class="share-text">
@@ -558,7 +550,7 @@
             <figure class="guide-fig"><img src="./img/guide-punch-out.webp" alt="퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)" loading="lazy" decoding="async"><figcaption>퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)</figcaption></figure>
             <ul>
               <li><b>퇴근을 꼭 찍어 주세요.</b> 안 찍으면 자동 퇴근 처리되고, 그날 근무는 사장님이 확인한 뒤에 기록됩니다.</li>
-              <li>비밀번호를 5번 연속 틀리면 30초 동안 막힙니다. 틀린 기록도 시트에 남습니다.</li>
+              <li>비밀번호를 5번 연속 틀리면 30초 동안 막힙니다(새로고침해도 그대로). 틀린 기록도 시트에 남습니다. 관리자 비밀번호는 5번 틀리면 1분 동안 막힙니다.</li>
               <li>내 이름 옆에 <b>"⚠️ 퇴근 확인 필요"</b>가 보이면 사장님께 실제 퇴근 시각을 알려 주세요.</li>
             </ul>
           </div>
@@ -791,14 +783,14 @@
 
   <footer class="app-footer">
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
-    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.5.2</span></div>
+    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.5.3</span></div>
   </footer>
 
   <!-- 출퇴근: 비밀번호 입력 -->
   <div id="punchPw" class="punch-modal" hidden>
     <div class="punch-modal-backdrop" data-punch-close></div>
-    <form id="punchPwForm" class="punch-card" autocomplete="off" onsubmit="return false">
-      <div id="punchPwName" class="punch-card-name">-</div>
+    <form id="punchPwForm" class="punch-card" autocomplete="off">
+      <div id="punchPwName" data-no-i18n class="punch-card-name">-</div>
       <p id="punchPwState" class="punch-card-state">-</p>
       <input id="punchPwInput" type="password" maxlength="20" autocomplete="new-password" placeholder="비밀번호" aria-label="비밀번호">
       <p id="punchPwErr" class="punch-err" role="alert"></p>
@@ -815,7 +807,7 @@
     <div class="punch-card punch-result" role="status">
       <div id="punchResIcon" class="punch-res-icon" aria-hidden="true">✓</div>
       <div id="punchResTitle" class="punch-res-title">-</div>
-      <div id="punchResWho" class="punch-res-who">-</div>
+      <div id="punchResWho" data-no-i18n class="punch-res-who">-</div>
       <div id="punchResStats" class="punch-res-stats"></div>
       <button type="button" class="btn btn-primary btn-big" data-punch-result-close>닫기</button>
       <div class="punch-timer"><span id="punchTimerBar"></span></div>
@@ -825,7 +817,7 @@
   <!-- 처음 안내: 관리자 비밀번호 정하기 (나중에 설정에서도 가능) -->
   <div id="pinSetup" class="punch-modal" hidden>
     <div class="punch-modal-backdrop" data-pinsetup-close></div>
-    <form id="pinSetupForm" class="punch-card" autocomplete="off" onsubmit="return false">
+    <form id="pinSetupForm" class="punch-card" autocomplete="off">
       <div class="punch-card-name">관리자 비밀번호를 정할까요?</div>
       <p class="punch-card-state">정하면 평소에는 <b>출퇴근 화면만</b> 보이고, 급여·위생·설정은 이 비밀번호를 입력해야 열려요. 알바생이 매장 기기에서 출퇴근을 찍게 하려면 꼭 정해 두세요.<br><small>구글 저장을 켜 두면 잊어도 시트에서 다시 정할 수 있어요.</small></p>
       <input id="pinSetupInput" type="password" maxlength="20" autocomplete="new-password" placeholder="4자 이상" aria-label="새 관리자 비밀번호">
@@ -840,7 +832,7 @@
   <!-- 관리자 비밀번호 입력 -->
   <div id="adminPin" class="punch-modal" hidden>
     <div class="punch-modal-backdrop" data-admin-close></div>
-    <form id="adminPinForm" class="punch-card" autocomplete="off" onsubmit="return false">
+    <form id="adminPinForm" class="punch-card" autocomplete="off">
       <div class="punch-card-name">관리자 비밀번호</div>
       <p class="punch-card-state">급여 계산·위생 점검·설정을 열려면 입력하세요</p>
       <input id="adminPinInput" type="password" maxlength="20" autocomplete="new-password" placeholder="비밀번호" aria-label="관리자 비밀번호">
@@ -1019,10 +1011,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611170300"></script>
-  <script src="./lang_web.js?v=202611170300"></script>
-  <script src="./i18n.js?v=202611170300"></script>
-  <script src="./gsync.js?v=202611170300"></script>
-  <script src="./app.js?v=202611170300"></script>
+  <script src="./engine.js?v=202611171000"></script>
+  <script src="./lang_web.js?v=202611171000"></script>
+  <script src="./i18n.js?v=202611171000"></script>
+  <script src="./gsync.js?v=202611171000"></script>
+  <script src="./app.js?v=202611171000"></script>
 </body>
 </html>

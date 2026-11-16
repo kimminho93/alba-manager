@@ -354,7 +354,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var ENGINE_VERSION = '1.5.2';
+  var ENGINE_VERSION = '1.5.3';
 
   /** "10,000원", " 62 " 같은 값을 숫자로 변환. 실패 시 def 반환 */
   function toNumber(v, def) {
@@ -1018,10 +1018,10 @@
     var cal = buildMonthCalendar(payMonth);
 
     var wh = Array.isArray(raw.weekHours) ? raw.weekHours : [];
-    var weekCountForWeekly = Math.max(WEEKS, wh.length || WEEKS);
+    var weekCountForWeekly = Math.max(WEEKS, Math.min(6, wh.length || WEEKS));   // 한 달은 최대 6주
     var weekHours = [];
     for (var wi = 0; wi < weekCountForWeekly; wi++) {
-      weekHours.push(Math.max(0, M.toNumber(wh[wi], 0)));
+      weekHours.push(M.clamp(M.toNumber(wh[wi], 0), 0, 168));
     }
 
     var hasDailyShifts = Array.isArray(raw.dailyShifts) && raw.dailyShifts.length > 0;
@@ -1035,7 +1035,7 @@
 
     var dh = Array.isArray(raw.dailyHours) ? raw.dailyHours : [];
     var dailyHours = [];
-    var dhLen = Math.max(TOTAL_DAYS, dh.length);
+    var dhLen = Math.max(TOTAL_DAYS, Math.min(42, dh.length));
     for (var i = 0; i < dhLen; i++) {
       dailyHours.push(Math.max(0, M.clamp(M.toNumber(dh[i], 0), 0, 24)));
     }
@@ -1057,20 +1057,20 @@
       : Math.max(0, M.toNumber(raw.mealMinHours, DEFAULT_MEAL_MIN_HOURS));
     var mealAmount = raw.mealAmount === undefined || raw.mealAmount === null || raw.mealAmount === ''
       ? DEFAULT_MEAL_AMOUNT
-      : Math.max(0, Math.round(M.toNumber(raw.mealAmount, DEFAULT_MEAL_AMOUNT)));
+      : M.clamp(Math.round(M.toNumber(raw.mealAmount, DEFAULT_MEAL_AMOUNT)), 0, 10000000);
     var mealDays = raw.mealDays === undefined || raw.mealDays === null || raw.mealDays === ''
       ? null
-      : Math.max(0, Math.round(M.toNumber(raw.mealDays, 0)));
+      : M.clamp(Math.round(M.toNumber(raw.mealDays, 0)), 0, 31);
 
     return {
       name: String(raw.name === null || raw.name === undefined ? '' : raw.name).trim().slice(0, 20) || t('알바생'),
       payMonth: payMonth,
-      hourlyWage: Math.max(0, Math.round(M.toNumber(raw.hourlyWage, 0))),
+      hourlyWage: M.clamp(Math.round(M.toNumber(raw.hourlyWage, 0)), 0, 10000000),
       mode: mode,
       contractDays: contractDays,
       weekAbsent: weekAbsent,
       weekExcuse: weekExcuse,
-      totalHours: Math.max(0, M.toNumber(raw.totalHours, 0)),
+      totalHours: M.clamp(M.toNumber(raw.totalHours, 0), 0, 744),
       weekHours: weekHours,
       dailyHours: dailyHours,
       dailyShifts: dailyShifts,
@@ -1663,7 +1663,8 @@
 
   var RETAIN_MONTHS = 60;          // 구글 시트의 월별 탭 보관 기간(5년)
   var MAX_WORKERS = 200;
-  var MONTH_RE = /^\d{4}-\d{2}$/;
+  var MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+  var BAD_ID = Object.create(null); BAD_ID['__proto__'] = BAD_ID.constructor = BAD_ID.prototype = 1;
 
   var DEFAULT_SETTINGS = {
     wage: 10320,
@@ -1771,13 +1772,13 @@
   /** 저장된 알바생 목록 검사·정리 (깨진 항목은 버림) */
   function normalizeWorkers(list) {
     var out = [];
-    var seen = {};
-    var seenCode = {};
+    var seen = Object.create(null);
+    var seenCode = Object.create(null);
     (Array.isArray(list) ? list : []).slice(0, MAX_WORKERS).forEach(function (raw) {
       if (!isObj(raw)) return;
       var name = cleanName(raw.name);
       if (!name) return;
-      var id = typeof raw.id === 'string' && raw.id && !seen[raw.id] ? raw.id : newId();
+      var id = typeof raw.id === 'string' && /^[^|\s]{1,64}$/.test(raw.id) && !BAD_ID[raw.id] && !seen[raw.id] ? raw.id : newId();   // '|'는 확인 필요 항목의 열쇠 구분자라 못 씀
       seen[id] = true;
       var months = {};
       if (isObj(raw.months)) {
@@ -2163,7 +2164,7 @@
 
   /** 예전 정산 명단(이름+달 한 줄씩) → 알바생별 월 기록 */
   function migrateRoster(entries) {
-    var byName = {};
+    var byName = Object.create(null);
     var order = [];
     (Array.isArray(entries) ? entries : []).forEach(function (e) {
       if (!isObj(e)) return;
@@ -2275,7 +2276,7 @@
 
   /** 기록이 있는 달 목록 (오름차순) */
   function recordMonths(workers) {
-    var set = {};
+    var set = Object.create(null);
     (workers || []).forEach(function (w) { Object.keys(w.months || {}).forEach(function (k) { set[k] = true; }); });
     return Object.keys(set).sort();
   }
@@ -2738,7 +2739,7 @@
   }
 
   function safeSheetNames(sheets) {
-    var used = {};
+    var used = Object.create(null);
     return sheets.map(function (s, i) {
       var base = String(s.name || 'Sheet' + (i + 1)).replace(/[\[\]:*?\/\\]/g, '').trim().slice(0, 31) || 'Sheet' + (i + 1);
       var name = base, n = 2;
@@ -3082,7 +3083,7 @@
   }
 
   function groupByMonth(results) {
-    var map = {};
+    var map = Object.create(null);
     results.forEach(function (r) { (map[monthKey(r)] = map[monthKey(r)] || []).push(r); });
     return Object.keys(map).sort().map(function (k) { return { key: k, title: monthTitle(k), list: map[k] }; });
   }
@@ -3162,7 +3163,7 @@
     });
     recs.sort(function (a, b) { return a.key < b.key ? -1 : (a.key > b.key ? 1 : (a.r.name < b.r.name ? -1 : (a.r.name > b.r.name ? 1 : 0))); });
 
-    var perDate = {};
+    var perDate = Object.create(null);
     recs.forEach(function (x) { perDate[x.key] = (perDate[x.key] || 0) + 1; });
 
     var rows = [];
@@ -3172,7 +3173,7 @@
     rows.push([H('날짜'), H('요일'), H('이름'), H('출근'), H('퇴근'), H('휴게(분)'), H('근무시간(h)'), H('누적 근무일수'), H('누적 근무시간(h)'), H('식대'), H('식대(원)'), H('그날 출근 인원')]);
     var headerRow = rows.length;
     var lastKey = null, zebra = false;
-    var cum = {};
+    var cum = Object.create(null);
     recs.forEach(function (x) {
       var d = x.d, r = x.r;
       var first = x.key !== lastKey;
@@ -3288,13 +3289,13 @@
   }
 
   function payrollPersonalXlsx(results) {
-    var map = {}, order = [];
+    var map = Object.create(null), order = [];
     results.forEach(function (r) { var k = r.name; if (!map[k]) { map[k] = []; order.push(k); } map[k].push(r); });
     return M.buildXlsx(order.map(function (k) { return personalSheet(map[k], k); }));
   }
 
   function personalFileName(results) {
-    var names = {};
+    var names = Object.create(null);
     results.forEach(function (r) { names[r.name] = 1; });
     var l = Object.keys(names);
     return t('근무기록_') + (l.length === 1 ? safeFilePart(l[0]) : t('{n}명', { n: l.length })) + '.xlsx';
@@ -3405,4 +3406,4 @@
 });
 
 /* ===== 버전 (package.json 의 version) ===== */
-;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.5.2';
+;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.5.3';

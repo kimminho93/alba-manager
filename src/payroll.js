@@ -236,10 +236,10 @@
     var cal = buildMonthCalendar(payMonth);
 
     var wh = Array.isArray(raw.weekHours) ? raw.weekHours : [];
-    var weekCountForWeekly = Math.max(WEEKS, wh.length || WEEKS);
+    var weekCountForWeekly = Math.max(WEEKS, Math.min(6, wh.length || WEEKS));   // 한 달은 최대 6주
     var weekHours = [];
     for (var wi = 0; wi < weekCountForWeekly; wi++) {
-      weekHours.push(Math.max(0, M.toNumber(wh[wi], 0)));
+      weekHours.push(M.clamp(M.toNumber(wh[wi], 0), 0, 168));
     }
 
     var hasDailyShifts = Array.isArray(raw.dailyShifts) && raw.dailyShifts.length > 0;
@@ -253,7 +253,7 @@
 
     var dh = Array.isArray(raw.dailyHours) ? raw.dailyHours : [];
     var dailyHours = [];
-    var dhLen = Math.max(TOTAL_DAYS, dh.length);
+    var dhLen = Math.max(TOTAL_DAYS, Math.min(42, dh.length));
     for (var i = 0; i < dhLen; i++) {
       dailyHours.push(Math.max(0, M.clamp(M.toNumber(dh[i], 0), 0, 24)));
     }
@@ -275,20 +275,20 @@
       : Math.max(0, M.toNumber(raw.mealMinHours, DEFAULT_MEAL_MIN_HOURS));
     var mealAmount = raw.mealAmount === undefined || raw.mealAmount === null || raw.mealAmount === ''
       ? DEFAULT_MEAL_AMOUNT
-      : Math.max(0, Math.round(M.toNumber(raw.mealAmount, DEFAULT_MEAL_AMOUNT)));
+      : M.clamp(Math.round(M.toNumber(raw.mealAmount, DEFAULT_MEAL_AMOUNT)), 0, 10000000);
     var mealDays = raw.mealDays === undefined || raw.mealDays === null || raw.mealDays === ''
       ? null
-      : Math.max(0, Math.round(M.toNumber(raw.mealDays, 0)));
+      : M.clamp(Math.round(M.toNumber(raw.mealDays, 0)), 0, 31);
 
     return {
       name: String(raw.name === null || raw.name === undefined ? '' : raw.name).trim().slice(0, 20) || t('알바생'),
       payMonth: payMonth,
-      hourlyWage: Math.max(0, Math.round(M.toNumber(raw.hourlyWage, 0))),
+      hourlyWage: M.clamp(Math.round(M.toNumber(raw.hourlyWage, 0)), 0, 10000000),
       mode: mode,
       contractDays: contractDays,
       weekAbsent: weekAbsent,
       weekExcuse: weekExcuse,
-      totalHours: Math.max(0, M.toNumber(raw.totalHours, 0)),
+      totalHours: M.clamp(M.toNumber(raw.totalHours, 0), 0, 744),
       weekHours: weekHours,
       dailyHours: dailyHours,
       dailyShifts: dailyShifts,

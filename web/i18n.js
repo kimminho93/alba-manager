@@ -113,10 +113,12 @@
         r.addedNodes.forEach(function (n) {
           if (n.nodeType === 3) {
             var p = n.parentNode;
-            if (p && p.nodeType === 1 && !SKIP[p.tagName.toUpperCase()]) tText(n);
+            if (p && p.nodeType === 1 && !SKIP[p.tagName.toUpperCase()] && !(p.closest && p.closest('[data-no-i18n]'))) tText(n);
           } else if (n.nodeType === 1) tEl(n);
         });
       });
+      // 화면에서 사라진 조각의 되돌리기 정보는 버림 (며칠 켜 두는 매장 기기에서 메모리가 계속 늘지 않게)
+      if (saved.length > 3000) saved = saved.filter(function (x) { var t = x.node || x.el; return x.title || !t || t.isConnected !== false; });
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }

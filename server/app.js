@@ -144,7 +144,7 @@ function serveStatic(req, res, pathname) {
       'Cache-Control': 'no-cache'
     });
     if (req.method === 'HEAD') return res.end();
-    fs.createReadStream(file).pipe(res);
+    fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
   });
 }
 
@@ -153,6 +153,9 @@ function createServer(opts) {
   const quiet = !!(opts && opts.quiet);
 
   return http.createServer(async (req, res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
     const url = new URL(req.url, 'http://localhost');
     const pathname = url.pathname.replace(/\/+$/, '') || '/';
     const started = Date.now();
@@ -187,6 +190,9 @@ if (require.main === module) {
   const pi = args.indexOf('--port');
   const port = Number(pi >= 0 ? args[pi + 1] : process.env.PORT) || 8000;
   const staticOnly = args.includes('--static');
+  // 기본은 이 PC에서만 접속 (매장 와이파이의 다른 기기에 열지 않음). 같은 와이파이의 휴대폰에서 쓰려면 --host 0.0.0.0
+  const hi = args.indexOf('--host');
+  const host = (hi >= 0 ? args[hi + 1] : process.env.HOST) || '127.0.0.1';
 
   try {
     require('../tools/build.js').build({ quiet: true }); // web/engine.js 를 src 와 항상 동기화
@@ -194,7 +200,7 @@ if (require.main === module) {
     console.warn('[build] web/engine.js 갱신 실패 (기존 파일 사용):', e.message);
   }
 
-  createServer({ staticOnly }).listen(port, () => {
+  createServer({ staticOnly }).listen(port, host, () => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(' 사장님 도우미 ' + (staticOnly ? '[웹 단독 모드 · API 꺼짐]' : '[서버 모드 · API 켜짐]'));
     console.log(' http://localhost:' + port + '/');

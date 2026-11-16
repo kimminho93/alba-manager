@@ -193,7 +193,7 @@ function makeDevice(google, opts) {
   const dev = { data: { workers: [], archive: [], presets: [], store: {} }, tokenFail: false, tokens: 0, confirmAnswer: true, statuses: [] };
   const clock = { t: Date.UTC(2026, 10, 12, 3, 0, 0) };
   const deps = {
-    fetch: google.fetch,
+    fetch: (u, o) => google.fetch(u, o),   // 시험 중에 g.fetch 를 바꿔 끼우면 곧바로 적용
     storage: { get: k => (k in store ? store[k] : null), set: (k, v) => { store[k] = v; }, remove: k => { delete store[k]; } },
     now: () => clock.t,
     available: () => true,
@@ -1113,6 +1113,89 @@ function makeDevice(google, opts) {
     W(ph, '김').wage = 20001; ph.cloud.markDirty(); await ph.cloud.saveNow();
     await tick(tab);
     assert.strictEqual(W(tab, '김').wage, 20001);
+  });
+
+  await test('5차 보안: 손으로 조작한 수정요청·데이터의 __proto__/constructor 경로는 적용하지 않음 (프로토타입 오염 방지)', async () => {
+    const { g, tab, ph, sid, tick } = await shop();
+    g.rows(sid, '수정요청').push(['r-evil1', '2026-11-16 10:00:00', 'x', 'x', '', JSON.stringify([{ path: ['__proto__', 'polluted'], before: null, after: 'yes' }]), '', '', '']);
+    g.rows(sid, '수정요청').push(['r-evil2', '2026-11-16 10:00:01', 'x', 'x', '', JSON.stringify([{ path: ['workers', { id: 'id-김' }, '__proto__', 'isAdmin'], before: null, after: true }]), '', '', '']);
+    g.rows(sid, '수정요청').push(['r-evil3', '2026-11-16 10:00:02', 'x', 'x', '', JSON.stringify([{ path: ['constructor', 'prototype', 'p2'], before: null, after: 1 }]), '', '', '']);
+    await tick(tab);
+    assert.strictEqual(({}).polluted, undefined);
+    assert.strictEqual(({}).isAdmin, undefined);
+    assert.strictEqual(({}).p2, undefined);
+    const st = g.rows(sid, '수정요청').filter(r => /^r-evil/.test(r[0])).map(r => r[6]);
+    assert.deepStrictEqual(st, ['거절', '거절', '거절']);
+    const m = ph.cloud.merge3({ a: 0 }, JSON.parse('{"__proto__":{"z":1},"a":1}'), { a: 2, b: 1 });
+    assert.strictEqual(({}).z, undefined);
+    assert.ok(Object.keys(m).indexOf('__proto__') < 0);
+    // 'toString' 같은 평범한 이름의 칸은 그대로 비교·합치기·적용 (원형의 함수를 값으로 착각하지 않음)
+    assert.deepStrictEqual(ph.cloud.diffOps({ s: { toString: 1 } }, { s: { toString: 2 } }), [{ path: ['s', 'toString'], before: 1, after: 2 }]);
+    assert.deepStrictEqual(ph.cloud.merge3({ a: {} }, { a: { valueOf: 2 } }, { a: {} }), { a: { valueOf: 2 } });
+    const t2 = ph.cloud.applyOps({ workers: [{ id: 'toString', wage: 1 }] }, [{ path: ['workers', { id: 'toString' }, 'wage'], before: 1, after: 2 }]);
+    assert.strictEqual(t2.ok, true); assert.strictEqual(t2.data.workers[0].wage, 2);
+  });
+
+  await test('5차 보안: 요청ID·기기ID가 __proto__/toString 이어도 상태 칸을 제대로 쓰고 저장이 막히지 않음', async () => {
+    const { g, tab, sid, tick } = await shop();
+    const ranges = [];
+    const orig = g.fetch;
+    g.fetch = async (url, opt) => { if (opt && opt.body && /batchUpdate/.test(url)) { const b = JSON.parse(opt.body); (b.data || []).forEach(d => ranges.push(d.range)); } return orig(url, opt); };
+    const kim = W(tab, '김');
+    g.rows(sid, '수정요청').push(['__proto__', '2026-11-16 10:00:00', 'toString', 'x', '', JSON.stringify([{ path: ['workers', { id: kim.id }, 'wage'], before: kim.wage, after: 11000 }]), '', '', '']);
+    g.rows(sid, '수정요청').push(['toString', '2026-11-16 10:00:01', '__proto__', 'x', '', JSON.stringify([{ path: ['workers', { id: kim.id }, 'wage'], before: 11000, after: 12000 }]), '', '', '']);
+    await tick(tab);
+    assert.ok(!ranges.some(r => /object/i.test(r)), '잘못된 범위: ' + ranges.join(','));
+    const st = g.rows(sid, '수정요청').filter(r => r[0] === '__proto__' || r[0] === 'toString').map(r => r[6]);
+    assert.deepStrictEqual(st, ['적용됨', '적용됨']);
+    assert.strictEqual(W(tab, '김').wage, 12000);
+    assert.strictEqual(JSON.parse(tab.store['alba.cloud.v1']).pendWrites.length, 0);
+    W(tab, '김').wage = 12500; tab.cloud.markDirty();
+    assert.strictEqual(await tab.cloud.saveNow(), true);
+    assert.strictEqual(dataTab(g, sid).workers.find(w => w.name === '김').wage, 12500);
+  });
+
+  await test('5차 보안: 수정 요청으로 출퇴근 상태·출퇴근 코드는 못 바꿈 (기기 교체 때 넘기는 요청만 출퇴근 상태 허용)', async () => {
+    const { g, tab, sid, tick } = await shop();
+    const kim = W(tab, '김');
+    const row = (id, ops, note) => g.rows(sid, '수정요청').push([id, '2026-11-16 10:00:00', 'x', 'x', note || '', JSON.stringify(ops), '', '', '']);
+    row('r-p1', [{ path: ['workers', { id: kim.id }, 'punch'], before: null, after: { date: '2026-11-16', time: '09:00' } }]);
+    row('r-p2', [{ path: ['workers', { id: kim.id }, 'code'], before: kim.code, after: 'ZZZZZZZZ' }]);
+    row('r-p3', [{ path: ['workers', { id: kim.id }, 'lastTs'], before: null, after: '2099-01-01 00:00:00' }]);
+    row('r-p4', [{ path: ['workers', { id: kim.id }], before: kim, after: Object.assign({}, kim, { code: 'ZZZZZZZZ' }) }]);
+    row('r-ok', [{ path: ['workers', { id: kim.id }, 'punch'], before: null, after: { date: '2026-11-16', time: '09:00' } }], '[출퇴근 기기 교체] 근무 중 상태');
+    await tick(tab);
+    const st = {}; g.rows(sid, '수정요청').forEach(r => { if (/^r-/.test(r[0])) st[r[0]] = r[6]; });
+    assert.deepStrictEqual(st, { 'r-p1': '거절', 'r-p2': '거절', 'r-p3': '거절', 'r-p4': '거절', 'r-ok': '적용됨' });
+    assert.strictEqual(W(tab, '김').code, kim.code);
+    assert.ok(!W(tab, '김').lastTs);
+  });
+
+  await test('5차 보안: 관리자 비밀번호를 바꿀 때 시트 쓰기가 실패해도 다음 저장 때 올라가 옛 비밀번호가 되살아나지 않음', async () => {
+    const g = makeGoogle();
+    const a = makeDevice(g);
+    a.pin = '1111';
+    a.data.workers = [worker('철수', {})];
+    await a.cloud.connect();
+    const sid = JSON.parse(a.store['alba.cloud.v1']).sheetId;
+    assert.strictEqual(g.rows(sid, '관리자')[0][1], '1111');
+    const orig = g.fetch; let fail = true;
+    g.fetch = async (url, opt) => { if (fail && opt && opt.method === 'PUT' && /B1/.test(decodeURIComponent(url))) { return { ok: false, status: 503, json: async () => ({}), text: async () => '' }; } return orig(url, opt); };
+    a.pin = '9999';
+    await a.cloud.setAdminPin('9999');
+    fail = false;
+    if (a.cloud.pinPending()) { a.data.workers[0].wage = 11111; a.cloud.markDirty(); await a.cloud.saveNow(); }
+    assert.strictEqual(g.rows(sid, '관리자')[0][1], '9999');
+    assert.strictEqual(a.cloud.pinPending(), false);
+    // 시트 쓰기와 그 뒤 저장까지 실패 → 기억해 두었다가 다음 저장 때
+    fail = true; g.failDataWrite = 9;
+    await a.cloud.setAdminPin('7777');
+    assert.strictEqual(a.cloud.pinPending(), true);
+    assert.strictEqual(g.rows(sid, '관리자')[0][1], '9999');
+    g.failDataWrite = 0; fail = false;
+    await a.cloud.saveNow();
+    assert.strictEqual(g.rows(sid, '관리자')[0][1], '7777');
+    assert.strictEqual(a.cloud.pinPending(), false);
   });
 
   await test('3차 단일 저장: 지정 전에는 예전처럼 모든 기기가 저장(합치기)', async () => {

@@ -22,7 +22,8 @@
 
   var RETAIN_MONTHS = 60;          // 구글 시트의 월별 탭 보관 기간(5년)
   var MAX_WORKERS = 200;
-  var MONTH_RE = /^\d{4}-\d{2}$/;
+  var MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+  var BAD_ID = Object.create(null); BAD_ID['__proto__'] = BAD_ID.constructor = BAD_ID.prototype = 1;
 
   var DEFAULT_SETTINGS = {
     wage: 10320,
@@ -130,13 +131,13 @@
   /** 저장된 알바생 목록 검사·정리 (깨진 항목은 버림) */
   function normalizeWorkers(list) {
     var out = [];
-    var seen = {};
-    var seenCode = {};
+    var seen = Object.create(null);
+    var seenCode = Object.create(null);
     (Array.isArray(list) ? list : []).slice(0, MAX_WORKERS).forEach(function (raw) {
       if (!isObj(raw)) return;
       var name = cleanName(raw.name);
       if (!name) return;
-      var id = typeof raw.id === 'string' && raw.id && !seen[raw.id] ? raw.id : newId();
+      var id = typeof raw.id === 'string' && /^[^|\s]{1,64}$/.test(raw.id) && !BAD_ID[raw.id] && !seen[raw.id] ? raw.id : newId();   // '|'는 확인 필요 항목의 열쇠 구분자라 못 씀
       seen[id] = true;
       var months = {};
       if (isObj(raw.months)) {
@@ -522,7 +523,7 @@
 
   /** 예전 정산 명단(이름+달 한 줄씩) → 알바생별 월 기록 */
   function migrateRoster(entries) {
-    var byName = {};
+    var byName = Object.create(null);
     var order = [];
     (Array.isArray(entries) ? entries : []).forEach(function (e) {
       if (!isObj(e)) return;
@@ -634,7 +635,7 @@
 
   /** 기록이 있는 달 목록 (오름차순) */
   function recordMonths(workers) {
-    var set = {};
+    var set = Object.create(null);
     (workers || []).forEach(function (w) { Object.keys(w.months || {}).forEach(function (k) { set[k] = true; }); });
     return Object.keys(set).sort();
   }

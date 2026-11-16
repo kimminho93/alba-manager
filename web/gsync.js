@@ -108,7 +108,10 @@
   function readMeta() {
     try {
       var m = JSON.parse(deps.storage.get(META_KEY) || 'null');
-      if (m && typeof m === 'object') return m;
+      if (m && typeof m === 'object') {
+        if (m.sheetId && !/^[A-Za-z0-9_-]{1,200}$/.test(String(m.sheetId))) { m.sheetId = ''; m.connected = false; }
+        return m;
+      }
     } catch (e) {}
     return { connected: false, sheetId: '', stamp: '', dirty: false, lastSaved: 0 };
   }
@@ -408,17 +411,21 @@
       var pend = role() === 'writer' ? pendWrites().slice() : [], nExtra = pendWrites().length, extra = [];
       // 상태 칸은 요청ID로 지금 줄 위치를 다시 찾아 씀 (그 사이 사람이 줄을 지워 줄이 밀렸어도 다른 요청 줄에 쓰지 않게)
       var locate2 = pend.length ? api('GET', SHEETS + '/' + id + '/values/' + encodeURIComponent(SHEET_REQ + '!A1:A'), undefined, mode).then(function (r) {
-        var at = {};
+        var at = Object.create(null);
         ((r && r.values) || []).forEach(function (v, i) { if (v && v[0]) at[String(v[0])] = i + 1; });
         pend.forEach(function (w) { var n = w.id ? at[w.id] : w.row; if (n) extra.push({ range: SHEET_REQ + '!G' + n + ':I' + n, values: w.values }); });
       }, function () { /* 못 찾으면 이번엔 상태 칸을 쓰지 않음 */ }) : Promise.resolve();
       return clear.then(function () { return locate2; }).then(function () {
         if (role() === 'writer') extra.push({ range: SHEET_DEV + '!C1:D1', values: [[new Date(deps.now()).toISOString(), appVer()]] });   // 응답 시각
+        // 못 올린 관리자 비밀번호 변경이 있으면 함께 씀 (안 그러면 [비밀번호를 잊었어요]가 옛 비밀번호를 되살림)
+        var pinNow = meta.pendPin;
+        if (pinNow !== undefined && pinNow !== null && existing[SHEET_ADMIN] !== undefined && created[SHEET_ADMIN] === undefined) extra.push({ range: SHEET_ADMIN + '!B1', values: [[pinNow]] });
         return api('POST', SHEETS + '/' + id + '/values:batchUpdate', {
           valueInputOption: 'RAW',
           data: changed.map(function (t) { return { range: t.name + '!A1', values: t.rows && t.rows.length ? t.rows : [['']] }; }).concat(extra)
         }, mode).then(function (r) {
           meta.pendWrites = pendWrites().slice(nExtra);
+          if (pinNow !== undefined && meta.pendPin === pinNow) delete meta.pendPin;   // 썼거나, 이번에 새로 만들며 현재 값을 적었거나, 탭이 없음
           meta.unsaved = [];   // 적용한 요청이 데이터와 함께 저장됨
           if (role() === 'writer') meta.lastBeat = deps.now();
           return r;
@@ -463,7 +470,7 @@
   function noteConflict(path, l, r) { if (conflictSink) conflictSink.push({ path: path.slice(), local: l, remote: r }); }
   /* 처리 끝 표시(묘비)처럼 늘어나기만 하는 목록: 양쪽 합집합 (최근 200개) */
   function unionList(a, b) {
-    var out = [], seen = {};
+    var out = [], seen = Object.create(null);
     (Array.isArray(a) ? a : []).concat(Array.isArray(b) ? b : []).forEach(function (x) { var k = JSON.stringify(x); if (!seen[k]) { seen[k] = true; out.push(x); } });
     out.sort(function (x, y) { x = String(x); y = String(y); return x < y ? -1 : x > y ? 1 : 0; });   // 어느 기기에서 합쳐도 같은 순서
     return out.slice(-200);
@@ -476,15 +483,16 @@
     if (l === undefined) return b === undefined ? r : undefined;   // 이 기기가 지움(시트는 그대로면 위에서 처리) / 새로 생긴 건 살림
     if (r === undefined) return b === undefined ? l : undefined;
     if (isObj(l) && isObj(r)) {
-      var bo = isObj(b) ? b : {}, out = {}, seen = {};
+      var bo = isObj(b) ? b : Object.create(null), out = {}, seen = Object.create(null);
       Object.keys(l).concat(Object.keys(r)).forEach(function (k) {
-        if (seen[k]) return;
+        if (seen[k] || BAD_KEY[k]) return;
         seen[k] = true;
-        var v = k === 'pendingDone' && (Array.isArray(l[k]) || Array.isArray(r[k])) ? unionList(l[k], r[k]) : merge3(bo[k], l[k], r[k], path.concat([k]));
+        var bk = own(bo, k), lk = own(l, k), rk = own(r, k);
+        var v = k === 'pendingDone' && (Array.isArray(lk) || Array.isArray(rk)) ? unionList(lk, rk) : merge3(bk, lk, rk, path.concat([k]));
         // 한쪽은 칸을 지웠는데 다른 쪽은 그 칸을 새로 바꿨으면 새 값을 남김 (예: 옛 기기가 지난 출근을 퇴근 처리 ↔ 다른 기기에서 오늘 새로 출근)
-        if (v === undefined && bo[k] !== undefined) {
-          if (l[k] === undefined && r[k] !== undefined && !jeq(r[k], bo[k])) v = r[k];
-          else if (r[k] === undefined && l[k] !== undefined && !jeq(l[k], bo[k])) v = l[k];
+        if (v === undefined && bk !== undefined) {
+          if (lk === undefined && rk !== undefined && !jeq(rk, bk)) v = rk;
+          else if (rk === undefined && lk !== undefined && !jeq(lk, bk)) v = lk;
         }
         if (v !== undefined) out[k] = v;
       });
@@ -493,8 +501,8 @@
     if (Array.isArray(l) && Array.isArray(r)) {
       var ba = Array.isArray(b) ? b : [];
       if ((keyedArr(l) || l.length === 0) && (keyedArr(r) || r.length === 0) && (keyedArr(l) || keyedArr(r))) {
-        var idx = function (a) { var m = {}; a.forEach(function (x) { m[x.id] = x; }); return m; };
-        var bm = keyedArr(ba) ? idx(ba) : {}, lm = idx(l), rm = idx(r), res = [], done = {};
+        var idx = function (a) { var m = Object.create(null); a.forEach(function (x) { m[x.id] = x; }); return m; };
+        var bm = keyedArr(ba) ? idx(ba) : Object.create(null), lm = idx(l), rm = idx(r), res = [], done = Object.create(null);
         l.concat(r).forEach(function (x) {
           if (done[x.id]) return;
           done[x.id] = true;
@@ -518,7 +526,7 @@
       }
       // 내용으로 맞추는 목록 (점검 보관함 등): 이 기기 목록 + 시트에서 새로 생긴 것 − 시트에서 지운 것
       var key = function (x) { return JSON.stringify(x); };
-      var inB = {}, inL = {}, inR = {};
+      var inB = Object.create(null), inL = Object.create(null), inR = Object.create(null);
       ba.forEach(function (x) { inB[key(x)] = true; });
       l.forEach(function (x) { inL[key(x)] = true; });
       r.forEach(function (x) { inR[key(x)] = true; });
@@ -546,7 +554,7 @@
       var found = conflictSink.filter(function (c) { return !c.path.some(function (k) { return SKIP_CONFLICT[k]; }); });
       if (found.length && isObj(m)) {
         var list = Array.isArray(m.conflicts) ? m.conflicts.slice() : [];
-        var have = {};
+        var have = Object.create(null);
         list.forEach(function (c) { if (c && c.id) have[c.id] = true; });
         found.forEach(function (c) {
           var id = 'c' + hashStr(JSON.stringify([c.path, c.local, c.remote]));
@@ -580,6 +588,22 @@
      path 칸: 객체 키(문자열) · 날짜 칸 같은 자리 배열(숫자) · id 있는 목록의 항목({id})
      op: {path, before, after}  → 지금 값이 before와 같을 때만 after로 (null = 없음)
          {path, add: 항목} / {path, del: 항목} → id 없는 목록(점검 보관함 등): 내용으로 넣고 빼기 */
+  /* 객체 원형을 바꾸는 열쇠는 어디서 오든(시트를 손으로 고친 요청 등) 절대 쓰지 않음 (프로토타입 오염 방지) */
+  var BAD_KEY = Object.create(null); BAD_KEY['__proto__'] = BAD_KEY.constructor = BAD_KEY.prototype = 1;   // 원형 없는 표 (toString 같은 이름은 막지 않게)
+  /* 수정 요청으로는 바꿀 수 없는 알바생 칸: 출퇴근 상태(출퇴근 기기만 기록)·출퇴근 코드(바뀌면 장부 줄이 지워짐) */
+  var REQ_DENY = { punch: 1, lastTs: 1, lastKind: 1 };
+  function badPath(path) {
+    for (var i = 0; i < (path || []).length; i++) {
+      var k = path[i];
+      if (typeof k === 'string' && BAD_KEY[k]) return true;
+      if (k && typeof k === 'object' && (typeof k.id !== 'string' || BAD_KEY[k.id])) return true;
+      if (k !== null && typeof k !== 'string' && typeof k !== 'number' && typeof k !== 'object') return true;
+    }
+    return false;
+  }
+  /* 자기 칸만 읽음: 'toString' 같은 이름의 칸이 없을 때 원형의 함수를 값으로 착각하지 않게 */
+  var HAS = Object.prototype.hasOwnProperty;
+  function own(o, k) { return o !== null && o !== undefined && typeof o === 'object' && HAS.call(o, k) ? o[k] : undefined; }
   function canon(x) {
     if (x === undefined) return 'null';
     if (Array.isArray(x)) return '[' + x.map(canon).join(',') + ']';
@@ -598,16 +622,16 @@
     if (!all && typeof last === 'string' && SKIP_DIFF[last] && path.length > 2) return out;
     if (path.length === 1 && last === 'reqLog') return out;
     if (isObj(b) && isObj(c)) {
-      var seen = {};
+      var seen = Object.create(null);
       Object.keys(b).concat(Object.keys(c)).forEach(function (k) {
-        if (seen[k]) return; seen[k] = true;
-        diffOps(b[k], c[k], path.concat([k]), out, all);
+        if (seen[k] || BAD_KEY[k]) return; seen[k] = true;
+        diffOps(own(b, k), own(c, k), path.concat([k]), out, all);
       });
       return out;
     }
     if (Array.isArray(b) && Array.isArray(c)) {
       if ((keyedArr(b) || !b.length) && (keyedArr(c) || !c.length) && (keyedArr(b) || keyedArr(c))) {
-        var bm = {}, cm = {}, ids = [], have = {};
+        var bm = Object.create(null), cm = Object.create(null), ids = [], have = Object.create(null);
         b.forEach(function (x) { bm[x.id] = x; if (!have[x.id]) { have[x.id] = 1; ids.push(x.id); } });
         c.forEach(function (x) { cm[x.id] = x; if (!have[x.id]) { have[x.id] = 1; ids.push(x.id); } });
         ids.forEach(function (id) {
@@ -622,11 +646,11 @@
         return out;
       }
       if (SETLIKE[last]) {
-        var bc = {}, cc = {};
+        var bc = Object.create(null), cc = Object.create(null);
         b.forEach(function (x) { var k = canon(x); bc[k] = (bc[k] || 0) + 1; });
         c.forEach(function (x) { var k = canon(x); cc[k] = (cc[k] || 0) + 1; });
         b.forEach(function (x) { var k = canon(x); if ((cc[k] || 0) < bc[k]) { out.push({ path: path, del: x }); bc[k]--; } });
-        var used = {};
+        var used = Object.create(null);
         c.forEach(function (x) { var k = canon(x); used[k] = (used[k] || 0) + 1; if (used[k] > (bc[k] || 0)) out.push({ path: path, add: x }); });
         return out;
       }
@@ -644,8 +668,9 @@
     return { parent: cur, key: path[path.length - 1] };
   }
   function step(cur, k) {
+    if (typeof k === 'string' && BAD_KEY[k]) return undefined;
     if (isObj(k)) { if (!Array.isArray(cur)) return undefined; for (var j = 0; j < cur.length; j++) if (cur[j] && cur[j].id === k.id) return cur[j]; return undefined; }
-    return cur[k];
+    return own(cur, k);
   }
   /* 기준 없이 양쪽이 만든 기록 합치기: 같으면 그대로, 한쪽에만 있으면 그 값, 날짜 칸은 휴무(기본값) 쪽을 근무가 덮음. 그 외 다르면 실패 */
   var FAIL = { fail: true };
@@ -654,10 +679,10 @@
     if (cur === undefined || cur === null) return clone(add);
     if (add === undefined || add === null) return clone(cur);
     if (isObj(cur) && isObj(add)) {
-      var out = {}, ks = {};
+      var out = {}, ks = Object.create(null);
       Object.keys(cur).concat(Object.keys(add)).forEach(function (k) {
-        if (ks[k] || out === FAIL) return; ks[k] = 1;
-        var v = fillNew(cur[k], add[k], (path || []).concat([k]));
+        if (ks[k] || out === FAIL || BAD_KEY[k]) return; ks[k] = 1;
+        var v = fillNew(own(cur, k), own(add, k), (path || []).concat([k]));
         if (v === FAIL) out = FAIL; else if (v !== undefined) out[k] = v;
       });
       return out;
@@ -681,7 +706,7 @@
     var d = clone(data) || {};
     for (var i = 0; i < (ops || []).length; i++) {
       var op = ops[i];
-      if (!op || !Array.isArray(op.path)) return { ok: false, path: [] };
+      if (!op || !Array.isArray(op.path) || !op.path.length || badPath(op.path)) return { ok: false, path: [] };
       if (op.add !== undefined || op.del !== undefined) {
         var arr = getAt(d, op.path);
         if (arr === undefined || arr === null) {
@@ -882,7 +907,7 @@
     meta.stamp = remote.stamp; meta.lineage = remote.lineage || [remote.stamp];
     var log = (remote.data && remote.data.reqLog) || {};
     meta.reqLog = isObj(log) ? log : null;
-    var applied = {}, rejected = {};
+    var applied = Object.create(null), rejected = Object.create(null);
     (log.applied || []).forEach(function (id) { applied[id] = true; });
     (log.rejected || []).forEach(function (x) { if (x && x.id) rejected[x.id] = x.reason || ''; });
     var keep = [];
@@ -943,7 +968,7 @@
     });
     var big = rows.filter(function (r) { return r[5].length > 45000; });
     if (big.length) {   // 칸 하나에 못 넣는 큰 요청: 버리고 알림
-      var bad = {}; big.forEach(function (r) { bad[r[0]] = true; });
+      var bad = Object.create(null); big.forEach(function (r) { bad[r[0]] = true; });
       var q2 = loadQ().filter(function (x) { if (bad[x.id] && host.onRequest) host.onRequest({ kind: 'rejected', item: x, reason: tr('한 번에 바꾼 내용이 너무 많아요. 나눠서 고쳐 주세요.') }); return !bad[x.id]; });
       saveQ(q2);
       rows = rows.filter(function (r) { return !bad[r[0]]; });
@@ -955,7 +980,7 @@
       if (e && e.status === 400) return ensureTab(SHEET_REQ, REQ_HEAD, 'silent').then(send);
       throw e;
     }).then(function () {
-      var sent = {}; rows.forEach(function (r) { sent[r[0]] = true; });
+      var sent = Object.create(null); rows.forEach(function (r) { sent[r[0]] = true; });
       saveQ(loadQ().map(function (x) { if (sent[x.id]) x.sent = true; return x; }));
       if (host.onDevice) host.onDevice(deviceInfo());
       return true;
@@ -971,7 +996,7 @@
      아직 처리 안 된 내 요청만 시트 내용 위에 얹어 예전 방식(합쳐 저장)으로 올림 */
   function settleToNone(remote) {
     var log = (remote && remote.data && remote.data.reqLog) || {};
-    var known = {};
+    var known = Object.create(null);
     (log.applied || []).forEach(function (id) { known[id] = 'a'; });
     (log.rejected || []).forEach(function (x) { if (x && x.id) known[x.id] = x.reason || ''; });
     var view = withoutLog(clone(remote.data)), left = 0;
@@ -1009,7 +1034,7 @@
     log.applied = Array.isArray(log.applied) ? log.applied : [];
     log.rejected = Array.isArray(log.rejected) ? log.rejected : [];
     var cursor = h.reqFrom;
-    var done = {};
+    var done = Object.create(null);
     log.applied.forEach(function (id) { done[id] = '적용됨'; });
     log.rejected.forEach(function (x) { if (x && x.id) done[x.id] = '거절'; });
     var data = clone(withoutLog(host.getData()));
@@ -1019,11 +1044,19 @@
       var rowNo = cursor + i;
       var id = String((row && row[0]) || '').trim();
       if (!id || id === REQ_HEAD[0]) return;
-      if (row[2]) { log.last = isObj(log.last) ? log.last : {}; log.last[String(row[2])] = id; }
+      if (row[2] && !BAD_KEY[String(row[2])]) { log.last = isObj(log.last) ? log.last : {}; log.last[String(row[2])] = id; }
       if (done[id]) { if (!row[6]) { writes.push({ id: id, row: rowNo, values: [[done[id], when, '']] }); any = true; } return; }
       var ops = null;
       try { ops = JSON.parse(String(row[5] || '')); } catch (e) { ops = null; }
-      var res = Array.isArray(ops) ? applyOps(data, ops) : { ok: false, path: [] };
+      var hand = /^\[/.test(String(row[4] || ''));   // 출퇴근 기기에서 넘어가며 보낸 요청만 출퇴근 상태를 함께 가져올 수 있음
+      var bad = Array.isArray(ops) ? ops.filter(function (op) {
+        if (!op || !Array.isArray(op.path) || op.path[0] !== 'workers') return false;
+        var k = op.path[2];
+        if (k === 'code') return true;
+        if (REQ_DENY[k]) return !hand;
+        return op.path.length === 2 && isObj(op.before) && isObj(op.after) && (!ceq(op.before.code, op.after.code) || (!hand && (!ceq(op.before.punch, op.after.punch) || !ceq(op.before.lastTs, op.after.lastTs) || !ceq(op.before.lastKind, op.after.lastKind))));
+      })[0] : null;
+      var res = bad ? { ok: false, path: bad.path } : Array.isArray(ops) ? applyOps(data, ops) : { ok: false, path: [] };
       any = true;
       if (res.ok) {
         data = res.data; changed = true;
@@ -1104,7 +1137,7 @@
         var log = remote.data && isObj(remote.data.reqLog) ? clone(remote.data.reqLog) : {};
         log.applied = Array.isArray(log.applied) ? log.applied : [];
         log.rejected = Array.isArray(log.rejected) ? log.rejected : [];
-        var known = {};
+        var known = Object.create(null);
         log.applied.forEach(function (id) { known[id] = 'a'; });
         log.rejected.forEach(function (x) { if (x && x.id) known[x.id] = x.reason || ''; });
         var view = withoutLog(clone(remote.data)), events = [], unsaved = [];
@@ -1300,6 +1333,7 @@
     if (meta.dirty && role() !== 'requester') { schedule(); return Promise.resolve(false); }
     if (host.isBusy && host.isBusy()) { if (role() === 'writer') heartbeat(); return Promise.resolve(false); }   // 입력 중이어도 응답 시각은 보냄
     refreshing = true;
+    if (pinPending()) flushPin();
     var wasWriter = role() === 'writer';
     // 앞쪽 50줄도 다시 읽음 (처리한 줄은 기록으로 건너뜀): 사람이 시트에서 줄을 지우거나 끼워 넣어 줄이 밀려도 요청을 놓치지 않게
     var cur = Math.max(2, (meta.reqLog && meta.reqLog.cursor ? meta.reqLog.cursor : 2) - 50);
@@ -1377,11 +1411,22 @@
   }
   function setAdminPin(pin) {
     if (!meta.connected || !meta.sheetId) return Promise.resolve(false);
-    var rng = encodeURIComponent(SHEET_ADMIN + '!B1');
-    return api('PUT', SHEETS + '/' + meta.sheetId + '/values/' + rng + '?valueInputOption=RAW', { values: [[pin || '']] }, 'silent')
-      .then(function () { return true; })
-      .catch(function () { return doSave('silent'); });   // 탭이 아직 없으면 다음 저장이 만들면서 현재 비밀번호를 적음
+    var want = String(pin || '');
+    meta.pendPin = want; writeMeta();   // 시트에 올라갈 때까지 기억 (실패하면 다음 저장·새로고침 때 다시)
+    return flushPin().then(function (ok) {
+      if (ok) return true;
+      meta.dirty = true; writeMeta();
+      return doSave('silent');   // 탭이 아직 없으면 다음 저장이 만들면서 현재 비밀번호를 적음
+    });
   }
+  function flushPin() {
+    var want = meta.pendPin;
+    if (want === undefined || want === null || !meta.connected || !meta.sheetId) return Promise.resolve(false);
+    var rng = encodeURIComponent(SHEET_ADMIN + '!B1');
+    return api('PUT', SHEETS + '/' + meta.sheetId + '/values/' + rng + '?valueInputOption=RAW', { values: [[want]] }, 'silent')
+      .then(function () { if (meta.pendPin === want) { delete meta.pendPin; writeMeta(); } return true; }, function () { return false; });
+  }
+  function pinPending() { return meta.pendPin !== undefined && meta.pendPin !== null; }
 
   /* 화면을 누를 때마다(사용자 동작 안에서) 토큰이 곧 만료되거나 이미 풀렸으면 조용히 갱신.
      타이머로 갱신하면 브라우저가 구글 창을 팝업 차단해서 실패하므로, 알바생·사장님이 누르는 순간을 이용한다. */
@@ -1464,6 +1509,7 @@
     purgePunchLog: purgePunchLog,
     readAdminPin: readAdminPin,
     setAdminPin: setAdminPin,
+    pinPending: pinPending,
     loadFromSheet: loadFromSheet,
     disconnect: disconnect,
     isConnected: function () { return !!meta.connected; },

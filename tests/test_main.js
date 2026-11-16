@@ -1111,6 +1111,33 @@ test('4차 검증: 지난 달 근무를 고치거나 퇴근 확인을 처리해�
   assert.strictEqual(w.months['2026-11'].wage, 10500);
 });
 
+test('5차 보안: 이름이 constructor/toString/__proto__ 여도 엑셀·명단 옮기기가 죽지 않고, 원형이 오염되지 않음', () => {
+  for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    const r = E.calculatePayroll({ name, payMonth: '2026-11', hourlyWage: 10320, mode: 'daily', dailyShifts: E.emptyShifts('2026-11') });
+    assert.ok(E.payrollPersonalXlsx([r, r]).length > 100);
+    assert.ok(E.personalFileName([r]).indexOf('.xlsx') > 0);
+    const ws = E.migrateRoster([{ name, payMonth: '2026-11', hourlyWage: 10000, dailyShifts: E.emptyShifts('2026-11') }]);
+    assert.strictEqual(ws.length, 1);
+  }
+  const ws = E.normalizeWorkers([{ id: '__proto__', name: '가' }, { id: 'toString', name: '나' }, { id: 'a|b', name: '다' }, { id: 'ok-1', name: '라' }]);
+  assert.notStrictEqual(ws[0].id, '__proto__');
+  assert.strictEqual(ws[1].id, 'toString');
+  assert.ok(ws[2].id.indexOf('|') < 0);
+  assert.strictEqual(ws[3].id, 'ok-1');
+  assert.strictEqual(({}).polluted, undefined);
+});
+
+test('5차 보안: 잘못된 달(2026-00·2026-13)은 버리고, 시급·시간·주 수에 상한', () => {
+  const [w] = E.normalizeWorkers([{ name: '홍', months: { '2026-00': { wage: 1 }, '2026-13': { wage: 1 }, '2026-11': { wage: 10320 } } }]);
+  assert.deepStrictEqual(Object.keys(w.months), ['2026-11']);
+  const n = E.normalizePayrollInput({ hourlyWage: 1e50, totalHours: 1e9, mealAmount: 1e40, mealDays: 999, weekHours: new Array(100000).fill(10) });
+  assert.strictEqual(n.hourlyWage, 10000000);
+  assert.strictEqual(n.totalHours, 744);
+  assert.strictEqual(n.mealAmount, 10000000);
+  assert.strictEqual(n.mealDays, 31);
+  assert.ok(n.weekHours.length <= 6);
+});
+
 test('버전: 엔진 번들의 ALBA_VERSION이 package.json 버전과 같다', () => {
   const fs = require('fs'), path = require('path');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));

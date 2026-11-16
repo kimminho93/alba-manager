@@ -263,7 +263,7 @@
   }
 
   function groupByMonth(results) {
-    var map = {};
+    var map = Object.create(null);
     results.forEach(function (r) { (map[monthKey(r)] = map[monthKey(r)] || []).push(r); });
     return Object.keys(map).sort().map(function (k) { return { key: k, title: monthTitle(k), list: map[k] }; });
   }
@@ -343,7 +343,7 @@
     });
     recs.sort(function (a, b) { return a.key < b.key ? -1 : (a.key > b.key ? 1 : (a.r.name < b.r.name ? -1 : (a.r.name > b.r.name ? 1 : 0))); });
 
-    var perDate = {};
+    var perDate = Object.create(null);
     recs.forEach(function (x) { perDate[x.key] = (perDate[x.key] || 0) + 1; });
 
     var rows = [];
@@ -353,7 +353,7 @@
     rows.push([H('날짜'), H('요일'), H('이름'), H('출근'), H('퇴근'), H('휴게(분)'), H('근무시간(h)'), H('누적 근무일수'), H('누적 근무시간(h)'), H('식대'), H('식대(원)'), H('그날 출근 인원')]);
     var headerRow = rows.length;
     var lastKey = null, zebra = false;
-    var cum = {};
+    var cum = Object.create(null);
     recs.forEach(function (x) {
       var d = x.d, r = x.r;
       var first = x.key !== lastKey;
@@ -469,13 +469,13 @@
   }
 
   function payrollPersonalXlsx(results) {
-    var map = {}, order = [];
+    var map = Object.create(null), order = [];
     results.forEach(function (r) { var k = r.name; if (!map[k]) { map[k] = []; order.push(k); } map[k].push(r); });
     return M.buildXlsx(order.map(function (k) { return personalSheet(map[k], k); }));
   }
 
   function personalFileName(results) {
-    var names = {};
+    var names = Object.create(null);
     results.forEach(function (r) { names[r.name] = 1; });
     var l = Object.keys(names);
     return t('근무기록_') + (l.length === 1 ? safeFilePart(l[0]) : t('{n}명', { n: l.length })) + '.xlsx';

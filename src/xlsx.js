@@ -289,7 +289,7 @@
   }
 
   function safeSheetNames(sheets) {
-    var used = {};
+    var used = Object.create(null);
     return sheets.map(function (s, i) {
       var base = String(s.name || 'Sheet' + (i + 1)).replace(/[\[\]:*?\/\\]/g, '').trim().slice(0, 31) || 'Sheet' + (i + 1);
       var name = base, n = 2;
