@@ -1214,6 +1214,23 @@ function makeDevice(google, opts) {
     assert.strictEqual(d.settings.bank.number, '123456-78-901234');
   });
 
+  await test('8차: 손님 계좌·보건증은 하위 칸을 섞지 않고 통째로 합치기·비교 (섞인 계좌 방지)', async () => {
+    const C = (await shop()).ph.cloud;
+    const b = { settings: { bank: { bank: '국민', number: '11111111', holder: '가' } } };
+    const l = { settings: { bank: { bank: '신한', number: '11111111', holder: '가' } } };
+    const r = { settings: { bank: { bank: '국민', number: '22222222', holder: '나' } } };
+    const m = C.merge3(b, l, r);
+    assert.ok(m.settings.bank.bank === '신한' && m.settings.bank.number === '11111111' && m.settings.bank.holder === '가', JSON.stringify(m.settings.bank));
+    const ops = C.diffOps(b, r);
+    assert.strictEqual(ops.length, 1);
+    assert.deepStrictEqual(ops[0].path, ['settings', 'bank']);
+    const wb = { workers: [{ id: 'w', health: { exam: '2026-01-01', expire: '2026-12-31' } }] };
+    const wc = { workers: [{ id: 'w', health: { exam: '2026-02-01', expire: '2027-01-31' } }] };
+    const ho = C.diffOps(wb, wc);
+    assert.strictEqual(ho.length, 1);
+    assert.strictEqual(ho[0].path[2], 'health');
+  });
+
   await test('3차 단일 저장: 지정 전에는 예전처럼 모든 기기가 저장(합치기)', async () => {
     const g = makeGoogle();
     const a = makeDevice(g); a.data.workers = [worker('김', {})]; await a.cloud.connect();

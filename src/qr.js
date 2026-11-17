@@ -69,6 +69,7 @@
         var d = s.charCodeAt(i + 1);
         if (d >= 0xDC00 && d < 0xE000) { c = 0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00); i++; }
       }
+      if (c >= 0xD800 && c < 0xE000) c = 0xFFFD;   // 짝 없는 반쪽 글자는 대체 문자로 (표준 UTF-8만 만들기)
       if (c < 0x80) out.push(c);
       else if (c < 0x800) out.push(0xC0 | (c >> 6), 0x80 | (c & 63));
       else if (c < 0x10000) out.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));

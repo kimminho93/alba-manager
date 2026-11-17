@@ -1274,7 +1274,6 @@
 
   function recalcChecklist() {
     var inp = readChecklistForm();
-    saveJson(KEYS.store, { store: inp.store, inspector: inp.inspector });
     var c = E.buildChecklist(inp);
     renderChecklist(c);
   }
@@ -1337,13 +1336,9 @@
     state.selId = state.workers.length ? state.workers[0].id : '';
     loadSelected();
 
-    var savedStore = loadJson(KEYS.store, null);
-    if (savedStore) {
-      if (savedStore.store) $('cStore').value = savedStore.store;
-      if (savedStore.inspector) $('cInspector').value = savedStore.inspector;
-    }
-    if (!$('cStore').value) $('cStore').value = tr('행복분식 강남점');
-    if (!$('cInspector').value) $('cInspector').value = tr('김사장');
+    var savedStore = cleanStoreInfo(loadJson(KEYS.store, null));
+    $('cStore').value = savedStore.store;
+    $('cInspector').value = savedStore.inspector;
   }
 
   function bindEvents() {
@@ -1835,7 +1830,7 @@
     });
 
     // 체크리스트 실시간 반응
-    ['cStore', 'cDate', 'cInspector', 'cFridge', 'cFreezer', 'cMemo'].forEach(function (id) {
+    ['cDate', 'cInspector', 'cFridge', 'cFreezer', 'cMemo'].forEach(function (id) {
       $(id).addEventListener('input', recalcChecklist);
     });
     $('chkFormList').addEventListener('change', recalcChecklist);
@@ -1897,7 +1892,7 @@
 
   /* 지금 받아온 내용을 화면에 바로 반영하면 곤란한 순간(입력 중·창이 열려 있음) */
   function cloudBusy() {
-    var ids = ['punchPw', 'punchResult', 'adminPin', 'dayModal', 'sheetBackdrop', 'healthModal'];   // sheetBackdrop: 폰에서 정산 설정·알바생 추가 창이 열려 있음
+    var ids = ['punchPw', 'punchResult', 'adminPin', 'dayModal', 'sheetBackdrop', 'healthModal', 'bankModal', 'pinSetup', 'cloudModal'];   // sheetBackdrop: 폰에서 정산 설정·알바생 추가 창이 열려 있음
     for (var i = 0; i < ids.length; i++) { var el = $(ids[i]); if (el && !el.hidden) return true; }
     var a = document.activeElement;
     return !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.id !== 'guideSearch');
@@ -1982,10 +1977,9 @@
         renderPresets();
       }
       if (d.store && typeof d.store === 'object') {
-        d.store = { store: typeof d.store.store === 'string' ? d.store.store.slice(0, 40) : '', inspector: typeof d.store.inspector === 'string' ? d.store.inspector.slice(0, 20) : '' };
+        d.store = cleanStoreInfo(d.store);   // 길이·예시 문구 정리한 값을 저장
         saveJson(KEYS.store, d.store);
-        if (d.store.store) $('cStore').value = d.store.store;
-        if (d.store.inspector) $('cInspector').value = d.store.inspector;
+        applyStoreInfo(d.store, true);
       }
       if (d.settings) { state.settings = E.sanitizeSettings(d.settings); saveJson(KEYS.settings, state.settings); applySettings(); $('sHealthWarn').value = String(state.settings.healthWarnDays); renderBank(); }
       if (!selWorker()) state.selId = state.workers.length ? state.workers[0].id : '';
@@ -2030,7 +2024,7 @@
       if (p[2] === 'months' && p[4]) return who + ' · ' + tr('{m}월', { m: Number(String(p[3]).slice(5, 7)) }) + ' ' + tr(FIELD_LABEL[p[4]] || p[4]);
       return who + ' · ' + tr(FIELD_LABEL[p[2]] || String(p[2] || ''));
     }
-    if (p[0] === 'settings') return tr('설정') + ' · ' + p.slice(1).join(' › ');
+    if (p[0] === 'settings') return tr('설정') + ' · ' + (FIELD_LABEL[p[1]] ? tr(FIELD_LABEL[p[1]]) + (p.length > 2 ? ' › ' + p.slice(2).join(' › ') : '') : p.slice(1).join(' › '));
     return p.join(' › ');
   }
   /* 덮인 값으로 되돌릴 수 있는 곳: 알바생 기록·설정 */
@@ -2193,7 +2187,7 @@
           !window.confirm(tr('그 뒤에 이 값이 또 바뀌었어요 (지금: {v}). 그래도 덮인 값({o})으로 되돌릴까요?', { v: cellText(now), o: cellText(c.remote) }))) return;
       if (c.remote === null || c.remote === undefined) delete t.obj[t.key]; else t.obj[t.key] = JSON.parse(JSON.stringify(c.remote));
       if (t.kind === 'workers') { state.workers = E.normalizeWorkers(state.workers); saveWorkers(); }
-      else { state.settings = E.sanitizeSettings(state.settings); saveJson(KEYS.settings, state.settings); applySettings(); }
+      else { state.settings = E.sanitizeSettings(state.settings); saveJson(KEYS.settings, state.settings); applySettings(); renderBank(); renderHealth(); }
       loadSelected(); recalcPayroll(); renderRoster();
       showToast(tr('덮인 값으로 되돌렸어요.'));
     } else showToast(tr('저장된 값으로 확정했어요.'));
@@ -2447,6 +2441,9 @@
     $('sheetBackdrop').hidden = true;
     $('dayModal').hidden = true;
     $('cloudModal').hidden = true;
+    closeAdminPin();   // 열려 있던 비밀번호 창과 '확인 후 할 일'(afterPin)도 버림 — 다음 잠금 해제 때 엉뚱한 일이 실행되지 않게
+    closeBank(); closeHealth();
+    if (!$('punchPw').hidden) closePunchPw();
     applyLockUi();
   }
 
@@ -2631,7 +2628,7 @@
   }
   function updateSafeNow() {
     if (!update.next) return false;
-    var openIds = ['punchPw', 'punchResult', 'adminPin', 'cloudModal', 'sheetBackdrop'];
+    var openIds = ['punchPw', 'punchResult', 'adminPin', 'cloudModal', 'sheetBackdrop', 'dayModal', 'healthModal', 'bankModal', 'pinSetup'];
     for (var i = 0; i < openIds.length; i++) { var el = $(openIds[i]); if (el && !el.hidden) return false; }
     var a = document.activeElement;
     if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
@@ -3193,10 +3190,9 @@
   }
   function readHealthFields(w, fromExam) {
     var exam = $('pHealthExam').value, exp = $('pHealthExp').value;
-    var old = (w.health || {});
-    // 검진일을 바꾸면 만료일을 새로 계산 (옛 만료일 전후 30일 안 검진이면 옛 만료일 다음 날부터 1년). 보건증에 적힌 값과 다르면 만료일 칸에서 고치면 됨
+    // 검진일을 적으면 만료일 = 1년 뒤 전날. 새로 받은 보건증(옛 만료일 다음 날부터 1년)은 🔔의 [새로 받았어요]에서. 보건증에 적힌 값과 다르면 만료일 칸에서 고침
     if (fromExam && E.validYmd(exam)) {
-      exp = E.renewHealthExpire(old, exam);
+      exp = E.healthYearEnd(exam);
       $('pHealthExp').value = exp;
     }
     var h = E.cleanHealth({ exam: exam, expire: exp, off: $('pHealthOff').checked });
@@ -3225,7 +3221,7 @@
   function bankConfirmed() { var b = curBank(); return !!b && bankOkKey() === E.bankKey(b); }
   function bankPending() { return !!curBank() && !bankConfirmed(); }
   function markBankOk(b) { try { if (b) localStorage.setItem(BANK_OK_KEY, E.bankKey(b)); else localStorage.removeItem(BANK_OK_KEY); } catch (e) {} }
-  function storeName() { var st = loadJson(KEYS.store, {}) || {}; return typeof st.store === 'string' ? st.store.slice(0, 30) : ''; }
+  function storeName() { return cleanStoreInfo(loadJson(KEYS.store, {})).store; }
   function payBase() {
     if (location.protocol !== 'https:') return PAY_URL;   // 이 PC 안 서버(localhost) 주소는 손님 휴대폰이 못 엶
     return location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '') + 'pay.html';
@@ -3234,6 +3230,7 @@
   function bankText(b) { return b.bank + ' ' + b.number + ' ' + b.holder; }
   function renderBank() {
     var b = curBank(), ok = bankConfirmed(), pend = bankPending();
+    if (!b && bankOkKey()) markBankOk(null);   // 계좌가 지워졌으면 이 기기의 확인 기록도 지움
     $('punchBankBtn').hidden = !ok;
     $('btnBankShow').hidden = !ok;
     $('btnBankPrint').hidden = !ok;
@@ -3266,7 +3263,7 @@
   function openBank() {
     var b = curBank();
     if (!b || !bankConfirmed()) return;
-    var svg = E.qrSvg(bankUrl(), { label: tr('계좌이체 QR') });
+    var svg = E.qrSvg(bankUrl(), { label: tr('계좌이체 QR') }) || E.qrSvg(E.payUrl(payBase(), b, ''), { label: tr('계좌이체 QR') });   // 너무 길면 매장명 없이
     $('bankQr').innerHTML = svg;   // 이 앱이 만든 SVG (글자는 들어가지 않음)
     $('bankStore').textContent = storeName() || tr('계좌이체');
     $('bankShowName').textContent = b.bank;
@@ -3280,7 +3277,7 @@
     if (!b || !bankConfirmed()) return;
     var box = $('bankPrint');
     if (!box) { box = document.createElement('div'); box.id = 'bankPrint'; box.setAttribute('data-no-i18n', ''); document.body.appendChild(box); }
-    box.innerHTML = '<div class="bp-store"></div><div class="bp-sub"></div><div class="bp-qr">' + E.qrSvg(bankUrl()) + '</div>' +
+    box.innerHTML = '<div class="bp-store"></div><div class="bp-sub"></div><div class="bp-qr">' + (E.qrSvg(bankUrl()) || E.qrSvg(E.payUrl(payBase(), b, ''))) + '</div>' +
       '<div class="bp-hint"></div><table class="bp-info"><tr><th></th><td class="bp-bank"></td></tr><tr><th></th><td class="bp-no"></td></tr><tr><th></th><td class="bp-holder"></td></tr></table>';
     box.querySelector('.bp-store').textContent = storeName() || '';
     box.querySelector('.bp-sub').textContent = tr('계좌이체 안내');
@@ -3291,10 +3288,11 @@
     box.querySelector('.bp-no').textContent = b.number;
     box.querySelector('.bp-holder').textContent = b.holder;
     document.body.classList.add('print-bank');
-    var done = function () { document.body.classList.remove('print-bank'); window.removeEventListener('afterprint', done); };
+    var done = function () { document.body.classList.remove('print-bank'); window.removeEventListener('afterprint', done); window.removeEventListener('focus', done); };
     window.addEventListener('afterprint', done);
     window.print();
-    setTimeout(done, 1000);
+    // 휴대폰처럼 인쇄 창이 따로 뜨는 곳: 돌아와 화면을 다시 볼 때 풀어 줌 (곧바로 풀면 다른 화면이 인쇄됨)
+    setTimeout(function () { window.addEventListener('focus', done); }, 500);
   }
   function setBank(b) {
     state.settings = E.sanitizeSettings(Object.assign({}, state.settings, { bank: b }));
@@ -3403,6 +3401,8 @@
   function optText(id) { var el = $(id); var o = el && el.options && el.options[el.selectedIndex]; return o ? o.textContent.replace(/\s*\(.*\)\s*$/, '').replace(/\s*·.*$/, '') : ''; }
   function renderSetSummaries() {
     var set = function (id, t) { var el = $(id); if (el) el.textContent = t; };
+    var sti = cleanStoreInfo(loadJson(KEYS.store, {}));
+    set('sumStore', [sti.store, sti.inspector].filter(Boolean).join(' · ') || tr('아직 없음'));
     set('sumPunch', optText('sPunchUnit'));
     set('sumSound', ($('sndVolLabel') && $('sndVolLabel').textContent) || '');
     set('sumSaver', optText('saverMin'));
@@ -3425,6 +3425,44 @@
       document.querySelectorAll('details.more-menu[open]').forEach(function (m) { m.open = false; var sm = m.querySelector('summary'); if (sm) sm.focus(); });
     });
   }
+  /* 매장 정보(설정): 매장명은 점검표·계좌 QR에, 사장님 이름은 점검자 성명 기본값으로 */
+  /* 예전 버전이 빈 칸에 예시 문구를 실제 값으로 저장했던 것 정리 (손님 QR에 남의 가게 이름이 뜨지 않게) */
+  var SAMPLE_STORE = { '행복분식 강남점': 1, 'Happy Snack Gangnam': 1 }, SAMPLE_OWNER = { '김사장': 1, 'Mr. Kim': 1 };
+  function cleanStoreInfo(st) {
+    st = st && typeof st === 'object' ? st : {};
+    var name = typeof st.store === 'string' ? E.cleanText(st.store, 30) : '', owner = typeof st.inspector === 'string' ? E.cleanText(st.inspector, 20) : '';
+    if (SAMPLE_STORE[name]) name = '';
+    if (SAMPLE_OWNER[owner]) owner = '';
+    return { store: name, inspector: owner };
+  }
+  function applyStoreInfo(st, fromCloud) {
+    st = cleanStoreInfo(st);
+    var name = typeof st.store === 'string' ? st.store : '', owner = typeof st.inspector === 'string' ? st.inspector : '';
+    var oldOwner = $('sOwnerName').getAttribute('data-was') || '';
+    var a = document.activeElement;
+    if (!(a && a.id === 'sStoreName') || fromCloud) $('sStoreName').value = name;
+    if (!(a && a.id === 'sOwnerName') || fromCloud) $('sOwnerName').value = owner;
+    $('sOwnerName').setAttribute('data-was', owner);
+    $('cStore').value = name;
+    if (!$('cInspector').value || $('cInspector').value === oldOwner) $('cInspector').value = owner;
+    recalcChecklist();
+    renderSetSummaries();
+  }
+  function initStoreInfo() {
+    var save = function () {
+      var st = { store: E.cleanText($('sStoreName').value, 30), inspector: E.cleanText($('sOwnerName').value, 20) };
+      saveJson(KEYS.store, st);
+      applyStoreInfo(st);
+    };
+    $('sStoreName').addEventListener('input', save);
+    $('sOwnerName').addEventListener('input', save);
+    var go = function () { openTab('settings'); $('acc-store').open = true; setTimeout(function () { $('sStoreName').focus(); }, 50); };
+    $('cStoreGo').addEventListener('click', go);
+    $('cStore').addEventListener('click', go);
+    var saved = loadJson(KEYS.store, {}), fixed = cleanStoreInfo(saved);
+    if (saved && (saved.store !== fixed.store || saved.inspector !== fixed.inspector) && (saved.store || saved.inspector)) saveJson(KEYS.store, fixed);   // 예시 문구 정리 결과를 저장(동기화)
+    applyStoreInfo(fixed);
+  }
   function initSetSummaries() {
     var tab = $('tab-settings');
     var later = function () { setTimeout(renderSetSummaries, 0); };
@@ -3439,6 +3477,7 @@
     initSaver();
     initHealthBank();
     initSetSummaries();
+    initStoreInfo();
     var pl = $('punchLang');   // 출퇴근 화면(잠금 중에도)에서 알바생이 언어를 바꿀 수 있게
     if (pl) {
       pl.textContent = E.getLang() === 'en' ? '🌐 한국어' : '🌐 English';
@@ -3469,7 +3508,7 @@
     $('punchResult').addEventListener('click', function (ev) { if (ev.target.closest('[data-punch-result-close]')) closePunchResult(); });
 
     $('lockBtn').addEventListener('click', function () {
-      if (isLocked()) openAdminPin(); else lockNow();
+      if (isLocked()) { punchState.afterPin = null; openAdminPin(); } else lockNow();
     });
     $('adminPin').addEventListener('click', function (ev) { if (ev.target.closest('[data-admin-close]')) closeAdminPin(); });
     $('adminPinForm').addEventListener('submit', function (ev) {
@@ -3606,6 +3645,8 @@
     recalcPayroll(); recalcChecklist(); renderRoster(); renderArchive();
     renderPunch(); tickClock();
     if (window.AlbaCloud && window.AlbaCloud.getStatus) renderCloudUi(window.AlbaCloud.getStatus());
+    // 앱이 상태에 따라 직접 쓰는 글(잠금 버튼·기기·계좌·보건증·출퇴근 기준 등)은 현재 상태로 다시 씀
+    applyLockUi(); fillPunchUnit(); renderBank(); renderHealth(); renderDevice(); renderPunchCloud(); renderPending(); renderConflicts(); renderSetSummaries();
   });
 
   /* 이스터에그: 앱 제목을 빠르게 7번 누르면 팝업 */

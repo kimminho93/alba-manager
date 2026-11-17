@@ -354,7 +354,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var ENGINE_VERSION = '1.7.0';
+  var ENGINE_VERSION = '1.7.1';
 
   /** "10,000원", " 62 " 같은 값을 숫자로 변환. 실패 시 def 반환 */
   function toNumber(v, def) {
@@ -1803,7 +1803,7 @@
       if (Array.isArray(raw.pending)) item.pending = notDone(item, cleanPending(raw.pending));   // 빈 목록도 남김 (다른 기기와 합칠 때 '확인 끝남'을 알 수 있게)
       var hc = cleanHealth(raw.health);
       if (hc) item.health = hc;
-      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(raw.lastTs))) { item.lastTs = raw.lastTs; if (/^(in|out|auto)$/.test(String(raw.lastKind))) item.lastKind = raw.lastKind; }
+      if (typeof raw.lastTs === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw.lastTs)) { item.lastTs = raw.lastTs; if ((typeof raw.lastKind === 'string' && /^(in|out|auto)$/.test(raw.lastKind))) item.lastKind = raw.lastKind; }
       out.push(item);
     });
     return out;
@@ -1816,7 +1816,8 @@
   var HEALTH_URGENT = 7;   // 이 날 수 이하로 남으면 '임박'(빨강)
   var HEALTH_WARN = [7, 14, 30];
   function validYmd(s) {
-    var m = YMD_RE.exec(String(s));
+    if (typeof s !== 'string') return false;   // 배열 ['2026-05-10'] 같은 값이 String()으로 통과하지 않게
+    var m = YMD_RE.exec(s);
     if (!m) return false;
     var y = +m[1], mo = +m[2], d = +m[3];
     return y >= 2000 && y <= 2100 && mo >= 1 && mo <= 12 && d >= 1 && d <= new Date(y, mo, 0).getDate();
@@ -1877,12 +1878,18 @@
   }
 
   /* ---------- 손님용 계좌 안내 (QR) ---------- */
+  /* 화면에 보일 짧은 글: 제어문자·글자 방향 뒤집기 문자·<> 제거, 앞뒤 공백 정리, 이모지가 반쪽으로 잘리지 않게 */
+  var BAD_TEXT = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069<>]/g;
+  function cleanText(v, max) {
+    var t = String(v === null || v === undefined ? '' : v).replace(BAD_TEXT, '').trim().slice(0, max);
+    return t.replace(/[\uD800-\uDBFF]$/, '').trim();
+  }
   /** { bank: 은행, number: 계좌번호(숫자·하이픈), holder: 예금주 } — 하나라도 잘못되면 null */
   function cleanBank(raw) {
     if (!isObj(raw)) return null;
-    var bank = String(raw.bank || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 20);
+    var bank = cleanText(raw.bank, 20);
     var number = String(raw.number || '').replace(/\s+/g, '').replace(/[^0-9-]/g, '');
-    var holder = String(raw.holder || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 20);
+    var holder = cleanText(raw.holder, 20);
     var digits = number.replace(/-/g, '').length;
     if (!bank || !holder || digits < 8 || digits > 20 || number.length > 30 || /^-|-$|--/.test(number)) return null;
     return { bank: bank, number: number, holder: holder };
@@ -1910,7 +1917,7 @@
   function payUrl(base, bank, store) {
     var b = cleanBank(bank);
     if (!b) return '';
-    var st = String(store || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 30);
+    var st = cleanText(store, 30);
     return String(base) + '#d=' + b64url(utf8Bytes(JSON.stringify([1, b.bank, b.number, b.holder, st])));
   }
 
@@ -1924,10 +1931,10 @@
 
   /* 출근 중인 기록 { date:'YYYY-MM-DD', time:'HH:MM' } 검사 */
   function cleanPunch(raw) {
-    if (!isObj(raw)) return null;
+    if (!isObj(raw) || typeof raw.date !== 'string' || typeof raw.time !== 'string') return null;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(raw.date)) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(raw.time))) return null;
     var o = { date: raw.date, time: raw.time };
-    if (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(raw.at))) o.at = raw.at;   // 실제로 찍은 시각(올림 전)
+    if ((typeof raw.at === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(raw.at))) o.at = raw.at;   // 실제로 찍은 시각(올림 전)
     return o;
   }
 
@@ -1937,14 +1944,14 @@
     if (!Array.isArray(raw)) return [];
     var out = [], seen = {};
     raw.forEach(function (x) {
-      if (!isObj(x) || !/^\d{4}-\d{2}-\d{2}$/.test(String(x.date)) || !HM_RE.test(String(x.start))) return;
+      if (!isObj(x) || typeof x.date !== 'string' || typeof x.start !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(String(x.date)) || !HM_RE.test(String(x.start))) return;
       var k = x.date + ' ' + x.start;
       if (seen[k]) return;
       seen[k] = true;
       var o = { id: k, date: x.date, start: x.start };   // id: 기기끼리 합칠 때 같은 항목을 맞추는 열쇠
-      if (HM_RE.test(String(x.at))) o.at = x.at;
-      if (HM_RE.test(String(x.end))) o.end = x.end;   // 찍었지만 달력에 못 넣은 퇴근 시각 (사장님 확인용)
-      if (/^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d$/.test(String(x.cut))) o.cut = x.cut;
+      if ((typeof x.at === 'string' && HM_RE.test(x.at))) o.at = x.at;
+      if ((typeof x.end === 'string' && HM_RE.test(x.end))) o.end = x.end;   // 찍었지만 달력에 못 넣은 퇴근 시각 (사장님 확인용)
+      if ((typeof x.cut === 'string' && /^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d$/.test(x.cut))) o.cut = x.cut;
       out.push(o);
     });
     return out.slice(-30);
@@ -2438,6 +2445,7 @@
     cleanBank: cleanBank,
     bankKey: bankKey,
     payUrl: payUrl,
+    cleanText: cleanText,
     DEFAULT_SETTINGS: DEFAULT_SETTINGS,
     RETAIN_MONTHS: RETAIN_MONTHS,
     emptyShifts: emptyShifts,
@@ -3595,6 +3603,7 @@
         var d = s.charCodeAt(i + 1);
         if (d >= 0xDC00 && d < 0xE000) { c = 0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00); i++; }
       }
+      if (c >= 0xD800 && c < 0xE000) c = 0xFFFD;   // 짝 없는 반쪽 글자는 대체 문자로 (표준 UTF-8만 만들기)
       if (c < 0x80) out.push(c);
       else if (c < 0x800) out.push(0xC0 | (c >> 6), 0x80 | (c & 63));
       else if (c < 0x10000) out.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
@@ -3804,4 +3813,4 @@
 });
 
 /* ===== 버전 (package.json 의 version) ===== */
-;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.7.0';
+;(typeof window !== 'undefined' ? window : globalThis).ALBA_VERSION = '1.7.1';

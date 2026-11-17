@@ -11,8 +11,8 @@
   <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-  <script src="./boot.js?v=202611171500"></script>
-  <link rel="stylesheet" href="./style.css?v=202611171500">
+  <script src="./boot.js?v=202611171600"></script>
+  <link rel="stylesheet" href="./style.css?v=202611171600">
 </head>
 <body>
   <header class="app-header">
@@ -323,12 +323,12 @@
       <div class="grid">
         <form id="chkForm" class="card input-card" autocomplete="off">
           <h2 class="card-title">점검 정보</h2>
-          <label class="field"><span>매장명 (상호)</span>
-            <input id="cStore" type="text" placeholder="예) 행복분식 강남점" maxlength="40">
+          <label class="field"><span>매장명 (상호) <button type="button" id="cStoreGo" class="btn-link hint-link">설정에서 바꾸기</button></span>
+            <input id="cStore" type="text" readonly placeholder="설정 → 매장 정보에서 적어 주세요" maxlength="40">
           </label>
           <div class="row-2">
             <label class="field"><span>점검일자</span><input id="cDate" type="date"></label>
-            <label class="field"><span>점검자 성명</span><input id="cInspector" type="text" placeholder="홍길동" maxlength="20"></label>
+            <label class="field"><span>점검자 성명</span><input id="cInspector" type="text" placeholder="예) 홍길동" maxlength="20"></label>
           </div>
           <div class="row-2">
             <label class="field"><span>냉장 온도 <em class="hint">0~5°C</em></span>
@@ -427,6 +427,14 @@
 
         <h3 class="set-group">매장·기기</h3>
         <div class="set-list">
+          <details class="set-acc" id="acc-store">
+            <summary><span class="acc-t">매장 정보</span><span class="acc-v" id="sumStore" data-no-i18n></span></summary>
+            <div class="acc-body">
+              <div class="set-note">매장명은 <b>위생 점검표</b>와 <b>손님 계좌이체 QR</b> 화면에 쓰여요. 점검자 성명은 점검할 때 바꿀 수 있고, 처음에는 사장님 이름이 들어가요.</div>
+              <label class="field"><span>매장명 (상호)</span><input id="sStoreName" type="text" maxlength="30" placeholder="예) 행복분식 강남점" autocomplete="off"></label>
+              <label class="field"><span>사장님 이름</span><input id="sOwnerName" type="text" maxlength="20" placeholder="예) 홍길동" autocomplete="off"></label>
+            </div>
+          </details>
           <details class="set-acc" id="acc-pin">
             <summary><span class="acc-t">관리자 비밀번호</span><span class="acc-v" id="pinState"></span></summary>
             <div class="acc-body">
@@ -564,7 +572,7 @@
           <details class="set-acc" id="acc-info">
             <summary><span class="acc-t">앱 정보·공유</span><span class="acc-v" id="sumInfo" data-no-i18n></span></summary>
             <div class="acc-body">
-          <div class="set-note">사장님 도우미 <b class="ver-text">v1.7.0</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
+          <div class="set-note">사장님 도우미 <b class="ver-text">v1.7.1</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
           <div class="share-box">
             <img class="share-qr" src="./img/share-qr.svg" alt="사장님 도우미 주소 QR 코드" width="160" height="160">
             <div class="share-text">
@@ -790,7 +798,7 @@
           <div class="guide-body">
             <ol>
               <li>위쪽 <b>[위생 점검]</b> 탭을 누릅니다.</li>
-              <li>매장명, 점검일자, 점검자를 적고 냉장·냉동 온도를 입력합니다.</li>
+              <li>점검일자·점검자를 확인하고 냉장·냉동 온도를 입력합니다. 매장명은 <b>설정 → 매장 정보</b>에 한 번 적어 두면 되고, 점검자는 처음에 거기 적은 사장님 이름이 들어갑니다(그날 점검한 사람으로 바꿔도 돼요).</li>
               <li>점검 항목 <b>41개</b> 중 <b>문제없는 항목만 눌러서 체크</b>하세요. 체크하지 않은 항목은 <b>"점검필요"</b>로 표시됩니다.</li>
               <li>전부 괜찮다면 <b>[✅ 전체 적합으로 체크]</b>를 누르면 됩니다.</li>
               <li>특이사항이 있으면 메모에 적습니다.</li>
@@ -908,7 +916,7 @@
 
   <footer class="app-footer">
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
-    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.7.0</span></div>
+    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.7.1</span></div>
   </footer>
 
   <!-- 출퇴근: 비밀번호 입력 -->
@@ -1164,10 +1172,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611171500"></script>
-  <script src="./lang_web.js?v=202611171500"></script>
-  <script src="./i18n.js?v=202611171500"></script>
-  <script src="./gsync.js?v=202611171500"></script>
-  <script src="./app.js?v=202611171500"></script>
+  <script src="./engine.js?v=202611171600"></script>
+  <script src="./lang_web.js?v=202611171600"></script>
+  <script src="./i18n.js?v=202611171600"></script>
+  <script src="./gsync.js?v=202611171600"></script>
+  <script src="./app.js?v=202611171600"></script>
 </body>
 </html>

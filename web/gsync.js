@@ -475,6 +475,11 @@
     out.sort(function (x, y) { x = String(x); y = String(y); return x < y ? -1 : x > y ? 1 : 0; });   // 어느 기기에서 합쳐도 같은 순서
     return out.slice(-200);
   }
+  /* 한 묶음으로만 뜻이 있는 칸(손님 계좌, 보건증): 하위 칸을 섞지 않고 통째로 비교 (A 기기 은행 + B 기기 계좌번호 같은 섞인 값 방지) */
+  function atomicPath(path) {
+    var last = path[path.length - 1];
+    return (path.length === 2 && path[0] === 'settings' && last === 'bank') || (path[0] === 'workers' && path.length === 3 && last === 'health');
+  }
   function merge3(b, l, r, path) {
     path = path || [];
     if (jeq(l, r)) return l;
@@ -482,6 +487,7 @@
     if (b !== undefined && jeq(r, b)) return l;
     if (l === undefined) return b === undefined ? r : undefined;   // 이 기기가 지움(시트는 그대로면 위에서 처리) / 새로 생긴 건 살림
     if (r === undefined) return b === undefined ? l : undefined;
+    if (isObj(l) && isObj(r) && atomicPath(path)) { noteConflict(path, l, r); return l; }
     if (isObj(l) && isObj(r)) {
       var bo = isObj(b) ? b : Object.create(null), out = {}, seen = Object.create(null);
       Object.keys(l).concat(Object.keys(r)).forEach(function (k) {
@@ -621,6 +627,7 @@
     var last = path[path.length - 1];
     if (!all && typeof last === 'string' && SKIP_DIFF[last] && path.length > 2) return out;
     if (path.length === 1 && last === 'reqLog') return out;
+    if (atomicPath(path)) { out.push({ path: path, before: b === undefined ? null : b, after: c === undefined ? null : c }); return out; }
     if (isObj(b) && isObj(c)) {
       var seen = Object.create(null);
       Object.keys(b).concat(Object.keys(c)).forEach(function (k) {

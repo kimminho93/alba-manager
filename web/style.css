@@ -2650,3 +2650,5 @@ body.locked .punch-cloud.bad, body.locked .punch-cloud.off { background: transpa
 .chk-item-body { min-width: 0; }
 .chk-item .result { flex: none; max-width: 34%; white-space: normal; text-align: center; line-height: 1.25; }
 @media (max-width: 380px) { html[lang="en"] .tab { font-size: 15px; letter-spacing: -.2px; } }
+.hint-link { min-height: 0; padding: 0 0 0 6px; font-size: 14px; font-weight: 700; color: var(--primary); vertical-align: baseline; }
+#cStore[readonly] { background: var(--card-2); color: var(--text); cursor: pointer; }

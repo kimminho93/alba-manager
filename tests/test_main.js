@@ -1210,6 +1210,21 @@ test('QR: 다른 구현(파이썬 qrcode)과 격자가 똑같고, 너무 길면 
   assert.strictEqual(E.qrSvg('x'.repeat(500)), '');
 });
 
+test('8차 보안: 날짜·출퇴근 칸에 배열이 오면 버리고, 화면 글에서 방향 뒤집기 문자·공백뿐인 값 거절', () => {
+  assert.strictEqual(E.validYmd(['2026-05-10']), false);
+  const [w] = E.normalizeWorkers([{ name: 'a', health: { expire: ['2026-05-10'] }, punch: { date: ['2026-11-17'], time: '09:00' },
+    pending: [{ date: ['2026-11-01'], start: '09:00' }], lastTs: ['2026-11-17 09:00:00'] }]);
+  assert.strictEqual(w.health, undefined);
+  assert.strictEqual(w.punch, undefined);
+  assert.deepStrictEqual(w.pending, []);
+  assert.strictEqual(w.lastTs, undefined);
+  assert.strictEqual(E.cleanBank({ bank: '국민', number: '12345678', holder: '   ' }), null);
+  assert.strictEqual(E.cleanBank({ bank: '국민‮행은', number: '12345678', holder: '홍⁦길동' }).holder, '홍길동');
+  assert.strictEqual(E.cleanText('😀'.repeat(15), 29), '😀'.repeat(14));   // 이모지 반쪽으로 끝나지 않음
+  const q = E.qrEncode('a\uD800b');   // 짝 없는 반쪽 글자도 표준 UTF-8로
+  assert.ok(q && q.version === 1);
+});
+
 test('버전: 엔진 번들의 ALBA_VERSION이 package.json 버전과 같다', () => {
   const fs = require('fs'), path = require('path');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));

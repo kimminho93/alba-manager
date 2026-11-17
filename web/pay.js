@@ -1,6 +1,10 @@
 /* 손님용 계좌이체 안내 페이지: 주소의 # 뒤 정보만 읽어 보여 주고 복사 (서버로 아무것도 보내지 않음) */
 (function () {
   'use strict';
+  // 다른 사이트가 이 페이지를 몰래 감싸(iframe) 엉뚱한 계좌를 복사하게 하는 것 방지
+  if (window.top !== window.self) {
+    try { window.top.location.replace(window.self.location.href); } catch (e) { document.documentElement.style.visibility = 'hidden'; return; }
+  }
   var en = !/^ko\b/i.test(navigator.language || 'ko');
   var T = {
     title: '계좌이체 안내', sub: '계좌이체 안내', bank: '은행', no: '계좌번호', holder: '예금주',
@@ -19,7 +23,12 @@
     bad: "Couldn't read the details. Please ask the store for the account number."
   };
   function $(id) { return document.getElementById(id); }
-  function clean(s, max) { return typeof s === 'string' && s.length && s.length <= max && !/[\u0000-\u001f<>]/.test(s) ? s : null; }
+  // 앞뒤 공백을 빼고도 글자가 있어야 하며, 제어문자·글자 방향 뒤집기 문자·<> 는 거절
+  function clean(s, max) {
+    if (typeof s !== 'string') return null;
+    s = s.trim();
+    return s.length && s.length <= max && !/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069<>]/.test(s) ? s : null;
+  }
   function decode(h) {
     var m = /(?:^#|&)d=([A-Za-z0-9_-]{8,600})(?:&|$)/.exec(h || '');
     if (!m) return null;
@@ -30,7 +39,7 @@
       var a = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
       if (!Array.isArray(a) || a[0] !== 1) return null;
       var bank = clean(a[1], 20), no = clean(a[2], 30), holder = clean(a[3], 20);
-      var store = a[4] === '' ? '' : clean(a[4], 30);
+      var store = typeof a[4] === 'string' && !a[4].trim() ? '' : clean(a[4], 30);
       if (!bank || !no || !holder || store === null) return null;
       var digits = no.replace(/-/g, '');
       if (!/^[0-9-]+$/.test(no) || digits.length < 8 || digits.length > 20 || /^-|-$|--/.test(no)) return null;
@@ -52,8 +61,14 @@
   document.documentElement.lang = en ? 'en' : 'ko';
   $('sub').textContent = T.sub; $('lBank').textContent = T.bank; $('lNo').textContent = T.no; $('lHolder').textContent = T.holder;
   $('copyNo').textContent = T.copyNo; $('copyAll').textContent = T.copyAll; $('howto').textContent = T.howto; $('bad').textContent = T.bad;
-  var d = decode(location.hash);
-  if (!d) { $('bad').hidden = false; return; }
+  var d = null;
+  function render() {
+  d = decode(location.hash);
+  $('done').textContent = '';
+  ['copyNo', 'copyAll'].forEach(function (id) { $(id).classList.remove('copied'); });
+  $('copyNo').textContent = T.copyNo;
+  if (!d) { $('bad').hidden = false; $('ok').hidden = true; $('store').textContent = ''; return; }
+  $('bad').hidden = true;
   $('store').textContent = d.store;
   $('bank').textContent = d.bank; $('no').textContent = d.no; $('holder').textContent = d.holder;
   var chk = $('check');
@@ -62,10 +77,13 @@
   var b = document.createElement('b'); b.textContent = d.holder; chk.appendChild(b);
   chk.appendChild(document.createTextNode(T.check2));
   $('ok').hidden = false;
+  }
   function done(btn, ok) {
     $('done').textContent = ok ? T.copied : T.fail;
     if (ok) { btn.classList.add('copied'); if (btn.id === 'copyNo') btn.textContent = T.copiedBtn; }
   }
-  $('copyNo').addEventListener('click', function () { var me = this; copy(d.digits, function (ok) { done(me, ok); }); });
-  $('copyAll').addEventListener('click', function () { var me = this; copy(d.bank + ' ' + d.digits, function (ok) { done(me, ok); }); });
+  $('copyNo').addEventListener('click', function () { if (!d) return; var me = this; copy(d.digits, function (ok) { done(me, ok); }); });
+  $('copyAll').addEventListener('click', function () { if (!d) return; var me = this; copy(d.bank + ' ' + d.digits, function (ok) { done(me, ok); }); });
+  window.addEventListener('hashchange', render);   // 이미 열린 탭에서 다른 QR 주소로 바뀌면 다시 읽음
+  render();
 })();
