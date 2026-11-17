@@ -160,10 +160,117 @@
       if (pn) item.punch = pn;
       if (Array.isArray(raw.pendingDone)) item.pendingDone = cleanDone(raw.pendingDone);
       if (Array.isArray(raw.pending)) item.pending = notDone(item, cleanPending(raw.pending));   // 빈 목록도 남김 (다른 기기와 합칠 때 '확인 끝남'을 알 수 있게)
+      var hc = cleanHealth(raw.health);
+      if (hc) item.health = hc;
       if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(raw.lastTs))) { item.lastTs = raw.lastTs; if (/^(in|out|auto)$/.test(String(raw.lastKind))) item.lastKind = raw.lastKind; }
       out.push(item);
     });
     return out;
+  }
+
+  /* ---------- 보건증(건강진단결과서) 만료 관리 ----------
+   * 「식품위생 분야 종사자의 건강진단 규칙」 제2조: 유효기간 1년, 직전 유효기간 만료일 다음 날부터 기산,
+   * 다음 검진은 만료일 전후 각 30일 이내. 1년 기간의 끝은 시작일 전날 (민법: 해당일이 없으면 그 달 말일) */
+  var YMD_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+  var HEALTH_URGENT = 7;   // 이 날 수 이하로 남으면 '임박'(빨강)
+  var HEALTH_WARN = [7, 14, 30];
+  function validYmd(s) {
+    var m = YMD_RE.exec(String(s));
+    if (!m) return false;
+    var y = +m[1], mo = +m[2], d = +m[3];
+    return y >= 2000 && y <= 2100 && mo >= 1 && mo <= 12 && d >= 1 && d <= new Date(y, mo, 0).getDate();
+  }
+  function ymdNums(s) { var m = YMD_RE.exec(s); return [+m[1], +m[2], +m[3]]; }
+  function addDaysYmd(s, n) { var p = ymdNums(s); return ymdOf(new Date(p[0], p[1] - 1, p[2] + n)); }
+  function daysBetween(a, b) {   // b - a (날 수, 시간대와 무관)
+    var pa = ymdNums(a), pb = ymdNums(b);
+    return Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - Date.UTC(pa[0], pa[1] - 1, pa[2])) / 86400000);
+  }
+  /** start 날부터 1년 유효할 때의 만료일 (예: 2026-05-10 → 2027-05-09, 2024-02-29 → 2025-02-28) */
+  function yearEnd(start) {
+    var p = ymdNums(start);
+    if (p[1] === 2 && p[2] === 29) return (p[0] + 1) + '-02-28';
+    return addDaysYmd(ymdOf(new Date(p[0] + 1, p[1] - 1, p[2])), -1);
+  }
+  /** 보건증 { exam?: 검진일, expire: 만료일, off?: 알림 끔 } 검사. 만료일이 없으면 검진일로 계산 */
+  function cleanHealth(raw) {
+    if (!isObj(raw)) return null;
+    var o = {};
+    if (validYmd(raw.exam)) o.exam = raw.exam;
+    if (validYmd(raw.expire)) o.expire = raw.expire;
+    else if (o.exam) o.expire = yearEnd(o.exam);
+    if (raw.off === true) o.off = true;
+    return o.expire || o.off ? o : null;
+  }
+  /**
+   * 새로 검진했을 때의 새 만료일. 기존 만료일 전후 30일 안에 검진했으면 '기존 만료일 다음 날부터 1년',
+   * 아니면(처음이거나 한참 지난 뒤) '검진일부터 1년'
+   */
+  function renewHealthExpire(health, exam) {
+    if (!validYmd(exam)) return '';
+    var old = health && validYmd(health.expire) ? health.expire : '';
+    if (old && Math.abs(daysBetween(old, exam)) <= 30) return yearEnd(addDaysYmd(old, 1));
+    return yearEnd(exam);
+  }
+  function cleanWarnDays(v) { v = Math.round(Number(v)); return HEALTH_WARN.indexOf(v) >= 0 ? v : 30; }
+  /** 한 사람의 보건증 상태: off(알림 끔) | missing(미등록) | expired(만료) | urgent(7일 이내) | soon(warnDays 이내) | ok */
+  function healthStatus(worker, today, warnDays) {
+    var h = worker && worker.health;
+    if (h && h.off) return { state: 'off' };
+    if (!h || !validYmd(h.expire) || !validYmd(today)) return { state: 'missing' };
+    var d = daysBetween(today, h.expire);
+    var warn = cleanWarnDays(warnDays);
+    return { state: d < 0 ? 'expired' : d <= HEALTH_URGENT ? 'urgent' : d <= warn ? 'soon' : 'ok', days: d, expire: h.expire };
+  }
+  /** 알림 목록 (만료 → 임박 → 곧 만료 → 미등록 순, 같은 단계는 남은 날 적은 순) */
+  function healthAlerts(workers, today, warnDays) {
+    var rank = { expired: 0, urgent: 1, soon: 2, missing: 3 };
+    var out = [];
+    (workers || []).forEach(function (w) {
+      var st = healthStatus(w, today, warnDays);
+      if (rank[st.state] === undefined) return;
+      out.push({ id: w.id, name: w.name, state: st.state, days: st.days, expire: st.expire });
+    });
+    out.sort(function (a, b) { return rank[a.state] - rank[b.state] || (a.days || 0) - (b.days || 0) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0); });
+    return out;
+  }
+
+  /* ---------- 손님용 계좌 안내 (QR) ---------- */
+  /** { bank: 은행, number: 계좌번호(숫자·하이픈), holder: 예금주 } — 하나라도 잘못되면 null */
+  function cleanBank(raw) {
+    if (!isObj(raw)) return null;
+    var bank = String(raw.bank || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 20);
+    var number = String(raw.number || '').replace(/\s+/g, '').replace(/[^0-9-]/g, '');
+    var holder = String(raw.holder || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 20);
+    var digits = number.replace(/-/g, '').length;
+    if (!bank || !holder || digits < 8 || digits > 20 || number.length > 30 || /^-|-$|--/.test(number)) return null;
+    return { bank: bank, number: number, holder: holder };
+  }
+  function bankKey(b) { b = cleanBank(b); return b ? b.bank + '|' + b.number + '|' + b.holder : ''; }
+  function b64url(bytes) {
+    var A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', out = '';
+    for (var i = 0; i < bytes.length; i += 3) {
+      var n = (bytes[i] << 16) | ((bytes[i + 1] || 0) << 8) | (bytes[i + 2] || 0);
+      out += A[(n >> 18) & 63] + A[(n >> 12) & 63] + (i + 1 < bytes.length ? A[(n >> 6) & 63] : '') + (i + 2 < bytes.length ? A[n & 63] : '');
+    }
+    return out;
+  }
+  function utf8Bytes(s) {
+    var e = encodeURIComponent(s), out = [];
+    for (var i = 0; i < e.length; i++) {
+      if (e[i] === '%') { out.push(parseInt(e.substr(i + 1, 2), 16)); i += 2; } else out.push(e.charCodeAt(i));
+    }
+    return out;
+  }
+  /**
+   * 손님 휴대폰이 여는 안내 페이지 주소. 정보는 # 뒤에 담아 서버로 전송되지 않음
+   * 형식: pay.html#d=<base64url(JSON [1, 은행, 계좌번호, 예금주, 매장명])>
+   */
+  function payUrl(base, bank, store) {
+    var b = cleanBank(bank);
+    if (!b) return '';
+    var st = String(store || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 30);
+    return String(base) + '#d=' + b64url(utf8Bytes(JSON.stringify([1, b.bank, b.number, b.holder, st])));
   }
 
   /* ---------- 출퇴근 찍기 (매장 기기에서 알바생이 이름 → 비밀번호) ---------- */
@@ -672,13 +779,24 @@
       punchOutMode: pu.outMode,
       punchGraceIn: pu.graceIn,
       punchGraceOut: pu.graceOut,
-      autoOutTime: cleanAutoOut((raw || {}).autoOutTime)
+      autoOutTime: cleanAutoOut((raw || {}).autoOutTime),
+      healthWarnDays: cleanWarnDays(raw.healthWarnDays),
+      bank: cleanBank(raw.bank)
     };
   }
 
   return {
     DEFAULT_MIN_WAGE: DEFAULT_MIN_WAGE,
     sanitizeSettings: sanitizeSettings,
+    cleanHealth: cleanHealth,
+    healthYearEnd: function (s) { return validYmd(s) ? yearEnd(s) : ''; },
+    renewHealthExpire: renewHealthExpire,
+    healthStatus: healthStatus,
+    healthAlerts: healthAlerts,
+    validYmd: validYmd,
+    cleanBank: cleanBank,
+    bankKey: bankKey,
+    payUrl: payUrl,
     DEFAULT_SETTINGS: DEFAULT_SETTINGS,
     RETAIN_MONTHS: RETAIN_MONTHS,
     emptyShifts: emptyShifts,

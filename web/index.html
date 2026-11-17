@@ -11,8 +11,8 @@
   <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-  <script src="./boot.js?v=202611171100"></script>
-  <link rel="stylesheet" href="./style.css?v=202611171100">
+  <script src="./boot.js?v=202611171300"></script>
+  <link rel="stylesheet" href="./style.css?v=202611171300">
 </head>
 <body>
   <header class="app-header">
@@ -25,6 +25,7 @@
     </div>
     <div class="header-actions">
       <button id="lockBtn" class="cloud-btn lock-btn" type="button" hidden>🔒 관리자</button>
+      <button id="bellBtn" class="cloud-btn bell-btn" type="button" hidden aria-label="보건증 알림">🔔<span id="bellCount" class="bell-count"></span></button>
       <button id="cloudBtn" class="cloud-btn" type="button" aria-label="구글 시트에 저장 설정">☁️ 구글 저장</button>
       <button id="langBtn" class="icon-btn lang-btn" type="button" aria-label="언어 / Language">🌐 EN</button>
       <button id="fontToggle" class="icon-btn font-btn" type="button" aria-label="글자 크게 보기 켜기/끄기" aria-pressed="false">가+</button>
@@ -54,6 +55,7 @@
         <div id="punchRemote" class="punch-remote" hidden></div>
         <div id="punchList" class="punch-list"></div>
         <button id="punchAllOut" type="button" class="btn punch-all" hidden>🌙 근무 중인 사람 모두 퇴근</button>
+        <button id="punchBankBtn" type="button" class="btn punch-bank" hidden>💳 계좌이체 QR</button>
         <div id="punchCloud" class="punch-cloud off" role="status">☁️ 구글 저장 상태 확인 중…</div>
       </div>
     </section>
@@ -90,6 +92,13 @@
           <label class="field"><span>출퇴근 비밀번호 <em class="hint">(선택) 알바생이 출퇴근 찍을 때 입력</em></span>
             <input id="pPw" type="text" maxlength="20" autocomplete="off" placeholder="예) 1234" disabled>
           </label>
+          <div class="field" id="healthField"><span>보건증 <em class="hint">검진일을 넣으면 만료일이 자동으로 채워져요. 보건증에 적힌 만료일로 고쳐도 돼요</em></span>
+            <div class="health-row">
+              <label class="health-col"><small>검진일</small><input id="pHealthExam" type="date" min="2000-01-01" max="2100-12-31" disabled></label>
+              <label class="health-col"><small>만료일</small><input id="pHealthExp" type="date" min="2000-01-01" max="2100-12-31" disabled></label>
+            </div>
+            <label class="health-off"><input id="pHealthOff" type="checkbox" disabled> <span>보건증 알림 끄기 (퇴사·휴직 등)</span></label>
+          </div>
           <p id="noWorkerNote" class="no-worker-note">아래 <b>정산 명단</b>에서 <b>알바생을 추가</b>하면 근무 기록이 자동으로 저장됩니다.</p>
 
           <div class="field month-field" id="monthField"><span>지급월</span>
@@ -417,6 +426,28 @@
           <button id="btnDevClear" type="button" class="btn btn-ghost" hidden>지정 해제</button>
         </div>
 
+        <h3 class="set-title">보건증 알림 <small class="pin-state">· 모든 기기 공통</small></h3>
+        <div class="set-note">알바생마다 <b>정산 설정</b>에 보건증 검진일·만료일을 적어 두면, 관리자 화면 위의 <b>🔔</b>에서 만료가 다가온 사람을 볼 수 있어요. 보건증(건강진단결과서)은 <b>1년</b>마다 새로 받아야 하고, 만료일 <b>전후 30일 안</b>에 검진하면 새 보건증은 옛 만료일 다음 날부터 1년이에요. 보건소 결과는 보통 3~7일 걸려요.</div>
+        <div class="snd-row"><label for="sHealthWarn">미리 알려 줄 때</label><select id="sHealthWarn"><option value="30">만료 30일 전부터 (추천)</option><option value="14">만료 14일 전부터</option><option value="7">만료 7일 전부터</option></select></div>
+
+        <h3 class="set-title">손님 계좌이체 QR <small id="bankState" class="pin-state"></small></h3>
+        <div class="set-note">손님이 휴대폰 카메라로 QR을 찍으면 <b>은행·계좌번호·예금주</b>가 보이고 <b>[계좌번호 복사]</b>를 눌러 쓰는 송금 앱에 붙여 넣을 수 있어요. 출퇴근 화면의 <b>[💳 계좌이체 QR]</b>로 크게 띄우거나 <b>안내판으로 인쇄</b>해 두세요. 바꾸려면 관리자 비밀번호가 필요하고, 다른 기기에서 계좌가 바뀌면 이 기기에서 확인해야 QR이 보여요.</div>
+        <div id="bankWarn" class="bank-warn" hidden role="alert"></div>
+        <div class="bank-form">
+          <label class="field"><span>은행</span>
+            <input id="sBankName" type="text" maxlength="20" list="bankList" placeholder="예) 국민은행" autocomplete="off">
+            <datalist id="bankList"></datalist>
+          </label>
+          <label class="field"><span>계좌번호</span><input id="sBankNo" type="text" inputmode="numeric" maxlength="30" placeholder="예) 123456-78-901234" autocomplete="off"></label>
+          <label class="field"><span>예금주</span><input id="sBankHolder" type="text" maxlength="20" placeholder="예) 홍길동" autocomplete="off"></label>
+        </div>
+        <div class="pin-row">
+          <button id="btnBankSave" type="button" class="btn btn-primary">저장</button>
+          <button id="btnBankShow" type="button" class="btn" hidden>QR 크게 보기</button>
+          <button id="btnBankPrint" type="button" class="btn" hidden>🖨️ 안내판 인쇄</button>
+          <button id="btnBankClear" type="button" class="btn btn-ghost" hidden>지우기</button>
+        </div>
+
         <h3 class="set-title">출퇴근 시간 끊기 <small class="pin-state">· 모든 기기 공통</small></h3>
         <div class="snd-row"><label for="sPunchUnit">끊는 단위</label><select id="sPunchUnit"><option value="30">30분 (기본)</option><option value="60">1시간</option><option value="20">20분</option><option value="15">15분</option><option value="10">10분</option><option value="5">5분</option></select></div>
         <div class="snd-row"><label for="sInMode">출근 방식</label><select id="sInMode"><option value="round">올림 (단위로 끊기)</option><option value="exact">찍은 그대로 (분 단위)</option></select></div>
@@ -441,7 +472,7 @@
         <div class="set-note">처음에는 휴대폰·브라우저 언어를 따라갑니다. 영어로 바꾸면 화면, 사용 방법, 점검표, 카톡 명세서·엑셀 파일도 영어로 나옵니다.</div>
 
         <h3 class="set-title">앱 정보</h3>
-        <div class="set-note">사장님 도우미 <b class="ver-text">v1.5.3</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
+        <div class="set-note">사장님 도우미 <b class="ver-text">v1.6.0</b> · 변경 내역은 저장소의 CHANGELOG.md 에서 볼 수 있습니다. 문의할 때 이 버전을 알려 주세요.</div>
         <div class="share-box">
           <img class="share-qr" src="./img/share-qr.svg" alt="사장님 도우미 주소 QR 코드" width="160" height="160">
           <div class="share-text">
@@ -510,6 +541,8 @@
             <button type="button" data-guide-go="g-weekly">주휴·식대</button>
             <button type="button" data-guide-go="g-roster">여러 명·엑셀</button>
             <button type="button" data-guide-go="g-hygiene">위생 점검</button>
+            <button type="button" data-guide-go="g-health">보건증 알림</button>
+            <button type="button" data-guide-go="g-bank">계좌이체 QR</button>
             <button type="button" data-guide-go="g-cloud">구글 저장</button>
             <button type="button" data-guide-go="g-backup">백업·기기 옮기기</button>
             <button type="button" data-guide-go="g-faq">자주 묻는 질문</button>
@@ -703,6 +736,33 @@
           </div>
         </details>
 
+        <details class="guide-item" id="g-health">
+          <summary><span class="guide-sum"><span class="guide-name">보건증 만료 알림</span><small class="guide-sub">검진일·만료일 · 🔔 · 새로 받았어요</small></span></summary>
+          <div class="guide-body">
+            <ol>
+              <li>알바생을 고르고 <b>정산 설정</b>의 <b>보건증</b> 칸에 <b>검진일</b>을 넣으면 만료일(1년 뒤 전날)이 자동으로 채워집니다. 보건증에 적힌 만료일과 다르면 만료일 칸을 고치세요.</li>
+              <li>관리자 화면 위의 <b>🔔</b>에 만료가 다가온 사람 수가 나옵니다. 누르면 <b>만료 → 7일 이내(빨강) → 곧 만료(노랑) → 날짜 미등록</b> 순서로 보입니다. 출퇴근 화면에는 보이지 않습니다.</li>
+              <li>새 보건증을 받으면 <b>[새로 받았어요]</b>에서 검진일만 고르세요. 옛 만료일 <b>전후 30일 안</b>에 검진했다면 법에 따라 <b>옛 만료일 다음 날부터 1년</b>으로 계산됩니다.</li>
+              <li>그만둔 사람이나 휴직 중인 사람은 <b>[알림 끄기]</b> 또는 정산 설정의 <b>보건증 알림 끄기</b>로 목록에서 뺄 수 있습니다.</li>
+              <li>언제부터 알려 줄지는 <b>⚙️ 설정 → 보건증 알림</b>에서 30일·14일·7일 중 고릅니다. 보건소 결과가 보통 3~7일 걸리니 30일을 추천합니다.</li>
+            </ol>
+            <p class="guide-tip">💡 보건증이 만료된 사람이나 날짜를 안 적은 사람이 있으면 위생 점검표 <b>4번(건강진단결과서)</b> 항목 아래에 안내가 뜹니다. 체크 여부는 사장님이 정합니다.</p>
+          </div>
+        </details>
+
+        <details class="guide-item" id="g-bank">
+          <summary><span class="guide-sum"><span class="guide-name">손님 계좌이체 QR</span><small class="guide-sub">계좌 저장 · QR 크게 보기 · 안내판 인쇄</small></span></summary>
+          <div class="guide-body">
+            <ol>
+              <li><b>⚙️ 설정 → 손님 계좌이체 QR</b>에 은행·계좌번호·예금주를 적고 <b>[저장]</b>을 누릅니다. 관리자 비밀번호가 있으면 한 번 더 확인합니다.</li>
+              <li>출퇴근 화면의 <b>[💳 계좌이체 QR]</b>을 누르면 큰 QR이 뜹니다. 관리자 잠금 중에도 <b>보기만</b> 할 수 있습니다. <b>[🖨️ 안내판 인쇄]</b>로 카운터에 붙여 둘 안내판도 만들 수 있습니다.</li>
+              <li>손님이 휴대폰 카메라로 찍으면 은행·계좌번호·예금주가 보이고, <b>[계좌번호 복사]</b>를 누른 뒤 쓰는 송금 앱에 붙여 넣으면 됩니다. 계좌 정보는 주소의 # 뒤에만 들어 있어 어느 서버로도 보내지지 않습니다.</li>
+              <li>다른 기기에서 계좌가 바뀌면 이 기기에서는 <b>확인하기 전까지 QR이 숨겨지고</b> 🔔와 설정에 안내가 뜹니다. 맞는 계좌인지 보고 <b>[맞아요, 이 계좌로 QR 표시]</b>를 누르세요.</li>
+            </ol>
+            <p class="guide-tip">💡 계좌를 바꾸면 전에 인쇄한 안내판은 옛 계좌를 담고 있으니 다시 인쇄하세요. 누군가 다른 QR 스티커를 덧붙이는 일에 대비해, 손님 화면에는 예금주 이름을 꼭 확인하라는 안내가 크게 나옵니다.</p>
+          </div>
+        </details>
+
         <details class="guide-item" id="g-cloud">
           <summary><span class="guide-sum"><span class="guide-name">구글 시트 자동 저장</span><small class="guide-sub">연동 · 자동 저장 · 다시 연결 · 출퇴근 기기 지정</small></span></summary>
           <div class="guide-body">
@@ -783,7 +843,7 @@
 
   <footer class="app-footer">
     계산 결과는 참고용입니다. 실제 신고·납부는 세무 전문가 또는 관할 기관 기준을 확인하세요.
-    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.5.3</span></div>
+    <div class="app-ver">사장님 도우미 <span class="ver-text">v1.6.0</span></div>
   </footer>
 
   <!-- 출퇴근: 비밀번호 입력 -->
@@ -827,6 +887,34 @@
         <button type="submit" class="btn btn-primary">정하기</button>
       </div>
     </form>
+  </div>
+
+  <!-- 보건증 알림 목록 -->
+  <div id="healthModal" class="punch-modal" hidden>
+    <div class="punch-modal-backdrop" data-health-close></div>
+    <div class="punch-card health-card" role="dialog" aria-modal="true" aria-labelledby="healthTitle">
+      <div class="punch-card-name" id="healthTitle">🔔 보건증 알림</div>
+      <p id="healthLead" class="punch-card-state"></p>
+      <div id="healthList" class="health-list"></div>
+      <div class="punch-btns"><button type="button" class="btn" data-health-close>닫기</button></div>
+    </div>
+  </div>
+
+  <!-- 손님용 계좌 QR (잠긴 상태에서도 보기만 가능) -->
+  <div id="bankModal" class="punch-modal bank-modal" hidden>
+    <div class="punch-modal-backdrop" data-bank-close></div>
+    <div class="punch-card bank-card" role="dialog" aria-modal="true" aria-labelledby="bankStore">
+      <div id="bankStore" class="bank-store" data-no-i18n></div>
+      <div class="bank-sub">계좌이체 안내</div>
+      <div id="bankQr" class="bank-qr"></div>
+      <div class="bank-hint">휴대폰 카메라로 찍으면 계좌번호를 복사할 수 있어요</div>
+      <div class="bank-info">
+        <div><span>은행</span><b id="bankShowName" data-no-i18n></b></div>
+        <div><span>계좌번호</span><b id="bankShowNo" data-no-i18n></b></div>
+        <div><span>예금주</span><b id="bankShowHolder" data-no-i18n></b></div>
+      </div>
+      <div class="punch-btns bank-btns"><button type="button" class="btn" data-bank-close>닫기</button></div>
+    </div>
   </div>
 
   <!-- 관리자 비밀번호 입력 -->
@@ -1011,10 +1099,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611171100"></script>
-  <script src="./lang_web.js?v=202611171100"></script>
-  <script src="./i18n.js?v=202611171100"></script>
-  <script src="./gsync.js?v=202611171100"></script>
-  <script src="./app.js?v=202611171100"></script>
+  <script src="./engine.js?v=202611171300"></script>
+  <script src="./lang_web.js?v=202611171300"></script>
+  <script src="./i18n.js?v=202611171300"></script>
+  <script src="./gsync.js?v=202611171300"></script>
+  <script src="./app.js?v=202611171300"></script>
 </body>
 </html>

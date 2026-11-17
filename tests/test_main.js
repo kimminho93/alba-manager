@@ -1138,6 +1138,78 @@ test('5차 보안: 잘못된 달(2026-00·2026-13)은 버리고, 시급·시간�
   assert.ok(n.weekHours.length <= 6);
 });
 
+test('보건증: 만료일 계산(1년·윤년·옛 만료일 다음 날부터)과 상태·알림 순서', () => {
+  assert.strictEqual(E.healthYearEnd('2026-05-10'), '2027-05-09');
+  assert.strictEqual(E.healthYearEnd('2026-01-01'), '2026-12-31');
+  assert.strictEqual(E.healthYearEnd('2024-02-29'), '2025-02-28');
+  assert.strictEqual(E.healthYearEnd('2027-03-01'), '2028-02-29');
+  assert.strictEqual(E.healthYearEnd('2026-02-30'), '');
+  // 만료 전후 30일 안 검진 → 옛 만료일 다음 날부터 1년
+  assert.strictEqual(E.renewHealthExpire({ expire: '2026-12-01' }, '2026-11-17'), '2027-12-01');
+  assert.strictEqual(E.renewHealthExpire({ expire: '2026-12-01' }, '2026-12-31'), '2027-12-01');
+  assert.strictEqual(E.renewHealthExpire({ expire: '2027-02-28' }, '2027-02-20'), '2028-02-29');
+  // 30일 넘게 지나서 검진 / 처음 → 검진일부터 1년
+  assert.strictEqual(E.renewHealthExpire({ expire: '2026-12-01' }, '2027-01-05'), '2028-01-04');
+  assert.strictEqual(E.renewHealthExpire(null, '2026-11-17'), '2027-11-16');
+  assert.strictEqual(E.renewHealthExpire({ expire: '2026-12-01' }, 'x'), '');
+  assert.deepStrictEqual(E.cleanHealth({ exam: '2026-05-10' }), { exam: '2026-05-10', expire: '2027-05-09' });
+  assert.deepStrictEqual(E.cleanHealth({ exam: 'bad', expire: '2027-01-01', off: 'yes' }), { expire: '2027-01-01' });
+  assert.strictEqual(E.cleanHealth({ expire: '2026-13-01' }), null);
+  assert.deepStrictEqual(E.cleanHealth({ off: true }), { off: true });
+  const t = '2026-11-17';
+  const W = (name, h) => ({ id: name, name, health: h });
+  const ws = [W('정상', { expire: '2027-06-01' }), W('미등록'), W('곧', { expire: '2026-12-10' }), W('끔', { off: true, expire: '2026-01-01' }),
+    W('임박', { expire: '2026-11-24' }), W('오늘', { expire: '2026-11-17' }), W('만료', { expire: '2026-11-16' })];
+  const a = E.healthAlerts(ws, t, 30);
+  assert.deepStrictEqual(a.map(x => x.name + ':' + x.state + ':' + (x.days === undefined ? '' : x.days)),
+    ['만료:expired:-1', '오늘:urgent:0', '임박:urgent:7', '곧:soon:23', '미등록:missing:']);
+  assert.deepStrictEqual(E.healthAlerts(ws, t, 7).map(x => x.name), ['만료', '오늘', '임박', '미등록']);
+  assert.strictEqual(E.healthStatus(ws[0], t, 999).state, 'ok');   // 잘못된 기준일은 30일로
+  // 알바생 정리 때 보건증도 정리되고, 시간대와 무관
+  const [w] = E.normalizeWorkers([{ name: '가', health: { exam: '2026-03-01' } }]);
+  assert.deepStrictEqual(w.health, { exam: '2026-03-01', expire: '2027-02-28' });
+  assert.strictEqual(E.normalizeWorkers([{ name: '나', health: 'x' }])[0].health, undefined);
+  assert.strictEqual(E.sanitizeSettings({ healthWarnDays: '14' }).healthWarnDays, 14);
+  assert.strictEqual(E.sanitizeSettings({}).healthWarnDays, 30);
+});
+
+test('손님 계좌: 검증, 안내 주소(# 뒤 base64url)를 되돌리면 같은 정보', () => {
+  assert.deepStrictEqual(E.cleanBank({ bank: ' 국민은행 ', number: '123456-78-901234', holder: '홍길동' }), { bank: '국민은행', number: '123456-78-901234', holder: '홍길동' });
+  assert.strictEqual(E.cleanBank({ bank: '국민', number: '1234567', holder: '홍' }), null);   // 7자리
+  assert.strictEqual(E.cleanBank({ bank: '국민', number: '1'.repeat(21), holder: '홍' }), null);
+  assert.strictEqual(E.cleanBank({ bank: '국민', number: '-12345678', holder: '홍' }), null);
+  assert.strictEqual(E.cleanBank({ bank: '', number: '12345678', holder: '홍' }), null);
+  assert.strictEqual(E.cleanBank({ bank: '국민', number: '12345678', holder: '' }), null);
+  assert.strictEqual(E.cleanBank({ bank: '<b>국민', number: '12345678', holder: '홍' }).bank, 'b국민');
+  assert.strictEqual(E.cleanBank({ bank: '국민', number: '1234 5678 90', holder: '홍' }).number, '1234567890');
+  assert.strictEqual(E.sanitizeSettings({ bank: { bank: '국민', number: '1', holder: '홍' } }).bank, null);
+  const u = E.payUrl('https://x.test/pay.html', { bank: '국민은행', number: '123456-78-901234', holder: '홍길동' }, '행복분식');
+  assert.ok(/^https:\/\/x\.test\/pay\.html#d=[A-Za-z0-9_-]+$/.test(u), u);
+  const d = u.split('#d=')[1];
+  const json = Buffer.from(d.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  assert.deepStrictEqual(JSON.parse(json), [1, '국민은행', '123456-78-901234', '홍길동', '행복분식']);
+  assert.strictEqual(E.payUrl('https://x', { bank: '', number: '1', holder: '' }), '');
+  assert.strictEqual(E.bankKey({ bank: '국민', number: '12345678', holder: '홍' }), '국민|12345678|홍');
+});
+
+test('QR: 다른 구현(파이썬 qrcode)과 격자가 똑같고, 너무 길면 null', () => {
+  const crypto = require('crypto');
+  const H = q => crypto.createHash('sha256').update(q.modules.map(r => r.join('')).join('\n')).digest('hex');
+  const q1 = E.qrEncode('사장님 도우미 QR 시험 123', 3);
+  assert.strictEqual(q1.version, 3);
+  assert.strictEqual(H(q1), '97d93b042d22559c90f44a73532ca549555c2002fd224b458db2a1108192bd0e');
+  const q2 = E.qrEncode('https://kimminho93.github.io/alba-manager/pay.html#d=WzEsIuq1reuvvCIsIjEyMzQ1Ni03OC05MDEyMzQiLCLtmY3quLjrj5kiLCLtlonrs7XrtoTsi50iXQ', 5);
+  assert.strictEqual(q2.version, 8);
+  assert.strictEqual(H(q2), '0d38f67b19a88fb150196e0f3ea9bbc0ce4d08240526a1d8bc4f730707c16a0f');
+  const q3 = E.qrEncode('x'.repeat(300), 6);
+  assert.strictEqual(q3.version, 13);
+  assert.strictEqual(H(q3), '966f409b0f95894f7a52849253ebfd129d14a6abf7e6dd6091a8018054425b58');
+  assert.strictEqual(E.qrEncode('x'.repeat(413)), null);
+  const svg = E.qrSvg('hello', { label: '"><script>' });
+  assert.ok(svg.startsWith('<svg') && svg.indexOf('<script') < 0);
+  assert.strictEqual(E.qrSvg('x'.repeat(500)), '');
+});
+
 test('버전: 엔진 번들의 ALBA_VERSION이 package.json 버전과 같다', () => {
   const fs = require('fs'), path = require('path');
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));

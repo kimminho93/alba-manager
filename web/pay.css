@@ -1,0 +1,21 @@
+:root { --bg: #f4f6fb; --card: #fff; --text: #141a29; --muted: #4f586c; --line: #d3d9e6; --primary: #3563f0; --ok: #10915a; --bad: #d93f45; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0f1420; --card: #171d2b; --text: #e6e9f1; --muted: #a3acc2; --line: #2c3548; --primary: #5b82ff; --ok: #34c77f; --bad: #ff6b70; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Noto Sans KR", sans-serif; -webkit-text-size-adjust: 100%; }
+.pay { max-width: 460px; margin: 0 auto; padding: 28px 20px 40px; text-align: center; }
+.store { font-size: 26px; font-weight: 800; word-break: keep-all; }
+.sub { margin-top: 4px; color: var(--muted); font-weight: 700; }
+.info { margin: 22px 0 10px; padding: 6px 18px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); text-align: left; }
+.info div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.info div:last-child { border-bottom: 0; }
+.info dt { color: var(--muted); font-size: 16px; white-space: nowrap; }
+.info dd { margin: 0; font-size: 21px; font-weight: 800; text-align: right; word-break: break-all; }
+.info .no { font-size: 24px; letter-spacing: .5px; }
+.check { margin: 6px 0 18px; font-size: 15px; line-height: 1.5; color: var(--bad); font-weight: 700; }
+.btn { display: block; width: 100%; min-height: 56px; margin-top: 10px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); color: var(--text); font-size: 18px; font-weight: 800; cursor: pointer; }
+.btn.primary { min-height: 68px; border-color: var(--primary); background: var(--primary); color: #fff; font-size: 21px; }
+.btn.primary.copied { border-color: var(--ok); background: var(--ok); }
+.done { min-height: 1.5em; margin: 12px 0 4px; color: var(--ok); font-weight: 800; }
+.howto { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.bad { margin-top: 30px; color: var(--bad); font-weight: 700; line-height: 1.6; }
+[hidden] { display: none !important; }

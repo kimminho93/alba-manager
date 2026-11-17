@@ -917,9 +917,9 @@
       punchGraceIn: $('sGraceIn').value, punchGraceOut: $('sGraceOut').value, autoOutTime: $('sAutoOut').value
     };
   }
-  function punchRaw() {
+  function punchRaw() {   // 세금·최저시급 외에 그대로 둘 설정 (출퇴근 기준·보건증 알림·손님 계좌)
     var st = state.settings;
-    return { punchUnit: st.punchUnit, punchInMode: st.punchInMode, punchOutMode: st.punchOutMode, punchGraceIn: st.punchGraceIn, punchGraceOut: st.punchGraceOut, autoOutTime: st.autoOutTime };
+    return { punchUnit: st.punchUnit, punchInMode: st.punchInMode, punchOutMode: st.punchOutMode, punchGraceIn: st.punchGraceIn, punchGraceOut: st.punchGraceOut, autoOutTime: st.autoOutTime, healthWarnDays: st.healthWarnDays, bank: st.bank };
   }
 
   /* 설정을 계산·화면에 반영 */
@@ -980,6 +980,7 @@
     $('pName').disabled = !w;
     $('pPw').value = w && w.password ? w.password : '';
     $('pPw').disabled = !w;
+    fillHealthFields(w);
     $('noWorkerNote').hidden = !!w;
     $('pWage').value = s.wage;
     state.contractDays = s.contractDays;
@@ -1156,7 +1157,7 @@
       '<td class="num">' + (sum.totalTax ? '-' + E.moneyText(sum.totalTax) : E.moneyText(0)) + '</td>' +
       '<td class="num">' + E.moneyText(sum.totalNet) + '</td>' +
       '<td></td>' +
-      '</tr>';
+      '</tr>';    if (typeof healthDay === 'string' && $('bellBtn')) renderHealth();   // 알바생 추가·삭제·이름 변경 반영
   }
 
   /* ==========================================================
@@ -1225,6 +1226,8 @@
     $('chkMemo').textContent = c.memo || tr('특이사항 없음');
     $('chkSign').textContent = c.inspector !== '-' ? c.inspector : '________';
 
+    var hNote = typeof healthDay === 'string' && $('bellBtn') ? healthChecklistNote() : '';
+    function itemWarn(it) { return it.no === 4 && hNote ? '<div class="health-warn">⚠️ ' + escHtml(hNote) + '</div>' : ''; }
     var rowsHtml = '';
     c.groups.forEach(function (g) {
       g.items.forEach(function (it, idx) {
@@ -1234,7 +1237,7 @@
         }
         rowsHtml +=
           '<td class="no">' + it.no + '</td>' +
-          '<td>' + escHtml(it.text) + (it.standard ? '<span class="item-std">' + tr('기준: {s}', { s: escHtml(it.standard) }) + '</span>' : '') + '</td>' +
+          '<td>' + escHtml(it.text) + (it.standard ? '<span class="item-std">' + tr('기준: {s}', { s: escHtml(it.standard) }) + '</span>' : '') + itemWarn(it) + '</td>' +
           '<td><span class="result ' + (it.ok ? 'ok' : 'bad') + '">' + escHtml(it.status) + '</span></td>' +
           '<td class="note">' + escHtml(it.note) + '</td>' +
           '</tr>';
@@ -1251,7 +1254,7 @@
           '<span class="chk-item-no">' + it.no + '</span>' +
           '<div class="chk-item-body">' +
             '<div class="chk-item-text">' + escHtml(it.text) + '</div>' +
-            '<div class="chk-item-std">' + (it.standard ? tr('기준: {s}', { s: escHtml(it.standard) }) + ' · ' : '') + escHtml(it.note) + '</div>' +
+            '<div class="chk-item-std">' + (it.standard ? tr('기준: {s}', { s: escHtml(it.standard) }) + ' · ' : '') + escHtml(it.note) + '</div>' + itemWarn(it) +
           '</div>' +
           '<span class="result ' + (it.ok ? 'ok' : 'bad') + '">' + escHtml(it.status) + '</span>' +
           '</div>';
@@ -1682,7 +1685,7 @@
     });
     ['sPunchUnit', 'sInMode', 'sGraceIn', 'sOutMode', 'sGraceOut', 'sAutoOut'].forEach(function (id) {
       $(id).addEventListener('change', function () {
-        state.settings = E.sanitizeSettings(Object.assign({ minWage: state.settings.minWage, rates: state.settings.rates, mealTimes: state.settings.mealTimes }, readPunchSettings()));
+        state.settings = E.sanitizeSettings(Object.assign({}, state.settings, readPunchSettings()));
         saveJson(KEYS.settings, state.settings);
         fillPunchUnit();
         showToast(tr('출퇴근 시간 기준을 바꿨어요. 지금부터 찍는 시각에 적용돼요.'));
@@ -1886,7 +1889,7 @@
 
   /* 지금 받아온 내용을 화면에 바로 반영하면 곤란한 순간(입력 중·창이 열려 있음) */
   function cloudBusy() {
-    var ids = ['punchPw', 'punchResult', 'adminPin', 'dayModal', 'sheetBackdrop'];   // sheetBackdrop: 폰에서 정산 설정·알바생 추가 창이 열려 있음
+    var ids = ['punchPw', 'punchResult', 'adminPin', 'dayModal', 'sheetBackdrop', 'healthModal'];   // sheetBackdrop: 폰에서 정산 설정·알바생 추가 창이 열려 있음
     for (var i = 0; i < ids.length; i++) { var el = $(ids[i]); if (el && !el.hidden) return true; }
     var a = document.activeElement;
     return !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.id !== 'guideSearch');
@@ -1936,9 +1939,10 @@
     });
     sheets.sort(function (x, y) { return x.sortKey < y.sortKey ? 1 : -1; });   // 최근 달이 앞에
 
-    var wrows = [['이름', '고유코드', '비밀번호', '계약서상 주 근무일', '시급(원)', '기록이 있는 달']];
+    var wrows = [['이름', '고유코드', '비밀번호', '계약서상 주 근무일', '시급(원)', '기록이 있는 달', '보건증 만료일']];
     state.workers.forEach(function (w) {
-      wrows.push([w.name, w.code || '', w.password || '', '주 ' + w.contractDays + '일', w.wage, Object.keys(w.months).length + '개월']);
+      var hh = w.health || {};
+      wrows.push([w.name, w.code || '', w.password || '', '주 ' + w.contractDays + '일', w.wage, Object.keys(w.months).length + '개월', hh.off ? '알림 끔' : (hh.expire || '')]);
     });
     sheets.push({ name: '알바생', rows: wrows.length > 1 ? wrows : [['(등록된 알바생이 없습니다)']], bold: [0] });
 
@@ -1975,7 +1979,7 @@
         if (d.store.store) $('cStore').value = d.store.store;
         if (d.store.inspector) $('cInspector').value = d.store.inspector;
       }
-      if (d.settings) { state.settings = E.sanitizeSettings(d.settings); saveJson(KEYS.settings, state.settings); applySettings(); }
+      if (d.settings) { state.settings = E.sanitizeSettings(d.settings); saveJson(KEYS.settings, state.settings); applySettings(); $('sHealthWarn').value = String(state.settings.healthWarnDays); renderBank(); }
       if (!selWorker()) state.selId = state.workers.length ? state.workers[0].id : '';
       loadSelected();
       recalcPayroll();
@@ -1983,6 +1987,7 @@
       renderArchive();
       recalcChecklist();
       renderConflicts();
+      renderHealth();
     } finally {
       syncSuspended = false;
     }
@@ -1994,7 +1999,7 @@
     return (Array.isArray(list) ? list : []).filter(function (c) { return c && typeof c.id === 'string' && Array.isArray(c.path); }).slice(-30);
   }
   function loadConflicts() { return cleanConflicts(loadJson(KEYS.conflicts, [])); }
-  var FIELD_LABEL = { wage: '시급', contractDays: '주 근무일', name: '이름', password: '비밀번호', includeWeekly: '주휴수당', includeMeal: '식대', mealAmount: '식대 금액', mealMinHours: '식대 기준 시간', tax: '세금', weekExcuse: '주휴 예외', breakMinutes: '휴게' };
+  var FIELD_LABEL = { wage: '시급', contractDays: '주 근무일', name: '이름', password: '비밀번호', includeWeekly: '주휴수당', includeMeal: '식대', mealAmount: '식대 금액', mealMinHours: '식대 기준 시간', tax: '세금', weekExcuse: '주휴 예외', breakMinutes: '휴게', health: '보건증', exam: '보건증 검진일', expire: '보건증 만료일', off: '보건증 알림 끔', healthWarnDays: '보건증 알림 시점', bank: '손님 계좌' };
   function cellText(v) {
     if (v === null || v === undefined) return tr('없음');
     if (typeof v === 'object' && !Array.isArray(v) && ('off' in v || 'start' in v)) {
@@ -2420,6 +2425,7 @@
     document.body.classList.toggle('locked', locked);
     $('lockBtn').hidden = !pin;
     $('lockBtn').textContent = locked ? tr('🔒 관리자') : tr('🔓 잠그기');
+    if (typeof healthDay === 'string' && $('bellBtn')) { renderHealth(); if (locked) closeHealth(); }
     $('pinState').textContent = pin ? tr('· 설정됨') : tr('· 아직 없음');
     if (locked) openTab('punch');
   }
@@ -3111,12 +3117,285 @@
     }).catch(function () {});
   }
 
+  /* ==========================================================
+     보건증 만료 알림 (관리자 화면 위 🔔)
+     ========================================================== */
+  function todayYmd() { var n = new Date(); return n.getFullYear() + '-' + pad2(n.getMonth() + 1) + '-' + pad2(n.getDate()); }
+  function healthAlertList() { return E.healthAlerts(state.workers, todayYmd(), state.settings.healthWarnDays); }
+  function healthStateText(a) {
+    if (a.state === 'expired') return tr('만료 {n}일 지남', { n: -a.days });
+    if (a.state === 'missing') return tr('미등록');
+    if (a.days === 0) return tr('오늘 만료');
+    return tr('{n}일 남음', { n: a.days });
+  }
+  function ymdText(s) { return s ? s.replace(/-/g, '.') : ''; }
+  var healthDay = '';
+  function renderHealth() {
+    healthDay = todayYmd();
+    var list = healthAlertList();
+    var hot = list.filter(function (a) { return a.state !== 'missing'; }).length + (bankPending() ? 1 : 0);
+    var btn = $('bellBtn');
+    btn.hidden = isLocked() || (!state.workers.length && !bankPending());
+    $('bellCount').textContent = hot ? String(hot) : '';
+    btn.classList.toggle('hot', bankPending() || list.some(function (a) { return a.state === 'expired' || a.state === 'urgent'; }));
+    btn.setAttribute('aria-label', hot ? tr('알림 {n}건', { n: hot }) : tr('보건증 알림'));
+    if (!$('healthModal').hidden) renderHealthList(list);
+  }
+  function renderHealthList(list) {
+    list = list || healthAlertList();
+    $('healthLead').textContent = tr('만료 {d}일 전부터 알려 드려요. 7일 이내는 빨간색이에요.', { d: state.settings.healthWarnDays });
+    var html = '';
+    if (bankPending()) {
+      html += '<div class="health-item st-expired"><div class="health-main"><b>' + tr('💳 손님 계좌가 바뀌었어요') + '</b>' +
+        '<small>' + tr('설정에서 확인해야 계좌 QR이 보여요') + '</small></div>' +
+        '<div class="health-acts"><button type="button" class="btn btn-sm btn-primary" data-bank-review>' + tr('확인하러 가기') + '</button></div></div>';
+    }
+    list.forEach(function (a) {
+      var id = escHtml(a.id);
+      html += '<div class="health-item st-' + a.state + '">' +
+        '<div class="health-main"><b>' + escName(a.name) + '</b> <span class="health-chip">' + escHtml(healthStateText(a)) + '</span>' +
+          (a.expire ? '<small>' + tr('만료일 {d}', { d: ymdText(a.expire) }) + '</small>' : '<small>' + tr('검진일·만료일을 적어 주세요') + '</small>') + '</div>' +
+        '<div class="health-acts">' +
+          (a.state !== 'missing' ? '<button type="button" class="btn btn-sm btn-primary" data-health-renew="' + id + '">' + tr('새로 받았어요') + '</button>' : '') +
+          '<button type="button" class="btn btn-sm" data-health-edit="' + id + '">' + (a.state === 'missing' ? tr('날짜 적기') : tr('날짜 고치기')) + '</button>' +
+          (a.state === 'missing' ? '<button type="button" class="btn btn-sm btn-ghost" data-health-off="' + id + '">' + tr('알림 끄기') + '</button>' : '') +
+        '</div>' +
+        '<div class="health-renew" data-renew-box="' + id + '" hidden>' +
+          '<label>' + tr('새 검진일') + ' <input type="date" min="2000-01-01" max="2100-12-31" data-renew-exam="' + id + '"></label>' +
+          '<div class="health-renew-out" data-renew-out="' + id + '"></div>' +
+          '<button type="button" class="btn btn-sm btn-primary" data-renew-save="' + id + '" disabled>' + tr('저장') + '</button>' +
+        '</div>' +
+        '</div>';
+    });
+    if (!html) html = '<p class="health-empty">' + tr('✓ 모든 알바생의 보건증이 유효해요.') + '</p>';
+    $('healthList').innerHTML = html;
+  }
+  function workerById(id) { return state.workers.filter(function (w) { return w.id === id; })[0]; }
+  function openHealth() { renderHealthList(); $('healthModal').hidden = false; }
+  function closeHealth() { $('healthModal').hidden = true; }
+  function healthChanged() { saveWorkers(); renderHealth(); recalcChecklist(); }
+
+  /* 정산 설정 창의 보건증 칸 */
+  function fillHealthFields(w) {
+    var h = (w && w.health) || {};
+    $('pHealthExam').value = h.exam || '';
+    $('pHealthExp').value = h.expire || '';
+    $('pHealthOff').checked = !!h.off;
+    ['pHealthExam', 'pHealthExp', 'pHealthOff'].forEach(function (id) { $(id).disabled = !w; });
+  }
+  function readHealthFields(w, fromExam) {
+    var exam = $('pHealthExam').value, exp = $('pHealthExp').value;
+    var old = (w.health || {});
+    // 검진일을 바꾸면 만료일을 새로 계산 (옛 만료일 전후 30일 안 검진이면 옛 만료일 다음 날부터 1년). 보건증에 적힌 값과 다르면 만료일 칸에서 고치면 됨
+    if (fromExam && E.validYmd(exam)) {
+      exp = E.renewHealthExpire(old, exam);
+      $('pHealthExp').value = exp;
+    }
+    var h = E.cleanHealth({ exam: exam, expire: exp, off: $('pHealthOff').checked });
+    if (h) w.health = h; else delete w.health;
+  }
+
+  /* 위생 점검표 4번(건강진단결과서) 옆 안내 */
+  function healthChecklistNote() {
+    var list = healthAlertList();
+    var exp = list.filter(function (a) { return a.state === 'expired'; }).map(function (a) { return a.name; });
+    var miss = list.filter(function (a) { return a.state === 'missing'; }).length;
+    var parts = [];
+    if (exp.length) parts.push(tr('보건증 만료 {n}명: {names}', { n: exp.length, names: exp.join(', ') }));
+    if (miss) parts.push(tr('보건증 날짜 미등록 {n}명', { n: miss }));
+    return parts.join(' · ');
+  }
+
+  /* ==========================================================
+     손님 계좌이체 QR
+     ========================================================== */
+  var BANK_OK_KEY = 'alba.bankOk';
+  var PAY_URL = 'https://kimminho93.github.io/alba-manager/pay.html';
+  var BANKS = ['KB국민은행', '신한은행', '우리은행', '하나은행', 'NH농협은행', 'IBK기업은행', '카카오뱅크', '토스뱅크', '케이뱅크', '새마을금고', '신협', '우체국', '지역농협·축협', 'SC제일은행', '수협은행', '부산은행', '경남은행', '대구은행(iM뱅크)', '광주은행', '전북은행', '제주은행', '산업은행', '씨티은행'];
+  function curBank() { return E.cleanBank(state.settings.bank); }
+  function bankOkKey() { try { return localStorage.getItem(BANK_OK_KEY) || ''; } catch (e) { return ''; } }
+  function bankConfirmed() { var b = curBank(); return !!b && bankOkKey() === E.bankKey(b); }
+  function bankPending() { return !!curBank() && !bankConfirmed(); }
+  function markBankOk(b) { try { if (b) localStorage.setItem(BANK_OK_KEY, E.bankKey(b)); else localStorage.removeItem(BANK_OK_KEY); } catch (e) {} }
+  function storeName() { var st = loadJson(KEYS.store, {}) || {}; return typeof st.store === 'string' ? st.store.slice(0, 30) : ''; }
+  function payBase() {
+    if (location.protocol !== 'https:') return PAY_URL;   // 이 PC 안 서버(localhost) 주소는 손님 휴대폰이 못 엶
+    return location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '') + 'pay.html';
+  }
+  function bankUrl() { var b = curBank(); return b ? E.payUrl(payBase(), b, storeName()) : ''; }
+  function bankText(b) { return b.bank + ' ' + b.number + ' ' + b.holder; }
+  function renderBank() {
+    var b = curBank(), ok = bankConfirmed(), pend = bankPending();
+    $('punchBankBtn').hidden = !ok;
+    $('btnBankShow').hidden = !ok;
+    $('btnBankPrint').hidden = !ok;
+    $('btnBankClear').hidden = !b;
+    $('bankState').textContent = !b ? tr('· 아직 없음') : ok ? tr('· 설정됨') : tr('· 확인 필요');
+    var warn = $('bankWarn');
+    warn.hidden = !pend;
+    if (pend) {
+      warn.innerHTML = escHtml(tr('다른 기기에서 손님 계좌가 바뀌었어요. 맞는 계좌인지 확인해 주세요.')) +
+        '<div class="bank-warn-acc" data-no-i18n>' + escHtml(bankText(b)) + '</div>' +
+        '<button type="button" id="btnBankConfirm" class="btn btn-sm btn-primary">' + escHtml(tr('맞아요, 이 계좌로 QR 표시')) + '</button>';
+    }
+    var act = document.activeElement;
+    var editing = act && /^sBank/.test(act.id || '');
+    if (!editing) {
+      $('sBankName').value = b ? b.bank : '';
+      $('sBankNo').value = b ? b.number : '';
+      $('sBankHolder').value = b ? b.holder : '';
+    }
+    if (!$('bankModal').hidden && !ok) closeBank();
+  }
+  function needPin(go, msg) {   // 관리자 비밀번호가 있으면 한 번 더 확인
+    if (!getPin()) { go(); return; }
+    punchState.afterPin = go;
+    openAdminPin();
+    if (msg) $('adminPinErr').textContent = msg;
+  }
+  function openBank() {
+    var b = curBank();
+    if (!b || !bankConfirmed()) return;
+    var svg = E.qrSvg(bankUrl(), { label: tr('계좌이체 QR') });
+    $('bankQr').innerHTML = svg;   // 이 앱이 만든 SVG (글자는 들어가지 않음)
+    $('bankStore').textContent = storeName() || tr('계좌이체');
+    $('bankShowName').textContent = b.bank;
+    $('bankShowNo').textContent = b.number;
+    $('bankShowHolder').textContent = b.holder;
+    $('bankModal').hidden = false;
+  }
+  function closeBank() { $('bankModal').hidden = true; }
+  function printBank() {
+    var b = curBank();
+    if (!b || !bankConfirmed()) return;
+    var box = $('bankPrint');
+    if (!box) { box = document.createElement('div'); box.id = 'bankPrint'; box.setAttribute('data-no-i18n', ''); document.body.appendChild(box); }
+    box.innerHTML = '<div class="bp-store"></div><div class="bp-sub"></div><div class="bp-qr">' + E.qrSvg(bankUrl()) + '</div>' +
+      '<div class="bp-hint"></div><table class="bp-info"><tr><th></th><td class="bp-bank"></td></tr><tr><th></th><td class="bp-no"></td></tr><tr><th></th><td class="bp-holder"></td></tr></table>';
+    box.querySelector('.bp-store').textContent = storeName() || '';
+    box.querySelector('.bp-sub').textContent = tr('계좌이체 안내');
+    box.querySelector('.bp-hint').textContent = tr('휴대폰 카메라로 찍으면 계좌번호를 복사할 수 있어요');
+    var th = box.querySelectorAll('th');
+    th[0].textContent = tr('은행'); th[1].textContent = tr('계좌번호'); th[2].textContent = tr('예금주');
+    box.querySelector('.bp-bank').textContent = b.bank;
+    box.querySelector('.bp-no').textContent = b.number;
+    box.querySelector('.bp-holder').textContent = b.holder;
+    document.body.classList.add('print-bank');
+    var done = function () { document.body.classList.remove('print-bank'); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    window.print();
+    setTimeout(done, 1000);
+  }
+  function setBank(b) {
+    state.settings = E.sanitizeSettings(Object.assign({}, state.settings, { bank: b }));
+    saveJson(KEYS.settings, state.settings);
+    markBankOk(b);
+    renderBank();
+    renderHealth();
+  }
+
+  function initHealthBank() {
+    $('bankList').innerHTML = BANKS.map(function (n) { return '<option value="' + escHtml(n) + '">'; }).join('');
+    $('bellBtn').addEventListener('click', openHealth);
+    $('healthModal').addEventListener('click', function (ev) {
+      var t = ev.target;
+      if (t.closest('[data-health-close]')) { closeHealth(); return; }
+      if (t.closest('[data-bank-review]')) { closeHealth(); openTab('settings'); setTimeout(function () { $('bankWarn').scrollIntoView({ block: 'center' }); }, 50); return; }
+      var b = t.closest('[data-health-renew]');
+      if (b) {
+        var box = $('healthList').querySelector('[data-renew-box="' + CSS.escape(b.getAttribute('data-health-renew')) + '"]');
+        box.hidden = !box.hidden;
+        if (!box.hidden) { var inp = box.querySelector('input'); if (!inp.value) { inp.value = todayYmd(); inp.dispatchEvent(new Event('input', { bubbles: true })); } inp.focus(); }
+        return;
+      }
+      b = t.closest('[data-health-edit]');
+      if (b) {
+        var w = workerById(b.getAttribute('data-health-edit'));
+        if (!w) return;
+        closeHealth();
+        openTab('payroll');
+        selectWorker(w.id);
+        openSheet('set');
+        setTimeout(function () { $('healthField').scrollIntoView({ block: 'center' }); $('pHealthExam').focus(); }, 80);
+        return;
+      }
+      b = t.closest('[data-health-off]');
+      if (b) {
+        var w2 = workerById(b.getAttribute('data-health-off'));
+        if (!w2) return;
+        w2.health = E.cleanHealth(Object.assign({}, w2.health || {}, { off: true }));
+        healthChanged();
+        showToast(tr('{n}님 보건증 알림을 껐어요. 정산 설정에서 다시 켤 수 있어요.', { n: w2.name }));
+        return;
+      }
+      b = t.closest('[data-renew-save]');
+      if (b) {
+        var id = b.getAttribute('data-renew-save'), w3 = workerById(id);
+        var exam = $('healthList').querySelector('[data-renew-exam="' + CSS.escape(id) + '"]').value;
+        var exp = w3 && E.renewHealthExpire(w3.health, exam);
+        if (!w3 || !exp) return;
+        w3.health = E.cleanHealth({ exam: exam, expire: exp });
+        healthChanged();
+        if (state.selId === w3.id) fillHealthFields(w3);
+        showToast(tr('{n}님 보건증을 새로 기록했어요. 만료일 {d}', { n: w3.name, d: ymdText(exp) }));
+      }
+    });
+    $('healthModal').addEventListener('input', function (ev) {
+      var inp = ev.target.closest('[data-renew-exam]');
+      if (!inp) return;
+      var id = inp.getAttribute('data-renew-exam'), w = workerById(id);
+      var exp = w && E.renewHealthExpire(w.health, inp.value);
+      var out = $('healthList').querySelector('[data-renew-out="' + CSS.escape(id) + '"]');
+      out.textContent = exp ? tr('새 만료일 {d}', { d: ymdText(exp) }) + (w.health && w.health.expire && E.healthYearEnd(inp.value) !== exp ? ' ' + tr('(옛 만료일 다음 날부터 1년)') : '') : tr('검진일을 골라 주세요');
+      $('healthList').querySelector('[data-renew-save="' + CSS.escape(id) + '"]').disabled = !exp;
+    });
+    $('pHealthExam').addEventListener('change', function () { var w = selWorker(); if (!w) return; readHealthFields(w, true); healthChanged(); });
+    $('pHealthExp').addEventListener('change', function () { var w = selWorker(); if (!w) return; readHealthFields(w, false); healthChanged(); });
+    $('pHealthOff').addEventListener('change', function () { var w = selWorker(); if (!w) return; readHealthFields(w, false); healthChanged(); });
+    $('sHealthWarn').addEventListener('change', function () {
+      state.settings = E.sanitizeSettings(Object.assign({}, state.settings, { healthWarnDays: $('sHealthWarn').value }));
+      saveJson(KEYS.settings, state.settings);
+      renderHealth();
+    });
+
+    $('btnBankSave').addEventListener('click', function () {
+      var b = E.cleanBank({ bank: $('sBankName').value, number: $('sBankNo').value, holder: $('sBankHolder').value });
+      if (!b) { showToast(tr('은행·계좌번호(숫자 8~20자리)·예금주를 모두 적어 주세요.'), true); return; }
+      if (bankConfirmed() && E.bankKey(b) === E.bankKey(curBank())) { showToast(tr('바뀐 내용이 없어요.')); return; }
+      needPin(function () { setBank(b); showToast(tr('손님 계좌를 저장했어요: {t}', { t: bankText(b) })); }, tr('계좌를 바꾸려면 관리자 비밀번호를 입력해 주세요.'));
+    });
+    $('btnBankClear').addEventListener('click', function () {
+      if (!window.confirm(tr('손님 계좌 QR을 지울까요?'))) return;
+      needPin(function () { setBank(null); showToast(tr('손님 계좌를 지웠어요.')); }, tr('계좌를 지우려면 관리자 비밀번호를 입력해 주세요.'));
+    });
+    $('bankWarn').addEventListener('click', function (ev) {
+      if (!ev.target.closest('#btnBankConfirm')) return;
+      var b = curBank();
+      if (!b) return;
+      var key = E.bankKey(b);
+      needPin(function () {
+        if (E.bankKey(curBank()) !== key) { renderBank(); return; }   // 그 사이 또 바뀜
+        markBankOk(b); renderBank(); renderHealth();
+        showToast(tr('이 계좌로 QR을 보여 줄게요.'));
+      }, tr('계좌를 확인하려면 관리자 비밀번호를 입력해 주세요.'));
+    });
+    $('btnBankShow').addEventListener('click', openBank);
+    $('punchBankBtn').addEventListener('click', openBank);
+    $('btnBankPrint').addEventListener('click', printBank);
+    $('bankModal').addEventListener('click', function (ev) { if (ev.target.closest('[data-bank-close]')) closeBank(); });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { closeBank(); closeHealth(); } });
+    $('sHealthWarn').value = String(state.settings.healthWarnDays);
+    renderBank();
+    renderHealth();
+  }
+
   function initPunch() {
     initSoundSettings();
     initSaver();
+    initHealthBank();
     runAutoClose();
     tickClock();
-    setInterval(function () { tickClock(); runAutoClose(); renderPunch(); renderChips(); renderWorkNow(); renderPunchCloud(); renderDevice(); }, 15000);
+    setInterval(function () { tickClock(); runAutoClose(); renderPunch(); renderChips(); renderWorkNow(); renderPunchCloud(); renderDevice(); if (healthDay !== todayYmd()) { renderHealth(); recalcChecklist(); } }, 15000);
 
     $('punchList').addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-punch]');

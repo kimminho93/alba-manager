@@ -17,6 +17,7 @@ module.exports = Object.assign(
   require('../src/workers.js'),
   require('../src/backup.js'),
   require('../src/xlsx.js'),
-  require('../src/reports.js')
+  require('../src/reports.js'),
+  require('../src/qr.js')
 );
 

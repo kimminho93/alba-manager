@@ -2468,3 +2468,66 @@ html[data-theme="dark"] .dev-bar.ok { color: #5fe0b8; }
 .punch-row.view { cursor: default; opacity: .85; }
 .dev-info { font-size: 13px; margin: 4px 0 8px; line-height: 1.6; }
 @media print { .dev-bar { display: none !important; } }
+
+/* ---------- 보건증 알림 (🔔) ---------- */
+.bell-btn { position: relative; }
+.bell-btn.hot { border-color: var(--bad); color: var(--bad); }
+.bell-count:not(:empty) { display: inline-block; min-width: 18px; margin-left: 4px; padding: 0 5px; border-radius: 9px; background: var(--bad); color: #fff; font-size: 12px; font-weight: 800; line-height: 18px; }
+.bell-btn:not(.hot) .bell-count:not(:empty) { background: var(--accent); }
+.health-card { max-width: 480px; max-height: 88vh; overflow-y: auto; text-align: left; }
+.health-card .punch-card-name, .health-card .punch-card-state { text-align: center; }
+.health-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.health-item { padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card-2, var(--card)); }
+.health-item.st-expired, .health-item.st-urgent { border-color: var(--bad); background: var(--bad-weak); }
+.health-item.st-soon { border-color: var(--accent); background: var(--accent-weak); }
+.health-main b { font-size: 17px; }
+.health-main small { display: block; margin-top: 3px; color: var(--muted); }
+.health-chip { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 10px; font-size: 13px; font-weight: 800; background: var(--line); }
+.st-expired .health-chip, .st-urgent .health-chip { background: var(--bad); color: #fff; }
+.st-soon .health-chip { background: var(--accent); color: #fff; }
+.health-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.health-acts .btn, .health-renew .btn { min-height: 38px; padding: 0 12px; font-size: 14px; }
+.health-renew { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.health-renew[hidden] { display: none; }
+.health-renew input { min-height: 38px; font-size: 15px; }
+.health-renew-out { flex: 1 1 100%; font-size: 14px; font-weight: 700; }
+.health-empty { text-align: center; color: var(--ok); font-weight: 700; }
+.health-row { display: flex; gap: 10px; }
+.health-col { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.health-col small { color: var(--muted); }
+.health-col input { width: 100%; box-sizing: border-box; }
+.health-off { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 14px; color: var(--muted); }
+.health-warn { margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: var(--bad-weak); color: var(--bad); font-size: 13px; font-weight: 700; }
+@media print { .health-warn { display: none !important; } }
+
+/* ---------- 손님 계좌이체 QR ---------- */
+.punch-bank { display: block; margin: 14px auto 0; min-height: 52px; padding: 0 22px; font-size: 18px; font-weight: 800; }
+.punch-bank[hidden] { display: none; }
+.bank-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 640px) { .bank-form { grid-template-columns: 1fr; } }
+.bank-warn { margin: 10px 0; padding: 12px 14px; border-radius: 12px; background: var(--bad-weak); color: var(--bad); font-weight: 700; line-height: 1.5; }
+.bank-warn[hidden] { display: none; }
+.bank-warn-acc { margin: 6px 0 10px; font-size: 17px; color: var(--text); }
+.bank-card { max-width: 440px; max-height: 94vh; overflow-y: auto; }
+.bank-store { font-size: 24px; font-weight: 800; }
+.bank-sub { margin-top: 2px; color: var(--muted); font-weight: 700; }
+.bank-qr { width: min(72vw, 300px); margin: 14px auto 8px; }
+.bank-qr svg { display: block; width: 100%; height: auto; border-radius: 8px; }
+.bank-hint { font-size: 14px; color: var(--muted); }
+.bank-info { margin: 14px 0 6px; text-align: left; }
+.bank-info div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1px solid var(--line); font-size: 17px; }
+.bank-info span { color: var(--muted); }
+.bank-info b { font-size: 19px; text-align: right; word-break: break-all; }
+#bankPrint { display: none; }
+@media print {
+  body.print-bank > *:not(#bankPrint) { display: none !important; }
+  body.print-bank #bankPrint { display: block !important; width: 100mm; margin: 10mm auto; padding: 8mm; border: 1px solid #000; border-radius: 4mm; text-align: center; color: #000; font-family: inherit; }
+  #bankPrint .bp-store { font-size: 20pt; font-weight: 800; }
+  #bankPrint .bp-sub { font-size: 12pt; margin-top: 2mm; }
+  #bankPrint .bp-qr { width: 60mm; margin: 5mm auto 3mm; }
+  #bankPrint .bp-qr svg { width: 100%; height: auto; }
+  #bankPrint .bp-hint { font-size: 10pt; }
+  #bankPrint .bp-info { width: 100%; margin-top: 4mm; border-collapse: collapse; font-size: 13pt; }
+  #bankPrint .bp-info th { width: 25mm; text-align: left; font-weight: 400; padding: 1.5mm 0; }
+  #bankPrint .bp-info td { text-align: right; font-weight: 800; padding: 1.5mm 0; }
+}

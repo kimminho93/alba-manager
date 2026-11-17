@@ -1198,6 +1198,22 @@ function makeDevice(google, opts) {
     assert.strictEqual(a.cloud.pinPending(), false);
   });
 
+  await test('6차: 보건증·손님 계좌도 수정 요청으로 출퇴근 기기에 반영됨', async () => {
+    const { g, tab, sid, tick } = await shop();
+    tab.data.settings = { minWage: 10320, bank: null }; tab.cloud.markDirty(); await tab.cloud.saveNow();   // 앱은 설정을 항상 가짐
+    const kim = W(tab, '김');
+    const row = (id, ops) => g.rows(sid, '수정요청').push([id, '2026-11-17 10:00:00', 'x', 'x', '', JSON.stringify(ops), '', '', '']);
+    row('r-h1', [{ path: ['workers', { id: kim.id }, 'health'], before: null, after: { exam: '2026-11-10', expire: '2027-11-09' } }]);
+    row('r-b1', [{ path: ['settings', 'bank'], before: null, after: { bank: '국민은행', number: '123456-78-901234', holder: '홍길동' } }]);
+    await tick(tab);
+    const st = {}; g.rows(sid, '수정요청').forEach(r => { if (/^r-/.test(r[0])) st[r[0]] = r[6]; });
+    assert.deepStrictEqual(st, { 'r-h1': '적용됨', 'r-b1': '적용됨' });
+    assert.deepStrictEqual(W(tab, '김').health, { exam: '2026-11-10', expire: '2027-11-09' });
+    const d = dataTab(g, sid);
+    assert.deepStrictEqual(d.workers.find(w => w.name === '김').health, { exam: '2026-11-10', expire: '2027-11-09' });
+    assert.strictEqual(d.settings.bank.number, '123456-78-901234');
+  });
+
   await test('3차 단일 저장: 지정 전에는 예전처럼 모든 기기가 저장(합치기)', async () => {
     const g = makeGoogle();
     const a = makeDevice(g); a.data.workers = [worker('김', {})]; await a.cloud.connect();
