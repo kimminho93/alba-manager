@@ -2531,3 +2531,122 @@ html[data-theme="dark"] .dev-bar.ok { color: #5fe0b8; }
   #bankPrint .bp-info th { width: 25mm; text-align: left; font-weight: 400; padding: 1.5mm 0; }
   #bankPrint .bp-info td { text-align: right; font-weight: 800; padding: 1.5mm 0; }
 }
+.field .health-off input { width: 22px; height: 22px; padding: 0; flex: none; }
+.field .health-off span { font-weight: 500; }
+
+/* ==========================================================
+   7차 UI 정리 (토스식: 무채색 바탕 + 흰 카드 + 파랑 하나)
+   ========================================================== */
+:root, html[data-theme="light"] {
+  --bg: #f2f4f6;
+  --card-2: #f7f8fa;
+  --text: #191f28;
+  --muted: #4e5968;
+  --line: #e1e5ea;
+  --primary: #3182f6;
+  --primary-weak: #e8f3ff;
+  --ok: #0f9d6b;
+  --bad: #e5484d;
+  --bad-weak: #fdecec;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .03);
+}
+
+/* 머리띠: 로고 + 필요한 버튼만 한 줄 */
+.app-header { flex-wrap: nowrap !important; padding-top: 14px; padding-bottom: 8px; }
+.brand { min-width: 0; }
+.brand h1 { white-space: nowrap; }
+.header-actions { flex-wrap: nowrap; gap: 6px; flex: none; }
+.header-actions .cloud-btn, .header-actions .icon-btn { min-height: 42px; height: 42px; border-radius: 12px; }
+.help-btn { width: 42px; min-width: 42px; padding: 0; font-weight: 800; font-size: 18px; color: var(--muted); }
+.help-btn.active { color: var(--primary); border-color: var(--primary); }
+body.locked #helpBtn { display: none !important; }
+@media (max-width: 420px) {
+  .brand-logo { display: none; }
+  .brand h1 { font-size: 18px; }
+  .header-actions .cloud-btn { padding: 0 10px; font-size: 14px; }
+}
+
+/* 위쪽 탭 4개: 한 줄에 같은 폭, 밑줄 하나로 현재 탭 표시 */
+.tabs { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; overflow: visible; border-bottom: 1px solid var(--line); }
+.tabs .tab-guide { display: none !important; }
+.tab { padding: 12px 4px; border: 0; border-radius: 0; background: transparent; font-size: 17px; font-weight: 700; color: var(--muted); white-space: nowrap; text-align: center; box-shadow: none; }
+.tab.active { background: transparent; color: var(--text); box-shadow: inset 0 -3px 0 var(--text); }
+.container { padding-top: 12px; }
+
+/* 카드: 테두리 대신 흰 면 + 둥근 모서리 */
+.card { border-color: transparent; box-shadow: var(--shadow); border-radius: 20px; }
+html[data-theme="dark"] .card { border-color: var(--line); }
+
+/* 근무 중 = 파랑 한 가지 */
+.punch-row.on { border-color: var(--primary); background: var(--primary-weak); }
+.punch-chip.on { background: var(--primary); color: #fff; }
+
+/* 출퇴근 화면 버튼: 같은 폭·높이 */
+.punch-all, .punch-bank { display: block; width: 100%; max-width: 560px; min-height: 56px; margin: 12px auto 0; border-radius: 16px; font-size: 18px; font-weight: 800; }
+.punch-bank { background: var(--card); border: 1.5px solid var(--line); color: var(--text); }
+/* 잠긴 매장 기기에서는 구글 경고를 조용한 한 줄로 */
+body.locked .punch-cloud.bad, body.locked .punch-cloud.off { background: transparent; border-color: transparent; color: var(--muted); font-weight: 500; font-size: 14px; }
+
+/* 정산 명단: 합계는 큰 숫자 한 줄, 위험한 버튼은 ⋯ 안으로 */
+.total-pill { background: transparent; border: 0; padding: 0; color: var(--muted); font-size: 15px; }
+.total-pill b { display: block; margin-top: 2px; color: var(--text); font-size: 26px; font-weight: 800; }
+.more-menu { position: relative; }
+.more-menu > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-width: 48px; min-height: 48px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); font-size: 20px; font-weight: 800; color: var(--muted); }
+.more-menu > summary::-webkit-details-marker { display: none; }
+.more-menu[open] > summary { border-color: var(--text); color: var(--text); }
+.more-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 200px; padding: 6px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0, 0, 0, .15); }
+.more-pop .btn { display: block; width: 100%; min-height: 48px; border: 0; background: transparent; text-align: left; font-weight: 700; }
+.more-pop .btn:hover { background: var(--card-2); }
+.more-pop .btn-danger { color: var(--bad); }
+@media print { .more-menu { display: none !important; } }
+
+/* 정산 설정: 주휴·식대 상자를 차분하게 */
+.weekly-box, .meal-box { border: 1.5px solid var(--line) !important; background: var(--card-2) !important; }
+.weekly-box.on, .meal-box.on { border-color: var(--primary) !important; background: var(--primary-weak) !important; }
+.weekly-box.on .weekly-title, .meal-box.on .meal-title { color: var(--text) !important; }
+
+/* ---------- 설정: 빠른 화면 바 + 그룹 + 접이식 줄 ---------- */
+.settings .guide-title { margin-bottom: 12px; }
+.set-quick { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 16px; background: var(--card-2); }
+.set-quick-t { flex: 1; font-weight: 700; color: var(--muted); }
+.quick-btn { min-width: 56px; min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); font-size: 17px; font-weight: 800; cursor: pointer; }
+.quick-btn[aria-pressed="true"] { border-color: var(--primary); color: var(--primary); }
+.set-group { margin: 26px 4px 8px; font-size: 15px; font-weight: 700; color: var(--muted); }
+.set-list { border-radius: 16px; background: var(--card); border: 1px solid var(--line); overflow: hidden; }
+.set-acc { border-bottom: 1px solid var(--line); }
+.set-acc:last-child, .set-list > :last-child { border-bottom: 0; }
+.set-acc > summary, .set-row-link { list-style: none; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 60px; padding: 12px 16px; cursor: pointer; background: transparent; border: 0; text-align: left; font: inherit; color: inherit; }
+.set-acc > summary::-webkit-details-marker { display: none; }
+.set-acc > summary::after { content: '›'; flex: none; font-size: 24px; line-height: 1; color: var(--muted); transform: rotate(90deg); transition: transform .15s; }
+.set-acc[open] > summary::after { transform: rotate(-90deg); }
+.set-acc[open] > summary { background: var(--card-2); }
+.acc-t { flex: 1; min-width: 0; font-size: 17px; font-weight: 700; }
+.acc-scope { margin-left: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.acc-v { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; color: var(--muted); }
+.acc-v.warn { color: var(--bad); font-weight: 800; }
+.acc-go { font-size: 24px; color: var(--muted); }
+.acc-body { padding: 4px 16px 18px; }
+.acc-body .set-note { margin: 10px 0 12px; }
+.acc-sub { margin: 18px 0 8px; font-size: 16px; }
+.acc-body .pin-row { flex-wrap: wrap; }
+.acc-body .pin-row .btn { min-height: 48px; }
+@media (min-width: 640px) { .acc-body .set-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media print { .set-quick { display: none !important; } }
+
+/* 급여(휴대폰 세로): 달 선택 바로 아래에 줄 돈·정산 설정, 그다음 달력 */
+@media screen and (max-width: 899px) and (orientation: portrait), screen and (max-width: 639px) {
+  #monthField { order: 1; }
+  .money-toggle { order: 2; }
+  body.money-show .pay-banner { order: 3; }
+  body.money-show .pay-actions { order: 4; }
+  #openSet { order: 5; }
+  #scheduleBoard { order: 6; }
+  #payDoc { order: 7; }
+}
+.archive-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
+.archive-title-row .card-title { margin: 0; }
+.punch-lang { display: block; margin: 14px auto 0; min-height: 44px; padding: 0 14px; font-size: 15px; color: var(--muted); }
+.chk-item { min-width: 0; }
+.chk-item-body { min-width: 0; }
+.chk-item .result { flex: none; max-width: 34%; white-space: normal; text-align: center; line-height: 1.25; }
+@media (max-width: 380px) { html[lang="en"] .tab { font-size: 15px; letter-spacing: -.2px; } }

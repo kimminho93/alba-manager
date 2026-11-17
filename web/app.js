@@ -214,8 +214,16 @@
         document.querySelectorAll('.tab-panel').forEach(function (panel) {
           panel.classList.toggle('active', panel.id === 'tab-' + target);
         });
+        var hb = $('helpBtn');
+        if (hb) hb.classList.toggle('active', target === 'guide');
+        if (target === 'settings' && typeof renderSetSummaries === 'function') renderSetSummaries();
+        window.scrollTo(0, 0);
       });
     });
+    var help = $('helpBtn');
+    if (help) help.addEventListener('click', function () { openTab('guide'); });
+    var sg = $('btnSetGuide');
+    if (sg) sg.addEventListener('click', function () { openTab('guide'); });
   }
 
   /* ---------- 엑셀 다운로드 유틸 ---------- */
@@ -2105,7 +2113,7 @@
         : role === 'writer' ? escHtml(tr('이 기기가 출퇴근 기기예요. 다른 기기의 수정 요청을 받아 반영합니다.'))
         : role === 'requester' ? escHtml(tr('출퇴근 기기: {n} (마지막 응답 {a}). 이 기기에서 고친 내용은 수정 요청으로 보내져요.', { n: d.name || '', a: ageText(d.beat) || '-' }))
         : escHtml(tr('아직 지정되지 않았어요. 매장 기기에서 이름을 적고 아래 버튼을 눌러 주세요.'));
-      $('devState').textContent = role === 'writer' ? tr('· 이 기기') : role === 'requester' ? tr('· 다른 기기 지정됨') : tr('· 미지정');
+      $('devState').textContent = (role === 'writer' ? tr('· 이 기기') : role === 'requester' ? tr('· 다른 기기 지정됨') : tr('· 미지정')).replace(/^·\s*/, '');
       $('btnDevSet').disabled = !conn;
       $('btnDevSet').textContent = role === 'writer' ? tr('이름 바꾸기') : tr('이 기기를 출퇴근 기기로 지정');
       $('btnDevClear').hidden = role !== 'writer';
@@ -2426,7 +2434,7 @@
     $('lockBtn').hidden = !pin;
     $('lockBtn').textContent = locked ? tr('🔒 관리자') : tr('🔓 잠그기');
     if (typeof healthDay === 'string' && $('bellBtn')) { renderHealth(); if (locked) closeHealth(); }
-    $('pinState').textContent = pin ? tr('· 설정됨') : tr('· 아직 없음');
+    $('pinState').textContent = (pin ? tr('· 설정됨') : tr('· 아직 없음')).replace(/^·\s*/, '');
     if (locked) openTab('punch');
   }
 
@@ -3230,7 +3238,9 @@
     $('btnBankShow').hidden = !ok;
     $('btnBankPrint').hidden = !ok;
     $('btnBankClear').hidden = !b;
-    $('bankState').textContent = !b ? tr('· 아직 없음') : ok ? tr('· 설정됨') : tr('· 확인 필요');
+    $('bankState').textContent = (!b ? tr('· 아직 없음') : ok ? tr('· 설정됨') : tr('· 확인 필요')).replace(/^·\s*/, '');
+    $('bankState').classList.toggle('warn', pend);
+    if (pend) $('acc-bank').open = true;   // 확인할 계좌가 있으면 펼쳐 둠
     var warn = $('bankWarn');
     warn.hidden = !pend;
     if (pend) {
@@ -3300,7 +3310,7 @@
     $('healthModal').addEventListener('click', function (ev) {
       var t = ev.target;
       if (t.closest('[data-health-close]')) { closeHealth(); return; }
-      if (t.closest('[data-bank-review]')) { closeHealth(); openTab('settings'); setTimeout(function () { $('bankWarn').scrollIntoView({ block: 'center' }); }, 50); return; }
+      if (t.closest('[data-bank-review]')) { closeHealth(); openTab('settings'); $('acc-bank').open = true; setTimeout(function () { $('bankWarn').scrollIntoView({ block: 'center' }); }, 50); return; }
       var b = t.closest('[data-health-renew]');
       if (b) {
         var box = $('healthList').querySelector('[data-renew-box="' + CSS.escape(b.getAttribute('data-health-renew')) + '"]');
@@ -3389,10 +3399,53 @@
     renderHealth();
   }
 
+  /* 설정 목록 각 줄 오른쪽의 현재 값 */
+  function optText(id) { var el = $(id); var o = el && el.options && el.options[el.selectedIndex]; return o ? o.textContent.replace(/\s*\(.*\)\s*$/, '').replace(/\s*·.*$/, '') : ''; }
+  function renderSetSummaries() {
+    var set = function (id, t) { var el = $(id); if (el) el.textContent = t; };
+    set('sumPunch', optText('sPunchUnit'));
+    set('sumSound', ($('sndVolLabel') && $('sndVolLabel').textContent) || '');
+    set('sumSaver', optText('saverMin'));
+    set('sumWage', E.moneyText(state.settings.minWage));
+    set('sumHealth', tr('{d}일 전부터', { d: state.settings.healthWarnDays }));
+    var r = state.settings.rates || {};
+    set('sumTax', Math.round(r.incomeTax * (1 + r.localTax / 100) * 1000) / 1000 + '%');
+    set('sumLang', E.getLang() === 'en' ? 'English' : '한국어');
+    set('sumInfo', 'v' + (window.ALBA_VERSION || ''));
+  }
+  /* ⋯ 메뉴: 안의 버튼을 누르거나 바깥을 누르면 닫힘 */
+  function initMoreMenus() {
+    document.addEventListener('click', function (ev) {
+      document.querySelectorAll('details.more-menu[open]').forEach(function (m) {
+        if (!m.contains(ev.target) || ev.target.closest('.more-pop .btn')) m.open = false;
+      });
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Escape') return;
+      document.querySelectorAll('details.more-menu[open]').forEach(function (m) { m.open = false; var sm = m.querySelector('summary'); if (sm) sm.focus(); });
+    });
+  }
+  function initSetSummaries() {
+    var tab = $('tab-settings');
+    var later = function () { setTimeout(renderSetSummaries, 0); };
+    tab.addEventListener('change', later);
+    tab.addEventListener('input', later);
+    tab.addEventListener('blur', later, true);
+    renderSetSummaries();
+  }
+
   function initPunch() {
     initSoundSettings();
     initSaver();
     initHealthBank();
+    initSetSummaries();
+    var pl = $('punchLang');   // 출퇴근 화면(잠금 중에도)에서 알바생이 언어를 바꿀 수 있게
+    if (pl) {
+      pl.textContent = E.getLang() === 'en' ? '🌐 한국어' : '🌐 English';
+      pl.addEventListener('click', function () { if (window.AlbaLang) window.AlbaLang.set(E.getLang() === 'en' ? 'ko' : 'en'); });
+      window.addEventListener('alba:lang', function () { pl.textContent = E.getLang() === 'en' ? '🌐 한국어' : '🌐 English'; renderSetSummaries(); });
+    }
+    initMoreMenus();
     runAutoClose();
     tickClock();
     setInterval(function () { tickClock(); runAutoClose(); renderPunch(); renderChips(); renderWorkNow(); renderPunchCloud(); renderDevice(); if (healthDay !== todayYmd()) { renderHealth(); recalcChecklist(); } }, 15000);
