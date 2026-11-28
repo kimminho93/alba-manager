@@ -3942,3 +3942,409 @@ nav.tabs .tabs-store { display: none; }
     padding: 0 !important; margin: 0 !important; min-height: 0 !important; background: #fff !important;
   }
 }
+
+/* ==========================================================
+   시안 I 맞추기 3: 출퇴근 머리 줄, 설정, 계좌이체 QR
+   (docs/design/briefs/matchI_3_punch_set_qr.md)
+   - 출퇴근: 공통 머리띠 숨김 → [가게 이름 | 자물쇠 관리자], #punchCloud는 문제 있을 때만 작은 한 줄
+   - 설정: 공통 머리띠 숨김 → [설정 | v1.7.1], 4묶음 + 왼쪽 선 아이콘 + 오른쪽 값 + ›, 빠른 화면 바는 앱 > 언어·글자·다크 안으로, 넓은 화면은 왼쪽 묶음 + 오른쪽 상세
+   - 계좌이체 QR: 머리 줄(계좌이체 QR + ×), 큰 QR 카드, 계좌 카드 + [복사], 아래 [계산대 안내판 인쇄](잠금 시 숨김)
+   - 인쇄(@media print)와 잠금(body.locked) 규칙을 침범하지 않도록 @media screen 안에서만 배치한다.
+   ========================================================== */
+@media screen {
+  /* ---------- 1. 출퇴근 (I_Punch / wide/I_Punch) ---------- */
+  body.on-punch .app-header,
+  body.locked .app-header { display: none; }
+  body.on-punch .container,
+  body.locked .container { padding: 0 16px 16px; max-width: 592px; }
+  body.on-punch:not(.locked) .container { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+  body.on-punch #tab-punch.active,
+  body.locked #tab-punch.active { display: block; padding-top: 0; animation: none; }
+
+  #tab-punch .punch-wrap {
+    max-width: 560px; margin: 0 auto;
+    display: flex; flex-direction: column; gap: 0;
+  }
+  #tab-punch .punch-side,
+  #tab-punch .punch-main-col { display: contents; }
+
+  .punch-topbar {
+    order: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: calc(14px + env(safe-area-inset-top)) 0 0 6px; min-height: 44px;
+  }
+  .punch-store {
+    font-size: 15px; font-weight: 700; color: var(--muted); min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #tab-punch #lockBtn {
+    flex: none; height: 36px; min-height: 36px; padding: 0 12px; border-radius: 18px;
+    border: 0; background: var(--card); color: var(--muted);
+    font-size: 13px; font-weight: 700; box-shadow: var(--shadow);
+  }
+  html[data-theme="dark"] #tab-punch #lockBtn { border: 1px solid var(--line); }
+  #tab-punch #lockBtn:hover { color: var(--text); }
+
+  #tab-punch .punch-clock {
+    order: 2; display: flex; flex-direction: column; align-items: flex-start; text-align: left;
+    padding: 16px 6px 16px; background: transparent; border-radius: 0; box-shadow: none;
+  }
+  #tab-punch .punch-date { order: 1; margin: 0; font-size: 16px; color: var(--muted); }
+  #tab-punch .punch-time { order: 2; font-size: 76px; font-weight: 800; letter-spacing: -3px; line-height: 1.05; }
+  #tab-punch .punch-live-stat { display: none; }
+
+  .punch-head {
+    order: 3; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 0 4px 10px;
+  }
+  #tab-punch .punch-title {
+    margin: 0; font-size: 14px; font-weight: 700; color: var(--muted); text-align: left;
+  }
+  #tab-punch .punch-all {
+    flex: none; width: auto; max-width: none; height: 30px; min-height: 30px; margin: 0; padding: 0 10px;
+    border-radius: 15px; border: 0; background: var(--card); color: var(--muted);
+    font-size: 12px; font-weight: 700; box-shadow: var(--shadow);
+  }
+  html[data-theme="dark"] #tab-punch .punch-all { border: 1px solid var(--line); }
+
+  #tab-punch .punch-remote { order: 4; margin: 0 0 10px; }
+  #tab-punch .punch-list { order: 5; display: flex; flex-direction: column; gap: 10px; }
+
+  .punch-foot {
+    order: 6; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px;
+    margin-top: 14px;
+  }
+  #tab-punch .punch-bank { grid-area: auto; margin: 0; }
+  #tab-punch .punch-lang { grid-area: auto; margin: 0; min-width: 92px; }
+  #tab-punch .punch-bank[hidden] ~ .punch-lang { grid-column: 1 / -1; }
+  #tab-punch .punch-cloud {
+    grid-area: auto; grid-column: 1 / -1; max-width: none; margin: 2px 0 0; padding: 4px 6px;
+    border: 0; border-radius: 0; background: transparent;
+    font-size: 12.5px; font-weight: 600; color: var(--muted); text-align: center; line-height: 1.4;
+  }
+  #tab-punch .punch-cloud.bad,
+  body.locked #tab-punch .punch-cloud.bad {
+    background: transparent; border: 0; color: var(--bad); font-size: 12.5px; font-weight: 600;
+  }
+  #tab-punch .punch-cloud[hidden] { display: none !important; }
+
+  /* ---------- 2. 설정 (I_Set / wide/I_Set) ---------- */
+  body.on-settings:not(.locked) .app-header { display: none; }
+  body.on-settings:not(.locked) .container { padding: 0 14px 16px; max-width: 680px; }
+  body.on-settings:not(.locked) #tab-settings.active { display: block; padding-top: 0; animation: none; }
+
+  #tab-settings .set-shell { display: block; }
+  #tab-settings .set-cat-col { display: none; }
+  #tab-settings .set-main { display: flex; flex-direction: column; min-width: 0; }
+
+  .set-topbar {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    padding: 14px 6px 2px;
+  }
+  .set-topbar h1 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.4px; color: var(--text); }
+  .set-ver { font-size: 12px; font-weight: 600; color: var(--muted); }
+
+  .set-panel-head { display: none; }
+  #tab-settings .set-group {
+    margin: 14px 8px 6px; font-size: 12px; font-weight: 800; color: var(--muted);
+  }
+  #tab-settings .set-list {
+    border-radius: 16px; background: var(--card); border: 0; box-shadow: var(--shadow); overflow: hidden;
+  }
+  html[data-theme="dark"] #tab-settings .set-list { border: 1px solid var(--line); }
+  #tab-settings .set-acc,
+  #tab-settings .set-row-link { border-bottom: 1px solid var(--bg); }
+  html[data-theme="dark"] #tab-settings .set-acc,
+  html[data-theme="dark"] #tab-settings .set-row-link { border-bottom-color: var(--line); }
+  #tab-settings .set-list > :last-child { border-bottom: 0; }
+  #tab-settings .set-acc > summary,
+  #tab-settings .set-row-link {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px;
+    padding: 10px 16px; cursor: pointer; background: transparent; border: 0;
+    text-align: left; font: inherit; color: inherit;
+  }
+  #tab-settings .set-acc > summary:hover,
+  #tab-settings .set-row-link:hover { background: var(--card-2); }
+  #tab-settings .set-acc > summary::after { display: none; }
+  #tab-settings .set-ico {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 20px; height: 20px; color: var(--muted);
+  }
+  #tab-settings .acc-t {
+    flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--text);
+  }
+  #tab-settings .acc-scope { margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  #tab-settings .acc-v {
+    flex: none; max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 13px; font-weight: 600; color: var(--muted);
+  }
+  #tab-settings .acc-v.is-ok { color: var(--primary); }
+  #tab-settings .acc-v.warn { color: var(--bad); font-weight: 800; }
+  #tab-settings .set-chev {
+    flex: none; color: var(--muted); opacity: .65; transition: transform .15s;
+  }
+  #tab-settings .set-acc[open] > summary .set-chev { transform: rotate(90deg); }
+  #tab-settings .set-acc[open] > summary { background: var(--card-2); }
+  #tab-settings .acc-body { padding: 6px 16px 18px; }
+  #tab-settings .acc-body .set-quick { margin: 8px 0 10px; }
+
+  /* ---------- 3. 계좌이체 QR (I_QR / wide/I_QR) ---------- */
+  #bankModal { padding: 0; }
+  #bankModal .bank-card {
+    position: relative; z-index: 1; display: flex; flex-direction: column; align-items: stretch;
+    width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border-radius: 0;
+    padding: 0; background: var(--bg); overflow-y: auto; text-align: center;
+  }
+  .bank-topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: calc(16px + env(safe-area-inset-top)) 16px 0 22px; flex: none;
+  }
+  .bank-topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .bank-top-title { margin: 0; font-size: 21px; font-weight: 800; color: var(--text); }
+  .bank-pill { display: none; }
+  .bank-close-btn {
+    flex: none; width: 40px; height: 40px; border-radius: 20px; border: 0;
+    background: var(--card); color: var(--muted); box-shadow: var(--shadow);
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
+  }
+  html[data-theme="dark"] .bank-close-btn { border: 1px solid var(--line); }
+  .bank-close-btn:hover { color: var(--text); }
+  .bank-close-txt { display: none; }
+
+  .bank-stage {
+    flex: 1; width: 100%; max-width: 480px; margin: 0 auto;
+    padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column;
+  }
+  .bank-grid { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .bank-qr-card {
+    background: var(--card); border-radius: 28px; padding: 26px 22px;
+    display: flex; flex-direction: column; align-items: center; box-shadow: var(--shadow);
+  }
+  html[data-theme="dark"] .bank-qr-card { border: 1px solid var(--line); }
+  #bankModal .bank-store { font-size: 15px; font-weight: 600; color: var(--muted); }
+  .bank-prompt { margin-top: 4px; font-size: 22px; font-weight: 800; color: var(--text); }
+  #bankModal .bank-qr {
+    width: min(68vw, 250px); margin: 20px auto 0; padding: 12px;
+    border-radius: 20px; border: 1px solid #e5e8eb; background: #fff; box-shadow: none;
+  }
+  #bankModal .bank-hint { margin-top: 14px; font-size: 13px; color: var(--muted); }
+
+  .bank-info-col { display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  #bankModal .bank-info {
+    width: 100%; max-width: none; margin: 0; padding: 16px 18px;
+    border-radius: 20px; background: var(--card); box-shadow: var(--shadow); text-align: left;
+  }
+  html[data-theme="dark"] #bankModal .bank-info { border: 1px solid var(--line); }
+  #bankModal .bank-info div { display: block; padding: 0; border-bottom: 0; font-size: inherit; }
+  .bank-kicker, .bank-store-wide, .bank-divider, .bank-holder-tip { display: none !important; }
+  #bankModal .bank-info .bank-acct-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  #bankModal .bank-info .bank-acct-text {
+    display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  }
+  #bankModal .bank-info .bank-meta { font-size: 13px; color: var(--muted); line-height: 1.35; }
+  #bankModal .bank-info .bank-no {
+    font-size: 19px; font-weight: 800; color: var(--text);
+    text-align: left !important; word-break: break-all;
+  }
+  .bank-copy-btn {
+    flex: none; height: 40px; padding: 0 14px; border-radius: 12px; border: 0;
+    background: var(--primary-weak); color: var(--primary); font: inherit; font-size: 14px; font-weight: 800;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .bank-copy-btn:hover { filter: brightness(.95); }
+  .bank-copy-btn.copied { background: var(--primary); color: var(--primary-ink); }
+
+  .bank-print-wrap { margin-top: auto; padding-top: 4px; }
+  .bank-print-wrap[hidden],
+  body.locked #bankModal .bank-print-wrap { display: none !important; }
+  .bank-print-text, .bank-print-wide { display: none; }
+  .bank-print-btn {
+    width: 100%; height: 52px; border-radius: 16px; border: 0;
+    background: var(--card); color: var(--muted); font: inherit; font-size: 15px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  html[data-theme="dark"] .bank-print-btn { border: 1px solid var(--line); }
+  .bank-print-btn:hover { color: var(--text); }
+}
+
+/* ==========================================================
+   넓은 화면(1024px 이상): wide/I_Punch, wide/I_Set, wide/I_QR
+   ========================================================== */
+@media screen and (min-width: 1024px) {
+  /* 1. 출퇴근 넓은 화면 (wide/I_Punch.html) */
+  body.on-punch .container,
+  body.locked .container { max-width: none; padding: 0; }
+  #tab-punch .punch-wrap {
+    max-width: none; margin: 0; width: 100%; min-height: 100vh;
+    display: flex; flex-direction: row; align-items: stretch;
+  }
+  #tab-punch .punch-side {
+    display: flex; flex-direction: column; justify-content: space-between;
+    width: 340px; flex: none; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    background: var(--card); border-right: 1px solid var(--line); padding: 24px 26px;
+  }
+  #tab-punch .punch-topbar { padding: 0; min-height: 36px; }
+  #tab-punch .punch-store { font-size: 15px; font-weight: 800; }
+  #tab-punch #lockBtn { background: var(--bg); box-shadow: none; }
+  #tab-punch #lockBtn:hover { background: var(--line); }
+  #tab-punch .punch-clock { margin: auto 0; padding: 18px 0; }
+  #tab-punch .punch-date { font-size: 17px; font-weight: 600; }
+  #tab-punch .punch-time { font-size: 82px; letter-spacing: -3.5px; line-height: 1.02; }
+  #tab-punch .punch-live-stat {
+    order: 3; display: inline-flex; align-items: center; gap: 8px;
+    margin-top: 12px; padding: 7px 14px; border-radius: 999px;
+    background: var(--bg); font-size: 13px; font-weight: 700; color: var(--muted);
+  }
+  #tab-punch .punch-live-stat[hidden] { display: none; }
+  #tab-punch .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex: none; }
+
+  #tab-punch .punch-foot { display: flex; flex-direction: column; gap: 10px; margin-top: 0; }
+  #tab-punch .punch-bank {
+    width: 100%; height: 54px; min-height: 54px; background: var(--bg); box-shadow: none;
+  }
+  #tab-punch .punch-bank:hover { background: var(--line); }
+  #tab-punch .punch-lang {
+    width: auto; align-self: flex-start; height: 42px; min-height: 42px; padding: 0 18px;
+    border-radius: 14px; border: 1px solid var(--line); background: var(--card); box-shadow: none;
+  }
+  #tab-punch .punch-cloud { text-align: left; padding: 2px 2px 0; }
+
+  #tab-punch .punch-main-col {
+    display: flex; flex-direction: column; gap: 14px; flex: 1; min-width: 0;
+    padding: 26px 28px;
+  }
+  #tab-punch .punch-head { padding: 0; }
+  #tab-punch .punch-title { font-size: 18px; font-weight: 800; color: var(--text); }
+  #tab-punch .punch-all { height: 36px; min-height: 36px; padding: 0 14px; border-radius: 18px; font-size: 13px; }
+  #tab-punch .punch-list {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-content: start;
+  }
+  #tab-punch .punch-list .punch-empty { grid-column: 1 / -1; }
+
+  /* 2. 설정 넓은 화면 (wide/I_Set.html) */
+  body.on-settings:not(.locked) .container { max-width: none; padding: 0; }
+  body.on-settings:not(.locked) .app-footer { display: none; }
+  #tab-settings .set-shell { display: flex; align-items: stretch; min-height: 100vh; width: 100%; }
+  #tab-settings .set-cat-col {
+    display: flex; flex-direction: column; gap: 14px; width: 260px; flex: none;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    background: var(--card); border-right: 1px solid var(--line); padding: 22px 14px 18px;
+  }
+  .set-col-head { padding: 0 8px; display: flex; align-items: baseline; justify-content: space-between; }
+  .set-col-head h1 { margin: 0; font-size: 21px; font-weight: 800; color: var(--text); }
+  .set-cat-list { display: flex; flex-direction: column; gap: 6px; }
+  .set-cat-btn {
+    width: 100%; border: 0; background: transparent; border-radius: 14px; padding: 12px 14px;
+    text-align: left; display: flex; flex-direction: column; gap: 3px; cursor: pointer;
+    transition: background .12s;
+  }
+  .set-cat-btn:hover { background: var(--card-2); }
+  .set-cat-btn.active { background: var(--primary-weak); }
+  .set-cat-title { font-size: 15px; font-weight: 800; color: var(--text); }
+  .set-cat-btn.active .set-cat-title { color: var(--primary); }
+  .set-cat-desc { font-size: 12px; color: var(--muted); line-height: 1.35; }
+  .set-col-foot {
+    margin-top: auto; padding: 12px 14px; border-radius: 14px;
+    background: var(--bg); font-size: 12px; color: var(--muted); line-height: 1.5;
+  }
+  .set-col-foot strong { color: var(--text); display: block; margin-bottom: 2px; font-weight: 800; }
+
+  #tab-settings .set-main { flex: 1; min-width: 0; padding: 26px 34px 36px; }
+  #tab-settings .set-topbar,
+  #tab-settings .set-group { display: none; }
+  #tab-settings .set-panel { max-width: 780px; display: none; flex-direction: column; gap: 14px; }
+  #tab-settings .set-panel.set-cat-selected { display: flex; }
+  #tab-settings .set-panel-head { display: block; margin-bottom: 2px; }
+  #tab-settings .set-panel-head h2 { margin: 0; font-size: 22px; font-weight: 800; color: var(--text); }
+  #tab-settings .set-panel-head p { margin: 5px 0 0; font-size: 14px; color: var(--muted); }
+  #tab-settings .set-list { border-radius: 20px; }
+  #tab-settings .set-acc > summary,
+  #tab-settings .set-row-link { min-height: 68px; padding: 14px 20px; gap: 14px; }
+  #tab-settings .set-ico { width: 38px; height: 38px; border-radius: 12px; background: var(--bg); }
+  #tab-settings .acc-t { font-size: 15.5px; font-weight: 700; }
+  #tab-settings .acc-body { padding: 6px 22px 20px; }
+
+  /* 3. 계좌이체 QR 넓은 화면 (wide/I_QR.html) */
+  #bankModal .bank-card {
+    display: flex; flex-direction: column; padding: 0; text-align: left;
+    grid-template-columns: none; grid-template-rows: none; grid-template-areas: none;
+  }
+  .bank-topbar { padding: 20px 32px 0; }
+  .bank-pill {
+    display: inline-flex; padding: 5px 11px; border-radius: 999px;
+    background: var(--card); color: var(--muted); font-size: 12px; font-weight: 700;
+  }
+  .bank-close-btn { width: auto; height: 42px; padding: 0 16px; border-radius: 21px; }
+  .bank-close-txt { display: inline; font-size: 14px; font-weight: 700; }
+
+  .bank-stage { max-width: none; padding: 24px 36px 32px; align-items: center; justify-content: center; }
+  .bank-grid {
+    flex: none; width: 100%; max-width: 980px;
+    display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 24px; align-items: stretch;
+  }
+  .bank-qr-card { padding: 36px 32px; justify-content: center; text-align: center; }
+  #bankModal .bank-store { display: none; }
+  .bank-prompt { margin-top: 0; font-size: 24px; }
+  #bankModal .bank-qr {
+    grid-area: auto; justify-self: center;
+    width: min(32vw, 310px); margin: 22px auto 0; padding: 16px; border-radius: 24px;
+  }
+  #bankModal .bank-hint { grid-area: auto; margin-top: 18px; font-size: 14px; }
+
+  .bank-info-col { gap: 16px; }
+  #bankModal .bank-info {
+    grid-area: auto; flex: 1; border-radius: 28px; padding: 34px 32px;
+    display: flex; flex-direction: column; justify-content: center; align-self: stretch;
+  }
+  .bank-kicker { display: block !important; font-size: 13px; font-weight: 800; color: var(--primary); }
+  .bank-store-wide {
+    display: block !important; margin-top: 6px; font-size: 30px; font-weight: 800;
+    letter-spacing: -.6px; color: var(--text);
+  }
+  .bank-divider { display: block !important; height: 1px; background: var(--bg); margin: 22px 0; }
+  html[data-theme="dark"] .bank-divider { background: var(--line); }
+  #bankModal .bank-info .bank-acct-row { flex-direction: column; align-items: stretch; gap: 20px; }
+  #bankModal .bank-info .bank-meta { font-size: 15px; font-weight: 600; }
+  #bankModal .bank-info .bank-no { margin-top: 4px; font-size: 28px; }
+  .bank-copy-btn { width: 100%; height: 54px; border-radius: 16px; font-size: 16px; }
+  .bank-holder-tip {
+    display: block !important; margin-top: 14px; font-size: 13px; color: var(--muted); line-height: 1.5;
+  }
+
+  .bank-print-wrap {
+    margin-top: 0; padding: 20px 24px; border-radius: 22px; background: var(--card);
+    box-shadow: var(--shadow); display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  }
+  html[data-theme="dark"] .bank-print-wrap { border: 1px solid var(--line); }
+  .bank-print-text { display: flex; flex-direction: column; gap: 3px; text-align: left; }
+  .bank-print-title { font-size: 16px; font-weight: 800; color: var(--text); }
+  .bank-print-sub { font-size: 13px; color: var(--muted); }
+  .bank-print-mob { display: none; }
+  .bank-print-wide { display: inline; }
+  .bank-print-btn {
+    width: auto; height: 46px; padding: 0 20px; border-radius: 14px; flex: none;
+    background: var(--text); color: var(--card); font-size: 14px; box-shadow: none;
+  }
+  .bank-print-btn:hover { color: var(--card); opacity: .9; }
+}
+
+@media screen and (min-width: 1024px) and (max-width: 1120px) {
+  #tab-punch .punch-side { width: 300px; padding: 20px; }
+  #tab-punch .punch-time { font-size: 72px; }
+  #tab-settings .set-cat-col { width: 224px; }
+}
+
+@media screen and (min-width: 1300px) {
+  #tab-punch .punch-side { width: 380px; padding: 28px 30px; }
+  #tab-punch .punch-time { font-size: 92px; }
+  #bankModal .bank-qr { width: 320px; }
+}
+
+@media print {
+  .set-cat-col, .set-topbar, .set-panel-head, .punch-topbar, .punch-foot { display: none !important; }
+}

@@ -221,6 +221,7 @@
         document.body.classList.toggle('on-punch', target === 'punch');
         document.body.classList.toggle('on-payroll', target === 'payroll');
         document.body.classList.toggle('on-checklist', target === 'checklist');
+        document.body.classList.toggle('on-settings', target === 'settings');
         if (target !== 'checklist') document.body.classList.remove('chk-memo-open', 'chk-archive-open', 'chk-doc-open');
         document.querySelectorAll('.tab-panel').forEach(function (panel) {
           panel.classList.toggle('active', panel.id === 'tab-' + target);
@@ -235,6 +236,25 @@
     if (help) help.addEventListener('click', function () { openTab('guide'); });
     var sg = $('btnSetGuide');
     if (sg) sg.addEventListener('click', function () { openTab('guide'); });
+    var sc = $('btnSetCloud');
+    if (sc) sc.addEventListener('click', function () { if ($('cloudBtn')) $('cloudBtn').click(); });
+    var scl = $('setCatList');
+    if (scl) scl.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-set-cat]');
+      if (b) selectSetCat(b.getAttribute('data-set-cat'));
+    });
+  }
+
+  function selectSetCat(cat) {
+    if (!cat) return;
+    document.querySelectorAll('#setCatList [data-set-cat]').forEach(function (b) {
+      var on = b.getAttribute('data-set-cat') === cat;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('#tab-settings [data-set-panel]').forEach(function (p) {
+      p.classList.toggle('set-cat-selected', p.getAttribute('data-set-panel') === cat);
+    });
   }
 
   /* ---------- 엑셀 다운로드 유틸 ---------- */
@@ -2597,7 +2617,7 @@
   }
 
   var shownNotice = '';
-  /* 출퇴근 화면(잠금 상태 포함)에 구글 저장 연결 상태 표시 */
+  /* 출퇴근 화면(잠금 상태 포함)에 구글 저장 상태 표시 — 시안 I: 문제가 있을 때만 작은 한 줄로 */
   function renderPunchCloud(connected, kind, clock) {
     var el = $('punchCloud');
     if (!el) return;
@@ -2606,14 +2626,20 @@
       connected = !!(st && st.connected); kind = st ? st.kind : 'off'; clock = fmtClock(st && st.lastSaved);
     }
     var waiting = loadQueue().length;
+    var hasErr = connected && (kind === 'needLogin' || kind === 'error');
+    if (!hasErr && !waiting) {
+      el.hidden = true;
+      el.className = 'punch-cloud';
+      el.textContent = '';
+      return;
+    }
     var more = waiting ? tr(' · 시트에 아직 안 올라간 출퇴근 {n}건', { n: waiting }) : '';
-    var cls = 'punch-cloud', txt;
-    if (!connected) { cls += ' bad'; txt = tr('⚠️ 구글 로그인이 안 되어 있어요 · 지금은 이 기기에만 저장돼요. 사장님이 구글 연동을 해 주세요'); }
-    else if (kind === 'needLogin' || kind === 'error') { cls += ' bad'; txt = tr('⚠️ 구글 로그인이 풀렸어요 · 화면을 누르면 다시 연결을 시도해요. 안 되면 사장님이 [다시 연결]을 눌러 주세요 (출퇴근은 이 기기에 저장돼요)') + more; }
-    else if (kind === 'saving') { txt = tr('⏳ 구글 시트에 저장 중…') + more; }
-    else { cls += waiting ? '' : ' ok'; txt = (waiting ? tr('⏳ 구글 시트 연결됨') : tr('✅ 구글 시트 연결됨')) + (clock ? tr(' · 마지막 저장 {c}', { c: clock }) : '') + more; }
-    el.className = cls;
+    var txt = hasErr
+      ? tr('구글 연결이 풀렸어요 · 다시 연결이 필요해요') + more
+      : tr('시트에 아직 안 올라간 출퇴근 {n}건', { n: waiting });
+    el.className = 'punch-cloud' + (hasErr ? ' bad' : '');
     el.textContent = txt;
+    el.hidden = false;
   }
 
 
@@ -2638,6 +2664,22 @@
       el.classList.toggle('is-ok', btn.classList.contains('ok'));
       el.classList.toggle('is-bad', btn.classList.contains('bad'));
     });
+    var sc = $('sumCloud');
+    if (sc) {
+      var scTxt = !connected && kind !== 'saving' ? tr('연결 안 됨')
+        : kind === 'saving' ? tr('저장 중…')
+        : (kind === 'needLogin' || kind === 'error') ? tr('다시 연결')
+        : tr('연결됨');
+      sc.textContent = scTxt;
+      sc.classList.toggle('warn', kind === 'needLogin' || kind === 'error');
+      sc.classList.toggle('is-ok', connected && kind !== 'needLogin' && kind !== 'error' && kind !== 'saving');
+    }
+    var sfc = $('setFootCloud');
+    if (sfc) {
+      sfc.textContent = !connected ? tr('이 기기에만 저장 중')
+        : (kind === 'needLogin' || kind === 'error') ? tr('구글 시트 다시 연결 필요')
+        : tr('구글 시트 자동 저장 연결됨');
+    }
 
     var html;
     if (!connected) {
@@ -2715,7 +2757,7 @@
 
   function initCloud() {
     var C = window.AlbaCloud;
-    if (!C) { ['cloudBtn', 'pmCloud', 'chkCloud'].forEach(function (cid) { var el = $(cid); if (el) el.hidden = true; }); return; }
+    if (!C) { ['cloudBtn', 'pmCloud', 'chkCloud', 'btnSetCloud'].forEach(function (cid) { var el = $(cid); if (el) el.hidden = true; }); return; }
     C.init({
       getData: cloudData,
       getTables: cloudTables,
@@ -2842,6 +2884,7 @@
       var el = $(lid);
       if (el) { el.hidden = !pin; el.textContent = $('lockBtn').textContent; }
     });
+    if ($('bankPrintWrap')) $('bankPrintWrap').hidden = locked;
     if (typeof healthDay === 'string' && $('bellBtn')) { renderHealth(); if (locked) closeHealth(); }
     $('pinState').textContent = (pin ? tr('· 설정됨') : tr('· 아직 없음')).replace(/^·\s*/, '');
     if (locked) openTab('punch');
@@ -3315,10 +3358,18 @@
       if (remote) rb.innerHTML = tr('📍 출퇴근은 <b>{n}</b>에서 찍어요. 이 기기에서는 근무 현황만 볼 수 있어요.', { n: escHtml(dv.name || tr('매장 기기')) });
       $('punchTitle').hidden = remote;
     }
+    var nOn = state.workers.filter(function (w) { return E.punchNext(w, now) === 'out'; }).length;
     if (allBtn) {
-      var nOn = state.workers.filter(function (w) { return E.punchNext(w, now) === 'out'; }).length;
       allBtn.hidden = nOn < 1 || remote;
       allBtn.textContent = tr('근무 중 {n}명 모두 퇴근', { n: nOn });
+    }
+    var ls = $('punchLiveStat');
+    if (ls) {
+      ls.hidden = !state.workers.length;
+      if (state.workers.length) {
+        ls.innerHTML = '<span class="live-dot" aria-hidden="true"></span><span class="num">' +
+          escHtml(tr('근무 중 {a}명 · 전체 {b}명', { a: nOn, b: state.workers.length })) + '</span>';
+      }
     }
     if (!state.workers.length) {
       box.innerHTML = '<p class="punch-empty">' + tr('등록된 알바생이 없습니다.<br>사장님께 알려 주세요.') + '</p>';
@@ -3735,7 +3786,7 @@
     $('btnBankShow').hidden = !ok;
     $('btnBankPrint').hidden = !ok;
     $('btnBankClear').hidden = !b;
-    $('bankState').textContent = (!b ? tr('· 아직 없음') : ok ? tr('· 설정됨') : tr('· 확인 필요')).replace(/^·\s*/, '');
+    $('bankState').textContent = (!b ? tr('· 아직 없음') : ok ? (b.bank || tr('· 설정됨')) : tr('· 확인 필요')).replace(/^·\s*/, '');
     $('bankState').classList.toggle('warn', pend);
     if (pend) $('acc-bank').open = true;   // 확인할 계좌가 있으면 펼쳐 둠
     var warn = $('bankWarn');
@@ -3760,15 +3811,25 @@
     openAdminPin();
     if (msg) $('adminPinErr').textContent = msg;
   }
+  var bankCopyTimer = null;
   function openBank() {
     var b = curBank();
     if (!b || !bankConfirmed()) return;
     var svg = E.qrSvg(bankUrl(), { label: tr('계좌이체 QR') }) || E.qrSvg(E.payUrl(payBase(), b, ''), { label: tr('계좌이체 QR') });   // 너무 길면 매장명 없이
     $('bankQr').innerHTML = svg;   // 이 앱이 만든 SVG (글자는 들어가지 않음)
-    $('bankStore').textContent = storeName() || tr('계좌이체');
+    var stName = storeName() || tr('계좌이체');
+    $('bankStore').textContent = stName;
+    if ($('bankStoreWide')) $('bankStoreWide').textContent = stName;
     $('bankShowName').textContent = b.bank;
     $('bankShowNo').textContent = b.number;
     $('bankShowHolder').textContent = b.holder;
+    if ($('bankHolderTip')) {
+      $('bankHolderTip').innerHTML = tr('송금 전 받는 분 이름이 {h}인지 확인해 주세요.', { h: '<strong>' + escName(b.holder) + '</strong>' });
+    }
+    if ($('btnBankModalCopy')) $('btnBankModalCopy').classList.remove('copied');
+    if ($('bankCopyText')) $('bankCopyText').textContent = tr('복사');
+    if (bankCopyTimer) { clearTimeout(bankCopyTimer); bankCopyTimer = null; }
+    if ($('bankPrintWrap')) $('bankPrintWrap').hidden = isLocked();
     $('bankModal').hidden = false;
   }
   function closeBank() { $('bankModal').hidden = true; }
@@ -3809,7 +3870,7 @@
     $('healthModal').addEventListener('click', function (ev) {
       var t = ev.target;
       if (t.closest('[data-health-close]')) { closeHealth(); return; }
-      if (t.closest('[data-bank-review]')) { closeHealth(); openTab('settings'); $('acc-bank').open = true; setTimeout(function () { $('bankWarn').scrollIntoView({ block: 'center' }); }, 50); return; }
+      if (t.closest('[data-bank-review]')) { closeHealth(); openTab('settings'); selectSetCat('store'); $('acc-bank').open = true; setTimeout(function () { $('bankWarn').scrollIntoView({ block: 'center' }); }, 50); return; }
       var b = t.closest('[data-health-renew]');
       if (b) {
         var box = $('healthList').querySelector('[data-renew-box="' + CSS.escape(b.getAttribute('data-health-renew')) + '"]');
@@ -3891,6 +3952,30 @@
     $('btnBankShow').addEventListener('click', openBank);
     $('punchBankBtn').addEventListener('click', openBank);
     $('btnBankPrint').addEventListener('click', printBank);
+    if ($('btnBankModalPrint')) $('btnBankModalPrint').addEventListener('click', function () {
+      if (isLocked()) return;
+      printBank();
+    });
+    if ($('btnBankModalCopy')) $('btnBankModalCopy').addEventListener('click', function () {
+      var b = curBank();
+      if (!b) return;
+      var btn = $('btnBankModalCopy'), txt = $('bankCopyText');
+      copyText(b.number.replace(/-/g, '')).then(function (ok) {
+        if (ok) {
+          btn.classList.add('copied');
+          if (txt) txt.textContent = tr('복사됨');
+          showToast(tr('계좌번호를 복사했어요.'));
+          if (bankCopyTimer) clearTimeout(bankCopyTimer);
+          bankCopyTimer = setTimeout(function () {
+            btn.classList.remove('copied');
+            if (txt) txt.textContent = tr('복사');
+            bankCopyTimer = null;
+          }, 1800);
+        } else {
+          showToast(tr('복사에 실패했습니다.'), true);
+        }
+      });
+    });
     $('bankModal').addEventListener('click', function (ev) { if (ev.target.closest('[data-bank-close]')) closeBank(); });
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { closeBank(); closeHealth(); } });
     $('sHealthWarn').value = String(state.settings.healthWarnDays);
@@ -3903,16 +3988,17 @@
   function renderSetSummaries() {
     var set = function (id, t) { var el = $(id); if (el) el.textContent = t; };
     var sti = cleanStoreInfo(loadJson(KEYS.store, {}));
-    set('sumStore', [sti.store, sti.inspector].filter(Boolean).join(' · ') || tr('아직 없음'));
+    set('sumStore', sti.store || sti.inspector || tr('아직 없음'));
     set('sumPunch', optText('sPunchUnit'));
-    set('sumSound', ($('sndVolLabel') && $('sndVolLabel').textContent) || '');
+    var vol = $('sndVol') ? Number($('sndVol').value) : 100;
+    set('sumSound', vol > 0 ? tr('켜짐') : tr('꺼짐'));
     set('sumSaver', optText('saverMin'));
     set('sumWage', E.moneyText(state.settings.minWage));
-    set('sumHealth', tr('{d}일 전부터', { d: state.settings.healthWarnDays }));
+    set('sumHealth', tr('{d}일 전', { d: state.settings.healthWarnDays }));
     var r = state.settings.rates || {};
     set('sumTax', Math.round(r.incomeTax * (1 + r.localTax / 100) * 1000) / 1000 + '%');
     set('sumLang', E.getLang() === 'en' ? 'English' : '한국어');
-    set('sumInfo', 'v' + (window.ALBA_VERSION || ''));
+    set('sumInfo', '');
   }
   /* ⋯ 메뉴: 안의 버튼을 누르거나 바깥을 누르면 닫힘 */
   function initMoreMenus() {
@@ -3945,7 +4031,10 @@
     if (!(a && a.id === 'sOwnerName') || fromCloud) $('sOwnerName').value = owner;
     $('sOwnerName').setAttribute('data-was', owner);
     $('cStore').value = name;
-    if ($('railStore')) $('railStore').textContent = name || tr('사장님 도우미');   // 넓은 화면 왼쪽 메뉴 맨 위
+    var storeLabel = name || tr('사장님 도우미');
+    if ($('railStore')) $('railStore').textContent = storeLabel;   // 넓은 화면 왼쪽 메뉴 맨 위
+    if ($('punchStore')) $('punchStore').textContent = storeLabel; // 출퇴근 화면 머리 줄
+    if ($('setFootStore')) $('setFootStore').textContent = storeLabel;
     if (!$('cInspector').value || $('cInspector').value === oldOwner) $('cInspector').value = owner;
     recalcChecklist();
     renderSetSummaries();
@@ -3958,7 +4047,7 @@
     };
     $('sStoreName').addEventListener('input', save);
     $('sOwnerName').addEventListener('input', save);
-    var go = function () { openTab('settings'); $('acc-store').open = true; setTimeout(function () { $('sStoreName').focus(); }, 50); };
+    var go = function () { openTab('settings'); selectSetCat('store'); $('acc-store').open = true; setTimeout(function () { $('sStoreName').focus(); }, 50); };
     $('cStoreGo').addEventListener('click', go);
     $('cStore').addEventListener('click', go);
     var saved = loadJson(KEYS.store, {}), fixed = cleanStoreInfo(saved);
@@ -4134,7 +4223,10 @@
   /* 언어를 바꾸면 앱이 만든 화면 조각을 새 언어로 다시 그림 (입력값은 그대로) */
   window.addEventListener('alba:lang', function () {
     syncMoneyUi();   // [보기]/[숨기기]·줄 돈 보기 글자를 새 언어로
-    if ($('railStore')) $('railStore').textContent = ($('sStoreName') && $('sStoreName').value.trim()) || tr('사장님 도우미');   // 가게 이름이 비었을 때 대체 글자
+    var storeLabelL = ($('sStoreName') && $('sStoreName').value.trim()) || tr('사장님 도우미');
+    if ($('railStore')) $('railStore').textContent = storeLabelL;   // 가게 이름이 비었을 때 대체 글자
+    if ($('punchStore')) $('punchStore').textContent = storeLabelL;
+    if ($('setFootStore')) $('setFootStore').textContent = storeLabelL;
     var checked = Array.prototype.map.call(document.querySelectorAll('#chkFormList input:checked'), function (el) { return el.value; });
     var opened = Array.prototype.map.call(document.querySelectorAll('#chkFormList details'), function (d) { return d.open; });   // 펼친 분류 기억
     buildChecklistForm();
