@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: blob: https:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none'">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="사장님 도우미 — 알바 급여·주휴수당·식대 자동 계산, 급여명세서, 매장 위생 점검표(41개 항목)를 휴대폰·PC에서 바로. 회원가입 없이 무료.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="사장님 도우미 · 알바 급여 &amp; 매장 위생 점검">
@@ -11,8 +11,8 @@
   <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-  <script src="./boot.js?v=202611171600"></script>
-  <link rel="stylesheet" href="./style.css?v=202611171600">
+  <script src="./boot.js?v=202611281600"></script>
+  <link rel="stylesheet" href="./style.css?v=202611281600">
 </head>
 <body>
   <header class="app-header">
@@ -32,10 +32,10 @@
   </header>
 
   <nav class="tabs" role="tablist">
-    <button class="tab" type="button" role="tab" data-tab="punch" aria-selected="false" data-en="Clock-in">출퇴근</button>
-    <button class="tab active" type="button" role="tab" data-tab="payroll" aria-selected="true">급여</button>
-    <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false" data-en="Hygiene">위생 점검</button>
-    <button class="tab" type="button" role="tab" data-tab="settings" aria-selected="false">설정</button>
+    <button class="tab" type="button" role="tab" data-tab="punch" aria-selected="false"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="tab-label" data-en="Clock-in">출퇴근</span></button>
+    <button class="tab active" type="button" role="tab" data-tab="payroll" aria-selected="true"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg><span class="tab-label" data-en="Work &amp; Pay">근무·급여</span></button>
+    <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span class="tab-label" data-en="Hygiene">위생 점검</span></button>
+    <button class="tab" type="button" role="tab" data-tab="settings" aria-selected="false"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span class="tab-label" data-en="Settings">설정</span></button>
     <button class="tab tab-guide" type="button" role="tab" data-tab="guide" aria-selected="false" hidden>사용 방법</button>
   </nav>
 
@@ -869,7 +869,7 @@
               <li>그 사이 매장에서 같은 곳이 바뀌었으면 요청은 <b>반영되지 않고 빨간 알림</b>이 뜹니다. 화면을 확인하고 다시 고쳐 주세요.</li>
               <li>출퇴근은 <b>매장 태블릿에서만</b> 찍을 수 있고, 폰·PC에서는 근무 현황만 보입니다. 태블릿을 바꿀 때는 새 기기에서 같은 버튼을 누르면 됩니다.</li>
             </ul>
-            <p class="guide-tip">💡 출퇴근 기기를 지정하지 않으면, 두 기기에서 동시에 고칠 때 <b>마지막에 저장한 내용</b>이 남을 수 있습니다(겹친 곳은 급여 탭 맨 위에 알려 드려요). 기기를 여러 대 쓰면 출퇴근 기기를 지정해 두세요.</p>
+            <p class="guide-tip">💡 출퇴근 기기를 지정하지 않으면, 두 기기에서 동시에 고칠 때 <b>마지막에 저장한 내용</b>이 남을 수 있습니다(겹친 곳은 근무·급여 탭 맨 위에 알려 드려요). 기기를 여러 대 쓰면 출퇴근 기기를 지정해 두세요.</p>
           </div>
         </details>
 
@@ -903,7 +903,7 @@
             <p>구글 저장을 켜 두었다면 구글 시트의 <b>관리자</b> 탭 오른쪽 칸(B1)에 비밀번호가 적혀 있습니다. 그 칸을 새 비밀번호로 고친 뒤 잠금 창에서 <b>[비밀번호를 잊었어요]</b>를 누르면 적용됩니다. 구글 저장도 백업도 없다면 열 방법이 없으니 꼭 해 두세요. 인터넷이나 구글 로그인이 끊긴 기기에서 비밀번호를 바꿨다면, 연결된 뒤 시트에 올라가고 그 전에는 이 버튼이 옛 비밀번호로 되돌리지 않습니다.</p>
             <p class="guide-q">알바생이 출퇴근을 잘못 찍었어요.</p>
             <p>급여 계산 탭 달력에서 <b>그 날을 눌러 시간을 고치면</b> 됩니다. 시트의 출퇴근기록 탭에는 실제로 찍은 시각이 그대로 남아 있어 나중에 확인할 수 있습니다.</p>
-            <p class="guide-q">급여 탭 맨 위에 빨간 [⚠️ 다른 기기와 수정이 겹쳤어요]가 떠요.</p>
+            <p class="guide-q">근무·급여 탭 맨 위에 빨간 [⚠️ 다른 기기와 수정이 겹쳤어요]가 떠요.</p>
             <p>두 기기에서 같은 곳을 거의 동시에 고친 경우입니다. <b>저장된 값</b>과 <b>덮인 값</b>을 보고 <b>[저장된 값 유지]</b> 또는 <b>[덮인 값으로 되돌리기]</b>를 누르세요. 출퇴근 기기를 지정해 두면 거의 생기지 않습니다.</p>
             <p class="guide-q">폰에서 고쳤는데 "내 수정 요청 N건 대기 중"이 계속 보여요.</p>
             <p>출퇴근 기기(매장 태블릿)가 꺼져 있거나 인터넷·구글 로그인이 끊긴 경우입니다. 위쪽에 <b>"응답이 없어요"</b>가 보이면 매장 기기를 켜고 확인해 주세요. 켜지면 30초 안에 반영되고, 그 사이 매장에서 같은 곳이 바뀌어 반영할 수 없으면 빨간 알림으로 알려 드립니다.</p>
@@ -1172,10 +1172,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611171600"></script>
-  <script src="./lang_web.js?v=202611171600"></script>
-  <script src="./i18n.js?v=202611171600"></script>
-  <script src="./gsync.js?v=202611171600"></script>
-  <script src="./app.js?v=202611171600"></script>
+  <script src="./engine.js?v=202611281600"></script>
+  <script src="./lang_web.js?v=202611281600"></script>
+  <script src="./i18n.js?v=202611281600"></script>
+  <script src="./gsync.js?v=202611281600"></script>
+  <script src="./app.js?v=202611281600"></script>
 </body>
 </html>

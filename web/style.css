@@ -2652,3 +2652,66 @@ body.locked .punch-cloud.bad, body.locked .punch-cloud.off { background: transpa
 @media (max-width: 380px) { html[lang="en"] .tab { font-size: 15px; letter-spacing: -.2px; } }
 .hint-link { min-height: 0; padding: 0 0 0 6px; font-size: 14px; font-weight: 700; color: var(--primary); vertical-align: baseline; }
 #cStore[readonly] { background: var(--card-2); color: var(--text); cursor: pointer; }
+
+/* ==========================================================
+   시안 I 1단계: 메뉴 위치 (docs/design/PATCH_PLAN_I.md)
+   - 1024px 미만(휴대폰·태블릿 세로. 경계는 1023.98px: 소수 폭에서 두 규칙 사이로 빠지지 않게): 화면 아래 고정 메뉴
+   - 1024px 이상(태블릿 가로·PC): 왼쪽 세로 메뉴 88px, 1300px 이상 220px
+   - 잠긴 매장 기기(body.locked)는 기존 규칙대로 메뉴가 없다. 여기서는 !important로 그 규칙을 이기지 않는다.
+   - 인쇄에는 적용하지 않는다(@media screen 안에서만).
+   - 선택자를 nav.tabs .tab 으로 쓴 것은 html[lang="en"] .tab(영어 작은 화면 글자) 규칙보다 우선하기 위해서다.
+   ========================================================== */
+.tab-ico { display: none; }
+@media screen {
+  nav.tabs .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; border: 0; }
+  nav.tabs .tab-ico { display: block; flex: none; width: 24px; height: 24px; }
+  nav.tabs .tab-label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  nav.tabs .tab:not(.active) { color: var(--muted); }
+  nav.tabs .tab:not(.active) .tab-ico { opacity: .55; }
+  /* 메뉴(80) 위에 떠야 하는 것: 토스트 85, ⋯ 더보기 82 (z-index 순서는 PATCH_PLAN_I.md) */
+  .toast { z-index: 85; }
+  .more-pop { z-index: 82; }
+}
+
+@media screen and (max-width: 1023.98px) {
+  nav.tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+    max-width: none; margin: 0;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    background: var(--card); border-bottom: 0; border-top: 1px solid var(--line);
+  }
+  nav.tabs .tab { padding: 6px 2px; font-size: 12px; font-weight: 700; letter-spacing: -.2px; box-shadow: none; background: transparent; }
+  nav.tabs .tab.active { color: var(--text); box-shadow: none; background: transparent; }
+  /* 아래 메뉴(약 68px + 안전 영역)에 본문 끝이 가리지 않게 */
+  /* 출퇴근 탭은 푸터가 숨겨지므로 본문에, 다른 탭은 푸터에 여백을 준다(이중 여백 방지) */
+  body.on-punch:not(.locked) .container { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+  body:not(.locked) .app-footer { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  body:not(.locked) .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
+}
+
+@media screen and (min-width: 1024px) {
+  nav.tabs {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 80;
+    width: 88px; max-width: none; margin: 0;
+    padding: 18px 8px calc(18px + env(safe-area-inset-bottom));
+    grid-template-columns: minmax(0, 1fr); grid-auto-rows: min-content; align-content: start; gap: 6px;
+    background: var(--card); border-bottom: 0; border-right: 1px solid var(--line);
+    overflow-y: auto;
+  }
+  nav.tabs .tab { padding: 10px 4px; border-radius: 14px; font-size: 12px; font-weight: 700; box-shadow: none; background: transparent; }
+  /* 88px 메뉴: 영어처럼 긴 이름은 두 줄로 (Work & Pay) */
+  nav.tabs .tab-label { white-space: normal; text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
+  nav.tabs .tab:hover { background: var(--card-2); }
+  nav.tabs .tab.active { color: var(--primary); background: var(--primary-weak); box-shadow: none; }
+  body:not(.locked) { padding-left: 88px; }
+  /* 토스트는 화면 전체가 아니라 메뉴 오른쪽 본문 가운데에 */
+  body:not(.locked) .toast { left: calc(50% + 44px); max-width: calc(100vw - 88px - 32px); }
+}
+
+@media screen and (min-width: 1300px) {
+  nav.tabs { width: 220px; padding-left: 12px; padding-right: 12px; }
+  nav.tabs .tab { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; font-size: 15px; }
+  nav.tabs .tab-label { white-space: nowrap; text-align: left; }
+  body:not(.locked) { padding-left: 220px; }
+  body:not(.locked) .toast { left: calc(50% + 110px); max-width: calc(100vw - 220px - 32px); }
+}
