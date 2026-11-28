@@ -225,11 +225,19 @@ function parseResult(agent, stdout, stderr, err) {
   return r;
 }
 
+/* 데스크톱 앱 안(Claude Code 세션)에서 센터를 켜면 앱 내부용 환경 변수(ANTHROPIC_BASE_URL, CLAUDE_CODE_* 등)가
+   물려 들어와 Claude CLI가 사용자 로그인 대신 앱 내부 경로로 인증하려다 "Not logged in"이 된다 → 빼고 실행한다 */
+function cleanEnv() {
+  var e = {};
+  Object.keys(process.env).forEach(function (k) { if (!/^(CLAUDE|ANTHROPIC)/i.test(k)) e[k] = process.env[k]; });
+  return e;
+}
+
 var child = null;
 function runAgent(agent, job, done) {
   var prompt = preamble(agent, job);
   var args = agent === 'claude' ? claudeArgs(prompt, job) : geminiArgs(prompt, job);
-  child = cp.execFile(BIN[agent], args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: JOB_TIMEOUT_MS, windowsHide: true },
+  child = cp.execFile(BIN[agent], args, { cwd: ROOT, env: cleanEnv(), encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: JOB_TIMEOUT_MS, windowsHide: true },
     function (err, stdout, stderr) { child = null; done(parseResult(agent, stdout, stderr, err)); });
 }
 

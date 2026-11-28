@@ -46,7 +46,7 @@ Claude는 이 저장소에서 작업을 시작할 때 이 문서를 먼저 읽�
 - `code-reviewer` 에이전트: 배포 전 diff 검토(계산·동기화·조용한 실패·화면).
 - `security-reviewer` 에이전트: 손님 화면, 입력, 구글 연동, 내보내기 보안 점검.
 - `/gemini` 스킬 + `tools/gemini.sh`: 시안·문서처럼 큰 파일 작성은 제미나이(안티그래비티 CLI `agy`, 기본 모델 gemini-4-neon-high)에게 지시서로 맡기고 Claude는 지시·검토만 해서 토큰을 아낀다. 제미나이는 터미널 명령 없이 파일 도구만 쓴다(무인 실행에서 명령은 자동 거부됨). 앱 코드의 계산·동기화·보안과 커밋·푸시는 맡기지 않는다.
-- **협업 센터**: `npm run collab` → http://127.0.0.1:8787 (`tools/collab/`). 입력창 하나로 Claude(데스크톱 앱에 든 Claude Code CLI, 처음 한 번 `/login` 필요)와 제미나이(agy)에게 일을 준다.
+- **협업 센터**: `npm run collab` → http://127.0.0.1:8787 (`tools/collab/`). PowerShell에서 "스크립트를 실행할 수 없으므로"가 나오면 `npm.cmd run collab` 또는 `node tools/collab/server.js`. 입력창 하나로 Claude(데스크톱 앱에 든 Claude Code CLI, 처음 한 번 `/login` 필요)와 제미나이(agy)에게 일을 준다.
   - 자동 배정: 오늘 토큰(입력+출력+캐시 생성+캐시 읽기×0.1)을 덜 쓴 쪽이 받는다. 로그인·한도로 실패하면 다른 쪽이 이어받는다(10분 뒤 다시 시도, 카드의 [다시 확인]).
   - 넘기기: 답 마지막 줄이 `@제미나이: 할 일` / `@claude: 할 일`이면 상대에게 이어서 맡긴다(최대 2번). 받을 쪽이 못 하면 넘긴 쪽이 직접 한다.
   - 한 번에 한 작업만 돈다. 두 일꾼 모두 git commit·push는 못 한다(Claude는 허용 도구 목록, 제미나이는 지시로 막음). 커밋은 대화창의 Claude가 검토 후에 한다.
