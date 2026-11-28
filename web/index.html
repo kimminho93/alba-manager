@@ -11,13 +11,13 @@
   <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-  <script src="./boot.js?v=202611290100"></script>
-  <link rel="stylesheet" href="./style.css?v=202611290100">
+  <script src="./boot.js?v=202611290200"></script>
+  <link rel="stylesheet" href="./style.css?v=202611290200">
 </head>
 <body>
   <header class="app-header">
     <div class="brand">
-      <span class="brand-logo">🧾</span>
+      <span class="brand-logo" aria-hidden="true"><svg class="hdr-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></span>
       <div>
         <h1>사장님 도우미</h1>
         <p>알바 급여 정산 · 매장 위생 점검</p>
@@ -25,8 +25,8 @@
     </div>
     <div class="header-actions">
       <button id="lockBtn" class="cloud-btn lock-btn" type="button" hidden data-no-i18n>관리자</button>
-      <button id="bellBtn" class="cloud-btn bell-btn" type="button" hidden aria-label="보건증 알림">🔔<span id="bellCount" class="bell-count"></span></button>
-      <button id="cloudBtn" class="cloud-btn" type="button" aria-label="구글 시트에 저장 설정">☁️ 구글 저장</button>
+      <button id="bellBtn" class="cloud-btn bell-btn" type="button" hidden aria-label="보건증 알림"><svg class="hdr-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span id="bellCount" class="bell-count"></span></button>
+      <button id="cloudBtn" class="cloud-btn" type="button" aria-label="구글 시트에 저장 설정">구글 저장</button>
       <button id="helpBtn" class="icon-btn help-btn" type="button" aria-label="사용 방법" title="사용 방법" hidden>?</button><!-- 시안 I: 위쪽 ? 버튼은 없애고 사용 방법은 설정 안에서 연다(JS가 참조하므로 요소는 남김) -->
     </div>
   </header>
@@ -55,7 +55,7 @@
         <div id="punchList" class="punch-list"></div>
         <button id="punchAllOut" type="button" class="btn punch-all" hidden>근무 중 모두 퇴근</button>
         <button id="punchBankBtn" type="button" class="btn punch-bank" hidden><svg class="punch-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/></svg><span>계좌이체 QR</span></button>
-        <div id="punchCloud" class="punch-cloud off" role="status">☁️ 구글 저장 상태 확인 중…</div>
+        <div id="punchCloud" class="punch-cloud off" role="status">구글 저장 상태 확인 중…</div>
         <button id="punchLang" type="button" class="btn punch-lang" data-no-i18n>English</button>
       </div>
     </section>
@@ -201,7 +201,7 @@
           </button>
           <div class="banner pay-banner">
             <p id="bannerText">계산 중…</p>
-            <button id="copyKakao" type="button" class="btn btn-kakao">💬 카톡 명세서 복사</button>
+            <button id="copyKakao" type="button" class="btn btn-kakao">카톡 명세서 복사</button>
           </div>
 
           <!-- 우측 상단 뷰 전환 바 (일별 출퇴근 시간표 크게 입력 <-> 급여명세서 미리보기) -->
@@ -261,8 +261,8 @@
 
           <div class="actions pay-actions">
             <button id="btnSlipOpen" type="button" class="btn btn-slip-open">명세서 보기</button>
-            <button id="btnPrintPay" type="button" class="btn"><span class="l-pc">🖨️ PDF 출력/저장</span><span class="l-ph">PDF</span></button>
-            <button id="btnXlsxPay" type="button" class="btn"><span class="l-pc">📊 엑셀(.xlsx) 다운로드</span><span class="l-ph">엑셀</span></button>
+            <button id="btnPrintPay" type="button" class="btn"><span class="l-pc">PDF 출력/저장</span><span class="l-ph">PDF</span></button>
+            <button id="btnXlsxPay" type="button" class="btn"><span class="l-pc">엑셀(.xlsx) 다운로드</span><span class="l-ph">엑셀</span></button>
           </div>
         </div>
       </div>
@@ -303,7 +303,7 @@
           <label class="field"><span>출퇴근 비밀번호 <em class="hint">(선택)</em></span>
             <input id="awPw" type="text" maxlength="20" autocomplete="off" placeholder="예) 1234">
           </label>
-          <button id="btnAddWorker" type="submit" class="btn btn-primary">➕ 알바생 추가</button>
+          <button id="btnAddWorker" type="submit" class="btn btn-primary">알바생 추가</button>
         </form>
         <p class="roster-hint">이름을 누르면 그 알바생의 근무 기록이 위 달력에 나타납니다. 고치면 바로 저장됩니다.</p>
         <div id="rosterCards" class="roster-cards"></div>
@@ -349,7 +349,7 @@
           </div>
 
           <div class="chk-tools">
-            <button id="btnCheckAll" type="button" class="btn">✅ 전체 적합으로 체크</button>
+            <button id="btnCheckAll" type="button" class="btn">전체 적합으로 체크</button>
             <button id="btnCheckNone" type="button" class="btn btn-ghost">전체 해제</button>
             <span id="chkProgress" class="chk-progress">0 / 41 체크</span>
           </div>
@@ -390,9 +390,9 @@
           </div>
 
           <div class="actions">
-            <button id="btnPrintChk" type="button" class="btn">🖨️ 점검표 PDF 출력/저장</button>
-            <button id="btnXlsxChk" type="button" class="btn">📊 점검표 엑셀(.xlsx) 다운로드</button>
-            <button id="btnAddArchive" type="button" class="btn btn-primary">🗂️ 보관함에 저장</button>
+            <button id="btnPrintChk" type="button" class="btn">점검표 PDF 출력/저장</button>
+            <button id="btnXlsxChk" type="button" class="btn">점검표 엑셀(.xlsx) 다운로드</button>
+            <button id="btnAddArchive" type="button" class="btn btn-primary">보관함에 저장</button>
           </div>
         </div>
       </div>
@@ -428,8 +428,8 @@
         <div class="set-quick" role="group" aria-label="화면 보기">
           <span class="set-quick-t">화면</span>
           <button id="fontToggle" class="quick-btn" type="button" aria-label="글자 크게 보기 켜기/끄기" aria-pressed="false">가+</button>
-          <button id="themeToggle" class="quick-btn" type="button" aria-label="다크/라이트 모드 전환">🌙</button>
-          <button id="langBtn" class="quick-btn" type="button" aria-label="언어 / Language">🌐 EN</button>
+          <button id="themeToggle" class="quick-btn" type="button" aria-label="다크/라이트 모드 전환"><svg class="hdr-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+          <button id="langBtn" class="quick-btn" type="button" aria-label="언어 / Language">EN</button>
         </div>
 
         <h3 class="set-group">매장·기기</h3>
@@ -468,7 +468,7 @@
           <details class="set-acc" id="acc-bank">
             <summary><span class="acc-t">손님 계좌이체 QR</span><span class="acc-v" id="bankState"></span></summary>
             <div class="acc-body">
-          <div class="set-note">손님이 휴대폰 카메라로 QR을 찍으면 <b>은행·계좌번호·예금주</b>가 보이고 <b>[계좌번호 복사]</b>를 눌러 쓰는 송금 앱에 붙여 넣을 수 있어요. 출퇴근 화면의 <b>[💳 계좌이체 QR]</b>로 크게 띄우거나 <b>안내판으로 인쇄</b>해 두세요. 바꾸려면 관리자 비밀번호가 필요하고, 다른 기기에서 계좌가 바뀌면 이 기기에서 확인해야 QR이 보여요.</div>
+          <div class="set-note">손님이 휴대폰 카메라로 QR을 찍으면 <b>은행·계좌번호·예금주</b>가 보이고 <b>[계좌번호 복사]</b>를 눌러 쓰는 송금 앱에 붙여 넣을 수 있어요. 출퇴근 화면의 <b>[계좌이체 QR]</b>로 크게 띄우거나 <b>안내판으로 인쇄</b>해 두세요. 바꾸려면 관리자 비밀번호가 필요하고, 다른 기기에서 계좌가 바뀌면 이 기기에서 확인해야 QR이 보여요.</div>
           <div id="bankWarn" class="bank-warn" hidden role="alert"></div>
           <div class="bank-form">
             <label class="field"><span>은행</span>
@@ -481,7 +481,7 @@
           <div class="pin-row">
             <button id="btnBankSave" type="button" class="btn btn-primary">저장</button>
             <button id="btnBankShow" type="button" class="btn" hidden>QR 크게 보기</button>
-            <button id="btnBankPrint" type="button" class="btn" hidden>🖨️ 안내판 인쇄</button>
+            <button id="btnBankPrint" type="button" class="btn" hidden>안내판 인쇄</button>
             <button id="btnBankClear" type="button" class="btn btn-ghost" hidden>지우기</button>
           </div>
             </div>
@@ -637,7 +637,7 @@
             <ol>
               <li>회원가입이나 로그인 없이 바로 쓸 수 있습니다.</li>
               <li>글씨가 작으면 <b>설정 → 화면</b>의 <b>[가+]</b> 버튼을 누르세요. 글자가 더 크게 보입니다.</li>
-              <li>화면이 눈부시면 같은 곳의 <b>[🌙]</b> 버튼으로 어두운 화면으로 바꿀 수 있습니다. 궁금한 게 있으면 <b>설정</b> 맨 아래 <b>[사용 방법 보기]</b>를 누르면 이 사용 방법이 열립니다.</li>
+              <li>화면이 눈부시면 같은 곳의 <b>달 모양</b> 버튼으로 어두운 화면으로 바꿀 수 있습니다. 궁금한 게 있으면 <b>설정</b> 맨 아래 <b>[사용 방법 보기]</b>를 누르면 이 사용 방법이 열립니다.</li>
               <li>자주 쓰신다면 <b>휴대폰 홈 화면에 추가</b>해 두세요. 앱처럼 한 번에 열립니다.
                 <ul>
                   <li>아이폰(Safari): 아래 <b>공유 버튼</b> → <b>홈 화면에 추가</b></li>
@@ -807,10 +807,10 @@
               <li>위쪽 <b>[위생 점검]</b> 탭을 누릅니다.</li>
               <li>점검일자·점검자를 확인하고 냉장·냉동 온도를 입력합니다. 매장명은 <b>설정 → 매장 정보</b>에 한 번 적어 두면 되고, 점검자는 처음에 거기 적은 사장님 이름이 들어갑니다(그날 점검한 사람으로 바꿔도 돼요).</li>
               <li>점검 항목 <b>41개</b>마다 <b>[적합]</b> 또는 <b>[점검 필요]</b>를 누르세요. 분류 이름을 누르면 접고 펼칠 수 있고, <b>[적합]</b>을 누르지 않은 항목은 <b>"점검필요"</b>로 표시됩니다.</li>
-              <li>전부 괜찮다면 <b>[✅ 전체 적합으로 체크]</b>를 누르면 됩니다.</li>
+              <li>전부 괜찮다면 <b>[전체 적합으로 체크]</b>를 누르면 됩니다.</li>
               <li>특이사항이 있으면 메모에 적습니다.</li>
-              <li><b>[🗂️ 보관함에 저장]</b>을 누르면 그날 점검표가 저장됩니다. 매일 저장해 두면 기록이 쌓입니다.</li>
-              <li><b>[🖨️ 점검표 PDF 출력/저장]</b>, <b>[📊 점검표 엑셀(.xlsx) 다운로드]</b>로 점검표를 파일로 만들 수 있습니다.</li>
+              <li><b>[보관함에 저장]</b>을 누르면 그날 점검표가 저장됩니다. 매일 저장해 두면 기록이 쌓입니다.</li>
+              <li><b>[점검표 PDF 출력/저장]</b>, <b>[점검표 엑셀(.xlsx) 다운로드]</b>로 점검표를 파일로 만들 수 있습니다.</li>
             </ol>
             <p class="guide-tip">💡 20번 항목(냉장·냉동고 온도)은 체크해도, 입력한 온도가 기준(냉장 0~5°C, 냉동 -18°C 이하)을 벗어나면 점검필요로 나옵니다.</p>
           </div>
@@ -835,7 +835,7 @@
           <div class="guide-body">
             <ol>
               <li><b>설정 → 손님 계좌이체 QR</b>에 은행·계좌번호·예금주를 적고 <b>[저장]</b>을 누릅니다. 관리자 비밀번호가 있으면 한 번 더 확인합니다.</li>
-              <li>출퇴근 화면의 <b>[💳 계좌이체 QR]</b>을 누르면 큰 QR이 뜹니다. 관리자 잠금 중에도 <b>보기만</b> 할 수 있습니다. <b>[🖨️ 안내판 인쇄]</b>로 카운터에 붙여 둘 안내판도 만들 수 있습니다.</li>
+              <li>출퇴근 화면의 <b>[계좌이체 QR]</b>을 누르면 큰 QR이 뜹니다. 관리자 잠금 중에도 <b>보기만</b> 할 수 있습니다. <b>[안내판 인쇄]</b>로 카운터에 붙여 둘 안내판도 만들 수 있습니다.</li>
               <li>손님이 휴대폰 카메라로 찍으면 은행·계좌번호·예금주가 보이고, <b>[계좌번호 복사]</b>를 누른 뒤 쓰는 송금 앱에 붙여 넣으면 됩니다. 계좌 정보는 주소의 # 뒤에만 들어 있어 어느 서버로도 보내지지 않습니다.</li>
               <li>다른 기기에서 계좌가 바뀌면 이 기기에서는 <b>확인하기 전까지 QR이 숨겨지고</b> 🔔와 설정에 안내가 뜹니다. 맞는 계좌인지 보고 <b>[맞아요, 이 계좌로 QR 표시]</b>를 누르세요.</li>
             </ol>
@@ -849,10 +849,10 @@
             <p>휴대폰을 바꾸거나 다른 컴퓨터에서 열어도 <b>같은 기록</b>을 보고 싶을 때 쓰세요. 내 구글 드라이브에 자동으로 저장됩니다.</p>
             <p class="guide-step-title">연동하기</p>
             <ol>
-              <li>화면 위쪽 <b>[☁️ 구글 저장]</b> 버튼을 누릅니다.</li>
+              <li>화면 위쪽 <b>[구글 저장]</b> 버튼을 누릅니다.</li>
               <li><b>[구글 계정으로 연동하기]</b>를 누릅니다.</li>
               <li>구글 로그인 창에서 <b>내 구글 계정</b>을 고르고, 허용을 눌러 주세요.</li>
-              <li>끝입니다. 위쪽 버튼이 <b>"☁️ 저장됨"</b>으로 바뀌면 연동된 것입니다.</li>
+              <li>끝입니다. 위쪽 버튼이 <b>"저장됨"</b>으로 바뀌면 연동된 것입니다.</li>
             </ol>
             <p class="guide-step-title">그 다음부터</p>
             <ul>
@@ -884,7 +884,7 @@
           <summary><span class="guide-sum"><span class="guide-name">백업 · 새 휴대폰으로 옮기기</span><small class="guide-sub">백업 파일 받기 · 불러오기</small></span></summary>
           <div class="guide-body">
             <ol>
-              <li>옮기기 전, <b>[☁️ 구글 저장]</b> 창 아래의 <b>[⬇️ 백업 파일 내려받기]</b>를 누릅니다. 기록 전체가 파일 하나로 저장됩니다.</li>
+              <li>옮기기 전, <b>[구글 저장]</b> 창 아래의 <b>[⬇️ 백업 파일 내려받기]</b>를 누릅니다. 기록 전체가 파일 하나로 저장됩니다.</li>
               <li>새 기기(또는 새 계정)에서 이 사이트를 열고 같은 창의 <b>[⬆️ 백업 파일 불러오기]</b>를 누른 뒤 그 파일을 고릅니다.</li>
               <li>확인 창에서 <b>[확인]</b>을 누르면 기록이 그대로 복원됩니다.</li>
               <li>구글 연동 중이면 복원한 내용이 구글 시트에도 자동 저장됩니다.</li>
@@ -899,7 +899,7 @@
             <p class="guide-q">세금이나 4대보험 비율이 바뀌었어요.</p>
             <p><b>설정</b> 탭의 <b>세금·4대보험 비율</b>, <b>최저시급·식사 시간대</b> 줄을 눌러 소득세·국민연금·건강보험 등의 비율과 최저시급을 고치면 바로 계산에 반영됩니다. 처음 값으로 되돌릴 수도 있습니다.</p>
             <p class="guide-q">기록이 사라졌어요.</p>
-            <p>기록은 사용 중인 브라우저에 저장됩니다. 브라우저의 "인터넷 사용 기록/사이트 데이터 삭제"를 하면 같이 지워집니다. 구글 연동이나 백업 파일이 있다면 [☁️ 구글 저장] 창에서 불러오세요.</p>
+            <p>기록은 사용 중인 브라우저에 저장됩니다. 브라우저의 "인터넷 사용 기록/사이트 데이터 삭제"를 하면 같이 지워집니다. 구글 연동이나 백업 파일이 있다면 [구글 저장] 창에서 불러오세요.</p>
             <p class="guide-q">가게 공용 컴퓨터에서 써도 되나요?</p>
             <p>쓰고 난 뒤 정산 명단과 점검 보관함의 오른쪽 위 <b>[⋯]</b>에서 <b>[명단 전체 지우기]</b>, <b>[보관함 비우기]</b>를 눌러 주세요. 다음 사람이 같은 브라우저에서 알바 이름과 시급을 볼 수 있습니다.</p>
             <p class="guide-q">내가 입력한 급여 정보가 어디로 전송되나요?</p>
@@ -1035,7 +1035,7 @@
   <div id="cloudModal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="cloudTitle">
     <div class="modal-card">
       <button id="cloudClose" class="modal-close" type="button" aria-label="닫기">✕</button>
-      <h2 id="cloudTitle" class="modal-title">☁️ 구글 시트에 자동 저장</h2>
+      <h2 id="cloudTitle" class="modal-title">구글 시트에 자동 저장</h2>
       <div id="cloudBody"></div>
       <input id="backupFile" type="file" accept=".json,application/json" hidden>
     </div>
@@ -1179,10 +1179,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611290100"></script>
-  <script src="./lang_web.js?v=202611290100"></script>
-  <script src="./i18n.js?v=202611290100"></script>
-  <script src="./gsync.js?v=202611290100"></script>
-  <script src="./app.js?v=202611290100"></script>
+  <script src="./engine.js?v=202611290200"></script>
+  <script src="./lang_web.js?v=202611290200"></script>
+  <script src="./i18n.js?v=202611290200"></script>
+  <script src="./gsync.js?v=202611290200"></script>
+  <script src="./app.js?v=202611290200"></script>
 </body>
 </html>

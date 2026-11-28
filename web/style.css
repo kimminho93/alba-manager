@@ -2910,3 +2910,50 @@ nav.tabs .tabs-store { display: none; }
   }
   nav.tabs .tabs-store:empty { display: none; }
 }
+
+/* ==========================================================
+   시안 I 6단계: 계좌이체 QR 전체 화면 (#bankModal, docs/design/PATCH_PLAN_I.md)
+   - 휴대폰: 화면 가득, 위 가게 이름 → 큰 QR → 안내 → 계좌 카드 → [닫기]
+   - 1024px 이상: 왼쪽 큰 QR, 오른쪽 가게 이름·계좌·[닫기] (계산대에 세워 둔 태블릿)
+   - QR은 흰 바탕을 유지한다(다크 모드에서도 카메라가 읽어야 함)
+   ========================================================== */
+@media screen {
+  #bankModal { padding: 0; }
+  #bankModal .bank-card {
+    position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center;
+    width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; border-radius: 0;
+    padding: calc(24px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
+    background: var(--bg); overflow-y: auto; text-align: center;
+  }
+  #bankModal .bank-store { font-size: 22px; font-weight: 800; color: var(--text); }
+  #bankModal .bank-sub { margin-top: 2px; font-size: 15px; font-weight: 700; color: var(--muted); }
+  #bankModal .bank-qr { width: min(74vw, 340px); margin: 22px auto 12px; padding: 16px; border-radius: 24px; background: #fff; box-shadow: var(--shadow); }
+  #bankModal .bank-qr svg { border-radius: 0; }
+  #bankModal .bank-hint { font-size: 15px; color: var(--muted); }
+  #bankModal .bank-info { width: 100%; max-width: 420px; margin: 18px 0 0; padding: 4px 18px; border-radius: 20px; background: var(--card); box-shadow: var(--shadow); }
+  #bankModal .bank-info div { padding: 14px 0; font-size: 16px; }
+  #bankModal .bank-info div:last-child { border-bottom: 0; }
+  #bankModal .bank-info b { font-size: 19px; font-variant-numeric: tabular-nums; }
+  #bankModal .bank-btns { display: block; width: 100%; max-width: 420px; margin-top: auto; padding-top: 18px; }
+  #bankModal .bank-btns .btn { width: 100%; min-height: 56px; border-radius: 16px; font-size: 17px; }
+}
+@media screen and (min-width: 1024px) {
+  #bankModal .bank-card {
+    display: grid; grid-template-columns: auto minmax(320px, 420px); grid-template-rows: auto auto 1fr auto auto;
+    grid-template-areas: "qr store" "qr sub" "qr info" "qr hint" "qr btns";
+    column-gap: 48px; align-items: center; justify-content: center; padding: 48px 64px; text-align: left;
+  }
+  #bankModal .bank-qr { grid-area: qr; width: min(46vw, 68vh, 520px); margin: 0; justify-self: end; }
+  #bankModal .bank-store { grid-area: store; font-size: 30px; align-self: end; }
+  #bankModal .bank-sub { grid-area: sub; font-size: 17px; }
+  #bankModal .bank-info { grid-area: info; max-width: none; align-self: center; }
+  #bankModal .bank-info b { font-size: 22px; }
+  #bankModal .bank-hint { grid-area: hint; margin-top: 12px; }
+  #bankModal .bank-btns { grid-area: btns; max-width: none; margin-top: 0; }
+}
+/* 6단계: 머리띠 선 아이콘(로고·알림·테마) */
+.hdr-ico { display: block; flex: none; width: 20px; height: 20px; }
+.brand-logo .hdr-ico { width: 24px; height: 24px; }
+.bell-btn { display: inline-flex; align-items: center; gap: 4px; }
+.bell-btn[hidden] { display: none; }
+#themeToggle { display: inline-flex; align-items: center; justify-content: center; }

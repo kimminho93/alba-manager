@@ -8,16 +8,16 @@
   var en = !/^ko\b/i.test(navigator.language || 'ko');
   var T = {
     title: '계좌이체 안내', sub: '계좌이체 안내', bank: '은행', no: '계좌번호', holder: '예금주',
-    copyNo: '📋 계좌번호 복사', copyAll: '은행 이름까지 복사', copied: '✅ 복사했어요! 이제 송금 앱을 여세요',
-    copiedBtn: '✅ 복사 완료', fail: '복사하지 못했어요. 계좌번호를 길게 눌러 복사해 주세요.',
+    copyNo: '계좌번호 복사', copyAll: '은행 이름까지 복사', copied: '복사했어요. 이제 송금 앱을 여세요',
+    copiedBtn: '복사 완료', fail: '복사하지 못했어요. 계좌번호를 길게 눌러 복사해 주세요.',
     howto: '복사한 뒤 쓰시는 은행 앱이나 토스·카카오페이를 열면 계좌번호를 붙여 넣을 수 있어요.',
     check1: '송금하기 전에 받는 분 이름이 ', check2: ' 인지 꼭 확인하세요.',
     bad: '안내 정보를 읽을 수 없어요. 매장에 계좌번호를 직접 물어봐 주세요.'
   };
   if (en) T = {
     title: 'Bank transfer', sub: 'Bank transfer details', bank: 'Bank', no: 'Account no.', holder: 'Account holder',
-    copyNo: '📋 Copy account number', copyAll: 'Copy with bank name', copied: '✅ Copied! Now open your banking app',
-    copiedBtn: '✅ Copied', fail: "Couldn't copy. Long-press the account number to copy it.",
+    copyNo: 'Copy account number', copyAll: 'Copy with bank name', copied: 'Copied. Now open your banking app',
+    copiedBtn: 'Copied', fail: "Couldn't copy. Long-press the account number to copy it.",
     howto: 'After copying, open your banking or payment app and paste the account number.',
     check1: 'Before sending, make sure the recipient name is ', check2: '.',
     bad: "Couldn't read the details. Please ask the store for the account number."
@@ -80,6 +80,7 @@
   }
   function done(btn, ok) {
     $('done').textContent = ok ? T.copied : T.fail;
+    $('done').classList.toggle('fail', !ok);   // 실패는 빨간 글씨
     if (ok) { btn.classList.add('copied'); if (btn.id === 'copyNo') btn.textContent = T.copiedBtn; }
   }
   $('copyNo').addEventListener('click', function () { if (!d) return; var me = this; copy(d.digits, function (ok) { done(me, ok); }); });

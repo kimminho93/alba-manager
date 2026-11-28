@@ -136,11 +136,16 @@
   }
 
   /* ---------- 테마 & 서버 연결 상태 배지 ---------- */
+  var THEME_ICON = {
+    moon: '<svg class="hdr-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
+    sun: '<svg class="hdr-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'
+  };
   function syncThemeBtn() {
     var cur = document.documentElement.getAttribute('data-theme') || 'light';
     var btn = $('themeToggle');
     if (btn) {
-      btn.textContent = cur === 'dark' ? '☀️' : '🌙';
+      // 이모지 대신 선 아이콘: 다크면 해(라이트로), 라이트면 달(다크로)
+      btn.innerHTML = cur === 'dark' ? THEME_ICON.sun : THEME_ICON.moon;
       btn.title = cur === 'dark' ? tr('라이트 모드로 전환') : tr('다크 모드로 전환');
     }
   }
@@ -256,18 +261,18 @@
         })
         .then(function (buf) {
           triggerBlobDownload(new Uint8Array(buf), filename);
-          showToast(tr('📊 엑셀(.xlsx) 다운로드 완료: {f}', { f: filename }));
+          showToast(tr('엑셀(.xlsx) 다운로드 완료: {f}', { f: filename }));
         })
         .catch(function () {
           setModeBadge(false);
           var bytes = localBuilder();
           triggerBlobDownload(bytes, filename);
-          showToast(tr('📊 엑셀(.xlsx) 다운로드 완료: {f}', { f: filename }));
+          showToast(tr('엑셀(.xlsx) 다운로드 완료: {f}', { f: filename }));
         });
     } else {
       var bytes = localBuilder();
       triggerBlobDownload(bytes, filename);
-      showToast(tr('📊 엑셀(.xlsx) 다운로드 완료: {f}', { f: filename }));
+      showToast(tr('엑셀(.xlsx) 다운로드 완료: {f}', { f: filename }));
     }
   }
 
@@ -1168,7 +1173,7 @@
     }).join('');
 
     if (!results.length) {
-      $('rosterBody').innerHTML = '<tr class="empty"><td colspan="11">아직 알바생이 없습니다. 위에서 이름·일하는 날·시급을 넣고 [➕ 알바생 추가]를 눌러주세요.</td></tr>';
+      $('rosterBody').innerHTML = '<tr class="empty"><td colspan="11">아직 알바생이 없습니다. 위에서 이름·일하는 날·시급을 넣고 [알바생 추가]를 눌러주세요.</td></tr>';
       $('rosterFoot').innerHTML = '';
       return;
     }
@@ -1364,7 +1369,7 @@
     $('archiveCount').textContent = tr('{n}일', { n: results.length });
 
     if (!results.length) {
-      $('archiveBody').innerHTML = '<tr class="empty"><td colspan="10">저장된 일별 점검 기록이 없습니다. [🗂️ 보관함에 저장] 버튼을 눌러 누적해보세요.</td></tr>';
+      $('archiveBody').innerHTML = '<tr class="empty"><td colspan="10">저장된 일별 점검 기록이 없습니다. [보관함에 저장] 버튼을 눌러 누적해보세요.</td></tr>';
       return;
     }
 
@@ -1752,7 +1757,7 @@
     $('copyKakao').addEventListener('click', function () {
       if (!state.payroll) return;
       copyText(state.payroll.kakaoText).then(function (ok) {
-        showToast(ok ? tr('💬 카카오톡용 급여명세서가 클립보드에 복사되었습니다!') : tr('복사에 실패했습니다.'));
+        showToast(ok ? tr('카카오톡용 급여명세서가 클립보드에 복사되었습니다!') : tr('복사에 실패했습니다.'));
       });
     });
 
@@ -1807,7 +1812,7 @@
       selectWorker(w.id);
       closeSheets();
       if (state.workers.length === 1) setTimeout(maybeAskPin, 700);
-      showToast(tr('➕ {n}님을 추가했습니다. 이름을 누르면 근무 기록을 입력할 수 있어요.', { n: w.name }));
+      showToast(tr('{n}님을 추가했습니다. 이름을 누르면 근무 기록을 입력할 수 있어요.', { n: w.name }));
     });
 
     // 명단에서 이름을 누르면 그 알바생의 기록을 달력에 불러옴
@@ -1856,7 +1861,7 @@
       if (personal) {
         var fn = E.personalFileName(results);
         triggerBlobDownload(E.payrollPersonalXlsx(results), fn);
-        showToast(tr('📊 엑셀(.xlsx) 다운로드 완료: {f}', { f: fn }));
+        showToast(tr('엑셀(.xlsx) 다운로드 완료: {f}', { f: fn }));
         return;
       }
       var names = {};
@@ -1940,7 +1945,7 @@
       state.archive.push(c.input);
       saveJson(KEYS.archive, state.archive);
       renderArchive();
-      showToast(tr('🗂️ 점검 보관함에 {d} 점검표 저장 ({v})', { d: c.date || tr('오늘'), v: c.verdict }));
+      showToast(tr('점검 보관함에 {d} 점검표 저장 ({v})', { d: c.date || tr('오늘'), v: c.verdict }));
     });
 
     $('archiveBody').addEventListener('click', function (ev) {
@@ -2319,10 +2324,10 @@
     var clock = fmtClock(st && st.lastSaved);
     renderPunchCloud(connected, kind, clock);
 
-    if (!connected && kind !== 'saving') { btn.textContent = tr('☁️ 구글 저장'); btn.className = 'cloud-btn'; }
-    else if (kind === 'saving') { btn.textContent = tr('☁️ 저장 중…'); btn.className = 'cloud-btn'; }
+    if (!connected && kind !== 'saving') { btn.textContent = tr('구글 저장'); btn.className = 'cloud-btn'; }
+    else if (kind === 'saving') { btn.textContent = tr('저장 중…'); btn.className = 'cloud-btn'; }
     else if (kind === 'needLogin' || kind === 'error') { btn.textContent = tr('⚠️ 다시 연결'); btn.className = 'cloud-btn bad'; }
-    else { btn.textContent = tr('☁️ 저장됨') + (clock ? ' ' + clock : ''); btn.className = 'cloud-btn ok'; }
+    else { btn.textContent = tr('저장됨') + (clock ? ' ' + clock : ''); btn.className = 'cloud-btn ok'; }
 
     var html;
     if (!connected) {
@@ -2462,9 +2467,9 @@
       if (act === 'backup-save') { backupDownload(); return; }
       if (act === 'backup-load') { $('backupFile').click(); return; }
       if (act === 'connect') {
-        C.connect().then(function (ok) { if (ok) { showToast(tr('☁️ 구글 시트 연동 완료')); adoptSheetPin(); } });
+        C.connect().then(function (ok) { if (ok) { showToast(tr('구글 시트 연동 완료')); adoptSheetPin(); } });
       } else if (act === 'save') {
-        C.saveNow().then(function (ok) { if (ok) showToast(tr('☁️ 구글 시트에 저장했습니다')); });
+        C.saveNow().then(function (ok) { if (ok) showToast(tr('구글 시트에 저장했습니다')); });
       } else if (act === 'open') {
         var u = C.sheetUrl();
         if (u) window.open(u, '_blank', 'noopener');
@@ -3281,7 +3286,7 @@
     $('healthLead').textContent = tr('만료 {d}일 전부터 알려 드려요. 7일 이내는 빨간색이에요.', { d: state.settings.healthWarnDays });
     var html = '';
     if (bankPending()) {
-      html += '<div class="health-item st-expired"><div class="health-main"><b>' + tr('💳 손님 계좌가 바뀌었어요') + '</b>' +
+      html += '<div class="health-item st-expired"><div class="health-main"><b>' + tr('손님 계좌가 바뀌었어요') + '</b>' +
         '<small>' + tr('설정에서 확인해야 계좌 QR이 보여요') + '</small></div>' +
         '<div class="health-acts"><button type="button" class="btn btn-sm btn-primary" data-bank-review>' + tr('확인하러 가기') + '</button></div></div>';
     }

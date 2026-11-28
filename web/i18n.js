@@ -137,7 +137,7 @@
   function syncControls() {
     var l = get();
     var b = document.getElementById('langBtn');
-    if (b) { b.textContent = l === 'en' ? '🌐 한국어' : '🌐 EN'; b.setAttribute('data-no-i18n', ''); b.title = l === 'en' ? '한국어로 보기' : 'View in English'; }
+    if (b) { b.textContent = l === 'en' ? '한국어' : 'EN'; b.setAttribute('data-no-i18n', ''); b.title = l === 'en' ? '한국어로 보기' : 'View in English'; }
     var sel = document.getElementById('sLang');
     if (sel) sel.value = l;
   }

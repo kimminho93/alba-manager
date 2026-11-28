@@ -1,21 +1,23 @@
-:root { --bg: #f4f6fb; --card: #fff; --text: #141a29; --muted: #4f586c; --line: #d3d9e6; --primary: #3563f0; --ok: #10915a; --bad: #d93f45; color-scheme: light dark; }
-@media (prefers-color-scheme: dark) { :root { --bg: #0f1420; --card: #171d2b; --text: #e6e9f1; --muted: #a3acc2; --line: #2c3548; --primary: #5b82ff; --ok: #34c77f; --bad: #ff6b70; } }
+/* 손님 휴대폰 계좌이체 안내 (pay.html). 시안 I 색: 토스식 회색 바탕 + 흰 카드 + 파랑 하나 */
+:root { --bg: #f2f4f6; --card: #fff; --text: #191f28; --muted: #6b7684; --line: #e5e8eb; --primary: #3182f6; --primary-ink: #fff; --ok: #0f9d6b; --bad: #f04452; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) { :root { --bg: #101215; --card: #1b1e23; --text: #eceef1; --muted: #a3acb9; --line: #2c3036; --primary: #4c8dff; --primary-ink: #0d1220; --ok: #34c77f; --bad: #ff6b70; } }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Noto Sans KR", sans-serif; -webkit-text-size-adjust: 100%; }
-.pay { max-width: 460px; margin: 0 auto; padding: 28px 20px 40px; text-align: center; }
-.store { font-size: 26px; font-weight: 800; word-break: keep-all; }
-.sub { margin-top: 4px; color: var(--muted); font-weight: 700; }
-.info { margin: 22px 0 10px; padding: 6px 18px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); text-align: left; }
-.info div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.pay { max-width: 460px; margin: 0 auto; padding: calc(32px + env(safe-area-inset-top)) 20px calc(40px + env(safe-area-inset-bottom)); text-align: center; }
+.store { font-size: 24px; font-weight: 800; word-break: keep-all; letter-spacing: -.3px; }
+.sub { margin-top: 4px; color: var(--muted); font-size: 15px; font-weight: 700; }
+.info { margin: 24px 0 12px; padding: 4px 20px; border-radius: 22px; background: var(--card); text-align: left; box-shadow: 0 1px 2px rgba(0, 0, 0, .04); }
+.info div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--line); }
 .info div:last-child { border-bottom: 0; }
-.info dt { color: var(--muted); font-size: 16px; white-space: nowrap; }
-.info dd { margin: 0; font-size: 21px; font-weight: 800; text-align: right; word-break: break-all; }
-.info .no { font-size: 24px; letter-spacing: .5px; }
-.check { margin: 6px 0 18px; font-size: 15px; line-height: 1.5; color: var(--bad); font-weight: 700; }
-.btn { display: block; width: 100%; min-height: 56px; margin-top: 10px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); color: var(--text); font-size: 18px; font-weight: 800; cursor: pointer; }
-.btn.primary { min-height: 68px; border-color: var(--primary); background: var(--primary); color: #fff; font-size: 21px; }
-.btn.primary.copied { border-color: var(--ok); background: var(--ok); }
+.info dt { color: var(--muted); font-size: 15px; white-space: nowrap; }
+.info dd { margin: 0; font-size: 20px; font-weight: 800; text-align: right; word-break: break-all; font-variant-numeric: tabular-nums; }
+.info .no { font-size: 24px; letter-spacing: .3px; }
+.check { margin: 6px 4px 20px; font-size: 15px; line-height: 1.55; color: var(--bad); font-weight: 700; }
+.btn { display: block; width: 100%; min-height: 56px; margin-top: 10px; border: 0; border-radius: 16px; background: var(--card); color: var(--text); font: inherit; font-size: 17px; font-weight: 800; cursor: pointer; }
+.btn.primary { min-height: 64px; background: var(--primary); color: var(--primary-ink); font-size: 19px; }
+.btn.primary.copied { background: var(--ok); color: var(--primary-ink); }   /* 다크에서도 글자 대비 유지 */
 .done { min-height: 1.5em; margin: 12px 0 4px; color: var(--ok); font-weight: 800; }
+.done.fail { color: var(--bad); }
 .howto { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .bad { margin-top: 30px; color: var(--bad); font-weight: 700; line-height: 1.6; }
 [hidden] { display: none !important; }
