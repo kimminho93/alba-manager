@@ -11,8 +11,8 @@
   <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-  <script src="./boot.js?v=202611281800"></script>
-  <link rel="stylesheet" href="./style.css?v=202611281800">
+  <script src="./boot.js?v=202611282100"></script>
+  <link rel="stylesheet" href="./style.css?v=202611282100">
 </head>
 <body>
   <header class="app-header">
@@ -219,7 +219,7 @@
             <div class="month-cal-wrap">
               <div class="month-cal-head">
                 <h4 id="calBoardTitle">2026년 11월 출퇴근 달력 (총 5개 주차)</h4>
-                <span class="muted small">날짜를 누르면 근무시간·식대를 정할 수 있어요 · 🍚 = 식대</span>
+                <span class="muted small">날짜를 누르면 근무시간·식대를 정할 수 있어요 · 칸 아래 파란 막대 = 식대</span>
               </div>
               <div class="table-wrap cal-table-view">
                 <table class="month-cal-table" aria-label="월별 출퇴근 달력">
@@ -315,6 +315,12 @@
             <tfoot id="rosterFoot"></tfoot>
           </table>
         </div>
+      </div>
+      <!-- 시안 I: 화면 아래 붙는 줄 돈 바 (금액은 [보기]를 눌러야 보임, #moneyToggle과 같은 상태) -->
+      <div id="moneyBar" class="money-bar" hidden>
+        <span id="moneyBarLabel" class="mb-label">이번 달 줄 돈</span>
+        <b id="moneyBarAmt" class="mb-amt m-amt"></b>
+        <button id="moneyBarBtn" type="button" class="mb-btn" aria-controls="moneyBarAmt" aria-pressed="false">보기</button>
       </div>
     </section>
 
@@ -1172,10 +1178,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611281800"></script>
-  <script src="./lang_web.js?v=202611281800"></script>
-  <script src="./i18n.js?v=202611281800"></script>
-  <script src="./gsync.js?v=202611281800"></script>
-  <script src="./app.js?v=202611281800"></script>
+  <script src="./engine.js?v=202611282100"></script>
+  <script src="./lang_web.js?v=202611282100"></script>
+  <script src="./i18n.js?v=202611282100"></script>
+  <script src="./gsync.js?v=202611282100"></script>
+  <script src="./app.js?v=202611282100"></script>
 </body>
 </html>

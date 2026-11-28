@@ -627,25 +627,41 @@
   }
 
   // 주별 주휴 상태 문구 + (결근 주일 때) 예외 지급 버튼
+  /* 주차 줄 상태. mark = "주휴 O/X" 짧은 표시, note = 이유(짧게), money = 주휴 금액(줄 돈 보기일 때만 보임), btn = 주휴 예외 버튼(2-9).
+     text는 예전 한 줄 문구(다른 곳에서 쓰지 않지만 호환용으로 남김) */
   function weekStatus(w, r, idx) {
-    if (!r.includeWeekly) return { text: tr('주휴 미포함'), btn: '', cls: '' };
+    if (!r.includeWeekly) return { text: tr('주휴 미포함'), mark: tr('주휴 미포함'), note: '', money: '', btn: '', cls: '' };
     var days = (w.workDays !== null && w.workDays !== undefined) ? tr('{a}/{b}일 출근', { a: w.workDays, b: w.contractDays }) : '';
+    var money = '+' + E.moneyText(w.allowance);
     if (w.eligible && !w.excused) {
-      return { text: tr('주휴 +{a}', { a: E.moneyText(w.allowance) }) + (days ? tr(' · 개근 ') + days : ''), btn: '', cls: 'ok' };
+      return { text: tr('주휴 +{a}', { a: E.moneyText(w.allowance) }) + (days ? tr(' · 개근 ') + days : ''), mark: tr('주휴 O'), note: '', money: money, btn: '', cls: 'ok' };
     }
     if (w.excused) {
       return {
         text: tr('주휴 +{a}', { a: E.moneyText(w.allowance) }) + tr(' (결근 있으나 지급)'),
+        mark: tr('주휴 O'), note: tr('결근 있으나 지급'), money: money,
         btn: '<button type="button" class="btn btn-xs wk-excuse-btn" data-week-excuse="' + idx + '">' + tr('다시 제외하기') + '</button>',
         cls: 'ok'
       };
     }
-    if (!w.hoursOk) return { text: tr('주휴 없음 (15시간 미만)'), btn: '', cls: '' };
+    if (!w.hoursOk) return { text: tr('주휴 없음 (15시간 미만)'), mark: tr('주휴 X'), note: tr('15시간 미만'), money: '', btn: '', cls: '' };
     return {
       text: tr('주휴 없음 · ') + (days || tr('결근')),
+      mark: tr('주휴 X'), note: days || tr('결근'), money: '',
       btn: '<button type="button" class="btn btn-xs wk-excuse-btn" data-week-excuse="' + idx + '" title="' + tr('공휴일·사장님 사정으로 쉰 주') + '">' + tr('이 주는 주휴 지급') + '</button>',
       cls: 'bad'
     };
+  }
+
+  /* 이 주가 아직 안 끝났는지: 'run'(오늘이 들어 있음) | 'next'(아직 시작 전) | '' (지난 주). 표시만 바꾼다 */
+  function weekTiming(cal, r, wi) {
+    var ds = r.days.filter(function (d) { return d.weekIndex === wi; }).map(function (d) { return d.date; });
+    if (!ds.length || !cal) return '';
+    var now = new Date(), ym = cal.year * 12 + (cal.month - 1), cur = now.getFullYear() * 12 + now.getMonth();
+    if (ym > cur) return 'next';
+    if (ym < cur) return '';
+    var t = now.getDate(), lo = Math.min.apply(null, ds), hi = Math.max.apply(null, ds);
+    return lo > t ? 'next' : (hi >= t ? 'run' : '');
   }
 
   function renderMonthCalendar(r) {
@@ -689,24 +705,38 @@
           (isOff
             ? '<div class="cal-off-badge">' + tr('휴무') + '</div>'
             : '<div class="cal-shift-range">' + shiftRangeHtml(day.start, day.end) + '</div>') +
-          (isMeal ? '<div class="cal-meal-icon" title="' + tr('식대: {w}', { w: mealWords(day.meals) }) + '">🍚' + mealShort(day.meals) + '</div>' : '') +
+          // 식대: 칸 아래 파란 막대 + 점/저/점저(하루 1회·2회 구분)
+          (isMeal ? '<div class="cal-meal-icon cal-meal-bar" title="' + tr('식대: {w}', { w: mealWords(day.meals) }) + '"><span>' + mealShort(day.meals) + '</span></div>' : '') +
           '</td>';
       }
       rowsHtml += '</tr>';
 
-      // 주간 합계: 한 줄 요약
+      // 주간 합계 한 줄: "1주 · 5일 · 40h · 식대 5 · 주휴 O" (주휴 금액은 [줄 돈 보기]를 눌렀을 때만)
       var st = weekStatus(wkObj, r, wi);
-      var mealSub = r.includeMeal ? (' · 🍚 ' + tr('식대 {n}회', { n: wkObj.mealDays })) : '';
+      var timing = weekTiming(cal, r, wi);
+      if (timing && r.includeWeekly && !(wkObj.eligible || wkObj.excused)) {   // 안 끝난 주는 "주휴 X" 대신 진행 중/예정 (계산·버튼은 그대로)
+        st.mark = timing === 'run' ? tr('진행 중') : tr('예정');
+        st.note = ''; st.cls = timing;
+      }
+      var facts = [];
+      if (wkObj.workDays !== null && wkObj.workDays !== undefined) facts.push(tr('{n}일', { n: wkObj.workDays }));
+      facts.push(E.formatNum(wkObj.hours, 1) + 'h');
+      if (r.includeMeal) facts.push(tr('식대 {n}', { n: wkObj.mealDays }));
+      facts.push(st.mark);
       rowsHtml += '<tr class="cal-week-sum"><td colspan="7"><div class="wk-line ' + st.cls + '">' +
-        '<b>' + tr('{k}주차 {h}시간', { k: wi + 1, h: E.formatNum(wkObj.hours, 1) }) + '</b>' +
-        '<span class="wk-line-text">' + st.text + mealSub + '</span>' +
+        '<b>' + tr('{k}주', { k: wi + 1 }) + '</b>' +
+        '<span class="wk-line-text">' + facts.join(' · ') +
+          (st.note ? ' <span class="wk-note">' + st.note + '</span>' : '') +
+          (st.money ? ' <span class="wk-money">' + st.money + '</span>' : '') + '</span>' +
         (st.btn || '') + '</div></td></tr>';
     }
 
     $('monthCalBody').innerHTML = rowsHtml;
   }
 
+  // 달력 칸: 출근·퇴근 시각을 두 줄로 그대로(09:00 / 18:02). 시각이 아닌 값이면 예전처럼 한 줄
   function shiftRangeHtml(a, b) {
+    if (/^\d{1,2}:\d{2}$/.test(a || '') && /^\d{1,2}:\d{2}$/.test(b || '')) return '<span>' + escHtml(a) + '</span><span>' + escHtml(b) + '</span>';
     var x = shortTime(a), y = shortTime(b);
     if (x.indexOf(':') < 0 && y.indexOf(':') < 0) return escHtml(x + '-' + y);
     return '<span>' + escHtml(x) + '</span><span>' + escHtml(y) + '</span>';
@@ -806,6 +836,14 @@
       '<b class="money">' + moneyBig(r.net) + '</b>' +
       '<span class="pay-sub">' + tr('{h}시간 · 주휴 {w}', { h: E.formatNum(r.totalHours, 2), w: r.includeWeekly ? tr('포함') : tr('미포함') }) +
         (r.includeMeal ? tr(' · 식대 {n}회 포함', { n: r.mealDays }) : '') + ' · ' + escHtml(r.tax.label) + '</span>';
+    // 화면 아래 줄 돈 바: 고른 알바생 한 명의 이번 달 실수령액. 금액은 syncMoneyUi가 [보기]일 때만 넣는다
+    var mb = $('moneyBar');
+    if (mb) {
+      var pm = /^(\d{4})-(\d{2})$/.exec($('pMonth').value || '');
+      $('moneyBarLabel').textContent = pm ? tr('{n}님 {m}월 줄 돈', { n: r.name || '', m: Number(pm[2]) }) : tr('이번 달 줄 돈');
+      mb.hidden = !state.workers.length;
+    }
+    syncMoneyUi();
     $('setSummary').textContent = tr('시급 {w} · 주 {d}일 · ', { w: E.moneyText(r.hourlyWage), d: state.contractDays }) +
       r.tax.label + tr(' · 주휴 {s}', { s: r.includeWeekly ? tr('포함') : tr('미포함') }) +
       (r.includeMeal ? tr(' · 식대 {a}', { a: E.moneyText(r.mealAmount) }) : tr(' · 식대 없음'));
@@ -1648,10 +1686,11 @@
     });
     $('slipClose').addEventListener('click', closeSheets);
     $('moneyToggle').addEventListener('click', function () {   // 줄 돈은 기본 숨김, 눌러야 보임
-      var on = document.body.classList.toggle('money-show');
-      $('moneyToggle').setAttribute('aria-expanded', on ? 'true' : 'false');
-      $('moneyToggleTitle').textContent = on ? tr('줄 돈 숨기기') : tr('줄 돈 보기');
+      document.body.classList.toggle('money-show');
+      syncMoneyUi();
     });
+    // 아래 줄 돈 바의 [보기]/[숨기기]는 위 버튼과 같은 상태를 쓴다
+    $('moneyBarBtn').addEventListener('click', function () { $('moneyToggle').click(); });
     document.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' && /set-open|add-open|slip-open|export-open/.test(document.body.className)) closeSheets();
     });
@@ -2432,10 +2471,25 @@
     if (locked) openTab('punch');
   }
 
+  /* 줄 돈 보기/숨김 상태를 버튼 글자·바 금액에 맞춘다(토글, 계산, 언어 바꿈, 잠금 때마다).
+     숨김일 때는 바에 금액을 아예 넣지 않는다 — 글자 크기 0으로 가리기만 하면 스크린 리더·복사·찾기에 금액이 남는다 */
+  function syncMoneyUi() {
+    var on = document.body.classList.contains('money-show');
+    var t = $('moneyToggle');
+    if (t) t.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if ($('moneyToggleTitle')) $('moneyToggleTitle').textContent = on ? tr('줄 돈 숨기기') : tr('줄 돈 보기');
+    var b = $('moneyBarBtn');
+    if (b) { b.textContent = on ? tr('숨기기') : tr('보기'); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+    var a = $('moneyBarAmt');
+    if (a) a.textContent = on && state.payroll ? E.moneyText(state.payroll.net) : '';
+  }
+
   function lockNow() {
     if (!getPin()) return;
     punchState.unlocked = false;
     markUnlocked(false);
+    document.body.classList.remove('money-show');   // 잠갔다 풀었을 때 금액이 열린 채로 남지 않게
+    syncMoneyUi();
     if (punchState.idleTimer) { clearTimeout(punchState.idleTimer); punchState.idleTimer = null; }
     document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open', 'modal-open');
     $('sheetBackdrop').hidden = true;
@@ -3650,6 +3704,7 @@
   if (window.ALBA_VERSION) Array.prototype.forEach.call(document.querySelectorAll('.ver-text'), function (el) { el.textContent = 'v' + window.ALBA_VERSION; });
   /* 언어를 바꾸면 앱이 만든 화면 조각을 새 언어로 다시 그림 (입력값은 그대로) */
   window.addEventListener('alba:lang', function () {
+    syncMoneyUi();   // [보기]/[숨기기]·줄 돈 보기 글자를 새 언어로
     var checked = Array.prototype.map.call(document.querySelectorAll('#chkFormList input:checked'), function (el) { return el.value; });
     buildChecklistForm();
     checked.forEach(function (v) { var el = document.querySelector('#chkFormList input[value="' + v + '"]'); if (el) el.checked = true; });
