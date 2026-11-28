@@ -11,8 +11,8 @@
   <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-  <script src="./boot.js?v=202611290600"></script>
-  <link rel="stylesheet" href="./style.css?v=202611290600">
+  <script src="./boot.js?v=202611290700"></script>
+  <link rel="stylesheet" href="./style.css?v=202611290700">
 </head>
 <body class="on-payroll">
   <header class="app-header">
@@ -421,90 +421,215 @@
 
     <!-- ======================= 탭 2: 위생 점검 ======================= -->
     <section id="tab-checklist" class="tab-panel" role="tabpanel">
-      <div class="grid">
-        <form id="chkForm" class="card input-card" autocomplete="off">
-          <h2 class="card-title">점검 정보</h2>
-          <label class="field"><span>매장명 (상호) <button type="button" id="cStoreGo" class="btn-link hint-link">설정에서 바꾸기</button></span>
-            <input id="cStore" type="text" readonly placeholder="설정 → 매장 정보에서 적어 주세요" maxlength="40">
-          </label>
-          <div class="row-2">
-            <label class="field"><span>점검일자</span><input id="cDate" type="date"></label>
-            <label class="field"><span>점검자 성명</span><input id="cInspector" type="text" placeholder="예) 홍길동" maxlength="20"></label>
+      <div class="chk-shell">
+        <!-- 넓은 화면(1024px+): 왼쪽 분류 묶음 목록 (진행도 + 전체 적합/해제 + 보관함) -->
+        <aside class="chk-cat-col" aria-label="위생 점검 분류">
+          <div class="chk-cat-head">
+            <div class="chk-cat-head-top">
+              <h1>위생 점검</h1>
+              <span id="chkSideProg" class="chk-cat-prog num"></span>
+            </div>
+            <div class="chk-prog-track" aria-hidden="true"><div id="chkSideProgFill" class="chk-prog-fill"></div></div>
           </div>
-          <div class="row-2">
-            <label class="field"><span>냉장 온도 <em class="hint">0~5°C</em></span>
-              <div class="input-unit"><input id="cFridge" type="number" step="0.1" value="3.0"><b>°C</b></div>
+          <div id="chkCatList" class="chk-cat-list" role="tablist" aria-label="점검 분류 목록"></div>
+          <div class="chk-cat-foot">
+            <div class="chk-cat-quick">
+              <button type="button" class="chk-sub-btn" data-cm="all">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
+                <span>전체 적합</span>
+              </button>
+              <button type="button" class="chk-sub-btn" data-cm="none">전체 해제</button>
+            </div>
+            <button type="button" id="chkArchiveWideBtn" class="chk-archive-btn">
+              <span class="chk-archive-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/></svg>
+                <span>지난 점검 보관함</span>
+              </span>
+              <span id="chkArchiveWideCnt" class="chk-archive-cnt num">0일 ›</span>
+            </button>
+          </div>
+        </aside>
+
+        <!-- 가운데/오른쪽: 시안 I 위생 점검 본문 -->
+        <div class="chk-main">
+          <!-- 시안 I 머리 줄 (휴대폰: 위생 점검 + 보관함·⋯ / 넓은 화면: 선택 분류 + 매장명 + 미리보기·PDF·엑셀·⋯) -->
+          <header class="chk-topbar">
+            <h1 class="chk-mob-title">위생 점검</h1>
+            <div class="chk-wide-title">
+              <h2 id="chkActiveTitle">위생 점검</h2>
+              <span id="chkStoreSub" class="chk-top-sub" data-no-i18n></span>
+            </div>
+            <div class="chk-topbar-tools">
+              <button type="button" class="tool-btn" data-cm="doc">미리보기</button>
+              <button type="button" class="tool-btn" data-cm="pdf">PDF</button>
+              <button type="button" class="tool-btn" data-cm="xlsx">엑셀</button>
+              <button type="button" id="chkArchiveOpenBtn" class="pay-ico-btn chk-archive-ico" aria-label="지난 점검 보관함">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/></svg>
+                <span id="chkArchiveDot" class="chk-ico-badge"></span>
+              </button>
+              <details id="chkMoreMenu" class="more-menu pay-more">
+                <summary class="pay-ico-btn" aria-label="더보기">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>
+                </summary>
+                <div class="more-pop pay-more-pop">
+                  <button type="button" class="btn cm-mobile-only" data-cm="doc">점검표 미리보기</button>
+                  <button type="button" class="btn cm-mobile-only" data-cm="pdf">점검표 PDF 출력/저장</button>
+                  <button type="button" class="btn cm-mobile-only" data-cm="xlsx">점검표 엑셀(.xlsx) 다운로드</button>
+                  <button type="button" class="btn cm-mobile-only" data-cm="memo">특이사항 메모</button>
+                  <button type="button" class="btn cm-mobile-only" data-cm="all">전체 적합으로 체크</button>
+                  <button id="btnCheckNone" type="button" class="btn cm-mobile-only">전체 해제</button>
+                  <button type="button" class="btn" data-cm="archive">지난 점검 보관함</button>
+                  <button type="button" class="btn" data-cm="archive-xlsx">보관함 엑셀로 받기</button>
+                  <button type="button" class="btn" data-cm="store">매장명 설정</button>
+                  <div class="more-sep" aria-hidden="true"></div>
+                  <button type="button" class="btn" id="chkCloud" data-cm="cloud">구글 저장</button>
+                  <button type="button" class="btn" id="chkLock" data-cm="lock" hidden data-no-i18n>잠그기</button>
+                  <button type="button" class="btn btn-danger" data-cm="archive-clear">보관함 비우기</button>
+                </div>
+              </details>
+            </div>
+          </header>
+
+          <form id="chkForm" class="chk-form" autocomplete="off">
+            <!-- 기존 JS/테스트 훅 유지 (매장명은 설정→매장 정보에서 자동 반영되어 미리보기·인쇄에 나옴) -->
+            <div class="chk-sr-hooks" aria-hidden="true">
+              <button type="button" id="cStoreGo" tabindex="-1">설정에서 바꾸기</button>
+              <input id="cStore" type="text" readonly maxlength="40" tabindex="-1">
               <small id="fridgeHint" class="temp-hint"></small>
-            </label>
-            <label class="field"><span>냉동 온도 <em class="hint">-18°C 이하</em></span>
-              <div class="input-unit"><input id="cFreezer" type="number" step="0.1" value="-18.5"><b>°C</b></div>
               <small id="freezerHint" class="temp-hint"></small>
-            </label>
-          </div>
-
-          <div class="chk-tools">
-            <button id="btnCheckAll" type="button" class="btn">전체 적합으로 체크</button>
-            <button id="btnCheckNone" type="button" class="btn btn-ghost">전체 해제</button>
-            <span id="chkProgress" class="chk-progress">0 / 41 체크</span>
-          </div>
-          <p class="hint-line">항목마다 [적합] 또는 [점검 필요]를 누르세요. [적합]을 누르지 않은 항목은 "점검필요"로 표시됩니다.</p>
-          <div id="chkFormList" class="chk-form-list"></div>
-
-          <label class="field"><span>특이사항 메모</span>
-            <textarea id="cMemo" rows="3" maxlength="500" placeholder="예) 냉동고 성에 제거 필요, 손 소독제 교체 예정"></textarea>
-          </label>
-        </form>
-
-        <div class="card preview-card">
-          <div id="chkBanner" class="banner chk-banner">
-            <p id="chkBannerText">계산 중…</p>
-            <span id="chkScore" class="score">0/41</span>
-          </div>
-
-          <div class="doc" id="chkDoc">
-            <div class="doc-head">
-              <h3>매장 위생 점검표</h3>
-              <span class="doc-law">위생 점검 41개 항목</span>
+              <span id="chkProgress" class="chk-progress">0 / 41 체크</span>
             </div>
-            <table class="doc-info">
-              <tr><th>매장명</th><td id="chkStore" data-no-i18n>-</td><th>점검일자</th><td id="chkDate">-</td></tr>
-              <tr><th>점검자</th><td id="chkInspector" data-no-i18n>-</td><th>종합 결과</th><td id="chkVerdict">-</td></tr>
-              <tr><th>냉장 온도</th><td id="chkFridge">-</td><th>냉동 온도</th><td id="chkFreezer">-</td></tr>
-            </table>
-            <div class="table-wrap chk-table-view">
-              <table class="doc-table chk-table">
-                <thead><tr><th>분류</th><th>No</th><th>점검 항목</th><th>결과</th><th>비고</th></tr></thead>
-                <tbody id="chkBody"></tbody>
-              </table>
-            </div>
-            <!-- 휴대폰용: 항목 카드 목록 (문서 영역 폭 560px 이하에서만 표시, 인쇄 시에는 위 표 사용) -->
-            <div id="chkCards" class="chk-cards-view" aria-label="점검 항목 목록"></div>
-            <div class="memo-box"><b>특이사항</b><p id="chkMemo">-</p></div>
-            <p class="doc-foot">점검자 : <span id="chkSign" data-no-i18n>________</span> (서명)</p>
-          </div>
 
-          <div class="actions">
-            <button id="btnPrintChk" type="button" class="btn">점검표 PDF 출력/저장</button>
-            <button id="btnXlsxChk" type="button" class="btn">점검표 엑셀(.xlsx) 다운로드</button>
-            <button id="btnAddArchive" type="button" class="btn btn-primary">보관함에 저장</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card archive">
-        <div class="archive-head">
-          <div class="archive-title-row">
-            <h2 class="card-title">점검 보관함 <span id="archiveCount" class="count">0일</span></h2>
-            <details class="more-menu">
-              <summary aria-label="더보기">⋯</summary>
-              <div class="more-pop">
-                <button id="btnArchiveXlsx" type="button" class="btn">엑셀로 받기</button>
-                <button id="btnArchiveClear" type="button" class="btn btn-danger">보관함 비우기</button>
+            <!-- 시안 I: 2×2 정보 카드 (넓은 화면 4×1 온도·점검 요약 카드) — 값을 누르면 바로 수정 -->
+            <section class="chk-info-card" aria-label="점검 정보 및 냉장·냉동 온도">
+              <div class="chk-info-cell">
+                <span class="chk-info-lbl">점검일 · 점검자</span>
+                <div class="chk-info-val chk-date-insp">
+                  <label class="chk-date-wrap">
+                    <span id="cDateDisp" class="num">-</span>
+                    <input id="cDate" type="date" aria-label="점검일자">
+                  </label>
+                  <span class="chk-sep" aria-hidden="true">·</span>
+                  <input id="cInspector" class="chk-inline-in chk-insp-in" type="text" placeholder="점검자" maxlength="20" aria-label="점검자 성명">
+                </div>
               </div>
-            </details>
+              <div class="chk-info-cell">
+                <span class="chk-info-lbl">진행</span>
+                <div class="chk-info-val num" id="chkProgVal">
+                  <span id="chkProgCount">0 / 41</span>
+                  <span id="chkProgNeed" class="chk-info-need"></span>
+                </div>
+              </div>
+              <div class="chk-info-cell" id="chkFridgeCell">
+                <span class="chk-info-lbl">냉장 0~5°C</span>
+                <label class="chk-info-val chk-temp-edit num">
+                  <input id="cFridge" class="chk-inline-in chk-temp-in num" type="number" step="0.1" value="3.0" aria-label="냉장 온도">
+                  <span class="chk-temp-unit">°C</span>
+                  <span id="cFridgeBadge" class="temp-ok">정상</span>
+                </label>
+              </div>
+              <div class="chk-info-cell" id="chkFreezerCell">
+                <span class="chk-info-lbl">냉동 −18°C 이하</span>
+                <label class="chk-info-val chk-temp-edit num">
+                  <input id="cFreezer" class="chk-inline-in chk-temp-in num" type="number" step="0.1" value="-18.5" aria-label="냉동 온도">
+                  <span class="chk-temp-unit">°C</span>
+                  <span id="cFreezerBadge" class="temp-ok">정상</span>
+                </label>
+              </div>
+            </section>
+
+            <!-- 스크롤되는 분류별 항목 목록 + (넓은 화면) 특이사항 메모 카드 -->
+            <div class="chk-scroll">
+              <div id="chkFormList" class="chk-form-list"></div>
+
+              <!-- 특이사항 메모: 휴대폰은 아래 바 버튼에서 시트로 열림, 넓은 화면은 항목 아래 카드로 표시 -->
+              <section id="chkMemoCard" class="memo-card" aria-label="특이사항 메모">
+                <div class="sheet-head memo-sheet-head">
+                  <b>특이사항 메모</b>
+                  <button type="button" id="chkMemoClose" class="sheet-done">완료</button>
+                </div>
+                <label class="memo-label" for="cMemo">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6"/></svg>
+                  <span>특이사항 메모</span>
+                </label>
+                <textarea id="cMemo" class="memo-input" rows="3" maxlength="500" placeholder="예) 냉동고 성에 제거 필요, 손 소독제 교체 예정"></textarea>
+                <div class="memo-sheet-foot">
+                  <button type="button" class="btn" data-cm="doc">점검표 미리보기</button>
+                </div>
+              </section>
+            </div>
+          </form>
+
+          <!-- 시안 I: 화면 아래 고정 바 (휴대폰: ✓·메모·[보관함에 저장] / 넓은 화면: 안내문·[보관함에 저장]) -->
+          <div class="chk-bottom-bar">
+            <span id="chkSaveHint" class="chk-save-hint"></span>
+            <div class="chk-bottom-btns">
+              <button id="btnCheckAll" type="button" class="chk-sq-btn" aria-label="전체 적합" title="전체 적합으로 체크">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
+              </button>
+              <button id="chkMemoOpenBtn" type="button" class="chk-sq-btn" aria-label="특이사항 메모" title="특이사항 메모">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6"/></svg>
+                <span id="chkMemoDot" class="chk-memo-dot" hidden></span>
+              </button>
+              <button id="btnAddArchive" type="button" class="chk-save-btn">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/></svg>
+                <span>보관함에 저장</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 점검표 미리보기 문서: 평소 숨김, [미리보기]에서 전체 오버레이 / 인쇄 시 그대로 출력 -->
+          <div id="chkDocWrap" class="card preview-card chk-doc-wrap">
+            <div class="chk-doc-bar">
+              <b>점검표 미리보기</b>
+              <div class="chk-doc-bar-acts">
+                <button id="btnPrintChk" type="button" class="btn">점검표 PDF 출력/저장</button>
+                <button id="btnXlsxChk" type="button" class="btn">점검표 엑셀(.xlsx) 다운로드</button>
+                <button id="chkDocClose" type="button" class="sheet-done">닫기</button>
+              </div>
+            </div>
+            <div id="chkBanner" class="banner chk-banner">
+              <p id="chkBannerText">계산 중…</p>
+              <span id="chkScore" class="score">0/41</span>
+            </div>
+
+            <div class="doc" id="chkDoc">
+              <div class="doc-head">
+                <h3>매장 위생 점검표</h3>
+                <span class="doc-law">위생 점검 41개 항목</span>
+              </div>
+              <table class="doc-info">
+                <tr><th>매장명</th><td id="chkStore" data-no-i18n>-</td><th>점검일자</th><td id="chkDate">-</td></tr>
+                <tr><th>점검자</th><td id="chkInspector" data-no-i18n>-</td><th>종합 결과</th><td id="chkVerdict">-</td></tr>
+                <tr><th>냉장 온도</th><td id="chkFridge">-</td><th>냉동 온도</th><td id="chkFreezer">-</td></tr>
+              </table>
+              <div class="table-wrap chk-table-view">
+                <table class="doc-table chk-table">
+                  <thead><tr><th>분류</th><th>No</th><th>점검 항목</th><th>결과</th><th>비고</th></tr></thead>
+                  <tbody id="chkBody"></tbody>
+                </table>
+              </div>
+              <!-- 휴대폰용: 항목 카드 목록 (문서 영역 폭 560px 이하에서만 표시, 인쇄 시에는 위 표 사용) -->
+              <div id="chkCards" class="chk-cards-view" aria-label="점검 항목 목록"></div>
+              <div class="memo-box"><b>특이사항</b><p id="chkMemo">-</p></div>
+              <p class="doc-foot">점검자 : <span id="chkSign" data-no-i18n>________</span> (서명)</p>
+            </div>
+          </div>
+        </div><!-- /.chk-main -->
+      </div><!-- /.chk-shell -->
+
+      <!-- 지난 점검 보관함: 보관함 아이콘·버튼에서 시트/창으로 열림 -->
+      <div id="chkArchivePanel" class="card archive chk-archive-panel" role="dialog" aria-modal="true" aria-labelledby="chkArchiveTitle">
+        <div class="sheet-head archive-sheet-head">
+          <b id="chkArchiveTitle">점검 보관함 <span id="archiveCount" class="count">0일</span></b>
+          <div class="archive-sheet-tools">
+            <button id="btnArchiveXlsx" type="button" class="btn">엑셀로 받기</button>
+            <button id="btnArchiveClear" type="button" class="btn btn-danger">보관함 비우기</button>
+            <button id="chkArchiveClose" type="button" class="sheet-done">닫기</button>
           </div>
         </div>
-        <div class="table-wrap">
+        <div id="archiveCards" class="archive-cards"></div>
+        <div class="table-wrap archive-table-wrap">
           <table class="list-table">
             <thead>
               <tr><th>#</th><th>점검일자</th><th>매장명</th><th>점검자</th><th class="num">냉장</th><th class="num">냉동</th><th>적합</th><th>결과</th><th>특이사항</th><th></th></tr>
@@ -1273,10 +1398,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611290600"></script>
-  <script src="./lang_web.js?v=202611290600"></script>
-  <script src="./i18n.js?v=202611290600"></script>
-  <script src="./gsync.js?v=202611290600"></script>
-  <script src="./app.js?v=202611290600"></script>
+  <script src="./engine.js?v=202611290700"></script>
+  <script src="./lang_web.js?v=202611290700"></script>
+  <script src="./i18n.js?v=202611290700"></script>
+  <script src="./gsync.js?v=202611290700"></script>
+  <script src="./app.js?v=202611290700"></script>
 </body>
 </html>

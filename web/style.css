@@ -3478,3 +3478,467 @@ nav.tabs .tabs-store { display: none; }
   .pay-topbar, .staff-col, #rosterPanel, #addWorkerForm, .money-bar, .cal-top-meta { display: none !important; }
   .pay-shell, .pay-main { display: block !important; padding: 0 !important; min-height: 0 !important; }
 }
+
+/* ==========================================================
+   시안 I 맞추기 2: 위생 점검 화면 (docs/design/briefs/matchI_2_chk.md)
+   - 휴대폰(I_Chk.html): 공통 머리띠 숨김 → [위생 점검 | 보관함·⋯] → [2×2 정보·온도 카드] → [분류 접기 목록] → [하단 고정 바: ✓·메모·보관함에 저장]
+   - 넓은 화면(wide/I_Chk.html, 1024px+): 왼쪽 분류 목록(진행도+전체 적합/해제+보관함) + 오른쪽 온도 카드·선택 분류 항목·메모·저장 바
+   - 인쇄(@media print)와 잠금(body.locked) 규칙을 침범하지 않도록 @media screen 안에서만 배치한다.
+   ========================================================== */
+@media screen {
+  body.on-checklist:not(.locked) .app-header { display: none; }
+  body.on-checklist:not(.locked) .container { padding: 0 12px 12px; max-width: 680px; }
+  body.on-checklist:not(.locked) #tab-checklist.active { display: block; padding-top: 0; animation: none; }
+
+  .chk-sr-hooks { display: none !important; }
+  #tab-checklist .chk-shell { display: block; }
+  #tab-checklist .chk-cat-col { display: none; }
+  #tab-checklist .chk-main { display: flex; flex-direction: column; min-width: 0; }
+  #tab-checklist .chk-form { display: flex; flex-direction: column; gap: 8px; }
+  #tab-checklist .chk-scroll { display: flex; flex-direction: column; gap: 8px; }
+
+  /* 1. 머리 줄: 왼쪽 "위생 점검", 오른쪽 보관함 아이콘·⋯ */
+  .chk-topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 12px 0 6px 8px; min-height: 44px;
+  }
+  .chk-mob-title { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.4px; color: var(--text); }
+  .chk-wide-title { display: none; }
+  .chk-topbar-tools { display: flex; align-items: center; gap: 2px; flex: none; }
+  .chk-topbar-tools .tool-btn { display: none; }
+  .chk-archive-ico { position: relative; }
+  .chk-ico-badge {
+    position: absolute; top: 3px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px;
+    border-radius: 8px; background: var(--primary); color: var(--primary-ink);
+    font-size: 10px; font-weight: 800; font-variant-numeric: tabular-nums;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .chk-ico-badge:empty { display: none; }
+
+  /* 2. 2×2 정보·온도 카드 (값을 눌러 바로 수정) */
+  .chk-info-card {
+    background: var(--card); border-radius: 18px; padding: 14px 16px;
+    box-shadow: var(--shadow);
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 14px;
+  }
+  html[data-theme="dark"] .chk-info-card { border: 1px solid var(--line); }
+  .chk-info-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .chk-info-lbl {
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .chk-info-val,
+  .chk-info-val.num {
+    font-size: 15px; font-weight: 800; color: var(--text); line-height: 1.3;
+    display: flex; align-items: center; gap: 4px; min-width: 0;
+    text-align: left !important; white-space: nowrap;
+  }
+  .chk-date-insp { gap: 3px; }
+  .chk-date-wrap {
+    position: relative; display: inline-flex; align-items: center; flex: none;
+    padding: 1px 4px; margin: -1px -4px; border-radius: 6px; cursor: pointer;
+  }
+  .chk-date-wrap:hover, .chk-date-wrap:focus-within { background: var(--primary-weak); color: var(--primary); }
+  #cDateDisp.num { text-align: left !important; }
+  .chk-date-wrap input[type="date"] {
+    position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0;
+    cursor: pointer; margin: 0; padding: 0; border: 0;
+  }
+  .chk-sep { color: var(--muted); flex: none; font-weight: 700; }
+  .chk-inline-in {
+    border: 0; background: transparent; padding: 1px 4px; margin: -1px 0; border-radius: 6px;
+    font: inherit; font-weight: 800; color: inherit; min-width: 0; outline: none;
+  }
+  .chk-inline-in:hover { background: rgba(120, 140, 170, .09); }
+  .chk-inline-in:focus { background: var(--primary-weak); color: var(--primary); }
+  .chk-insp-in { flex: 1; width: 100%; min-width: 0; text-overflow: ellipsis; }
+  .chk-insp-in::placeholder { font-weight: 600; color: var(--muted); opacity: .7; }
+  #chkProgVal { flex-wrap: wrap; gap: 2px 4px; white-space: normal; }
+  .chk-info-need { font-size: 14px; font-weight: 800; }
+  .chk-info-need.is-bad { color: var(--bad); }
+  .chk-info-need.is-ok { color: var(--ok); }
+  .chk-temp-edit { cursor: text; gap: 1px; }
+  .chk-temp-in,
+  .chk-temp-in.num {
+    flex: none; padding: 1px 2px; margin: -1px 0 -1px -2px;
+    text-align: left !important; -moz-appearance: textfield;
+  }
+  .chk-temp-in::-webkit-inner-spin-button,
+  .chk-temp-in::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .chk-temp-unit { flex: none; font-weight: 800; }
+  .chk-info-cell.is-bad .chk-temp-edit { color: var(--bad); }
+  .temp-ok, .temp-bad {
+    font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 6px;
+    margin-left: 5px; flex: none; line-height: 1.3;
+  }
+  .temp-ok { display: none; background: var(--primary-weak); color: var(--primary); }
+  .temp-bad { display: inline-flex; background: var(--bad-weak); color: var(--bad); }
+
+  /* 3. 분류 접기 목록 (시안 I: 깔끔한 흰 카드 + 초록 완료 + 파랑/빨강 판정 버튼) */
+  #tab-checklist #chkFormList.chk-form-list { gap: 8px; margin: 0; }
+  #tab-checklist #chkFormList .chk-form-group {
+    display: block; border: 0; border-radius: 16px; background: var(--card);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  html[data-theme="dark"] #tab-checklist #chkFormList .chk-form-group { border: 1px solid var(--line); }
+  #tab-checklist #chkFormList .chk-form-sum {
+    min-height: 48px; padding: 10px 16px; gap: 6px;
+  }
+  #tab-checklist #chkFormList .chk-form-sum::after { display: none; }
+  #tab-checklist #chkFormList .chk-chev { flex: none; color: var(--muted); transition: transform .15s; }
+  #tab-checklist #chkFormList .chk-form-group[open] > .chk-form-sum .chk-chev { transform: rotate(180deg); }
+  #tab-checklist #chkFormList .chk-form-title { font-size: 15px; font-weight: 700; color: var(--text); }
+  #tab-checklist #chkFormList .chk-form-group[open] > .chk-form-sum .chk-form-title { font-weight: 800; }
+  #tab-checklist #chkFormList .chk-gcount { font-size: 13px; font-weight: 700; color: var(--muted); text-align: right !important; }
+  #tab-checklist #chkFormList .chk-form-group.all-ok .chk-gcount { color: var(--ok); }
+  #tab-checklist #chkFormList .chk-gneed {
+    padding: 2px 7px; border-radius: 8px; background: var(--bad-weak); color: var(--bad);
+    font-size: 11.5px; font-weight: 800;
+  }
+  #tab-checklist #chkFormList .chk-form-item {
+    display: block; padding: 12px 16px; border: 0; border-top: 1px solid var(--bg);
+    border-radius: 0; background: transparent;
+  }
+  html[data-theme="dark"] #tab-checklist #chkFormList .chk-form-item { border-top-color: var(--line); }
+  #tab-checklist #chkFormList .chk-fitem-text { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+  #tab-checklist #chkFormList .chk-no {
+    width: 20px; flex: none; font-size: 13px; font-weight: 800; color: var(--muted);
+    padding-top: 2px; text-align: left !important;
+  }
+  #tab-checklist #chkFormList .chk-fitem-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  #tab-checklist #chkFormList .chk-q { font-size: 14px; font-weight: 500; line-height: 1.48; color: var(--text); word-break: keep-all; }
+  #tab-checklist #chkFormList .chk-form-item .item-std { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+  #tab-checklist #chkFormList .chk-item-warn {
+    display: inline-flex; align-items: center; align-self: flex-start; gap: 5px;
+    margin: 4px 0 0; padding: 4px 9px; border-radius: 8px;
+    background: #fff4e5; color: #b25e00; font-size: 12px; font-weight: 700; line-height: 1.35;
+  }
+  html[data-theme="dark"] #tab-checklist #chkFormList .chk-item-warn { background: var(--accent-weak); color: var(--accent); }
+  #tab-checklist #chkFormList .chk-item-warn svg { flex: none; }
+  #tab-checklist #chkFormList .chk-seg {
+    display: flex; flex-wrap: nowrap; gap: 6px; margin: 8px 0 0 28px;
+  }
+  #tab-checklist #chkFormList .chk-seg button {
+    height: 36px; min-height: 36px; padding: 0 14px; border-radius: 10px; border: 0;
+    background: var(--bg); color: var(--muted); font: inherit; font-size: 13px; font-weight: 800;
+    white-space: nowrap; cursor: pointer; transition: background .12s, color .12s;
+  }
+  html[data-theme="dark"] #tab-checklist #chkFormList .chk-seg button { background: var(--card-2); }
+  #tab-checklist #chkFormList .chk-seg .seg-ok[aria-pressed="true"] { background: var(--primary); color: var(--primary-ink); }
+  #tab-checklist #chkFormList .chk-seg .seg-bad[aria-pressed="true"] { background: var(--bad); color: #fff; }
+  @container (min-width: 600px) {
+    #tab-checklist #chkFormList .chk-form-item {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+    }
+    #tab-checklist #chkFormList .chk-fitem-text { flex: 1; }
+    #tab-checklist #chkFormList .chk-seg { margin: 0; flex: none; }
+  }
+
+  /* 4. 화면 아래 고정 바 (휴대폰: ✓ · 메모 · [보관함에 저장]) */
+  .chk-bottom-bar { z-index: 70; }
+  .chk-save-hint { display: none; }
+  .chk-bottom-btns { display: flex; align-items: center; gap: 8px; }
+  .chk-sq-btn {
+    position: relative; flex: none; width: 52px; height: 52px; padding: 0;
+    border-radius: 16px; border: 0; background: var(--card); color: var(--muted);
+    box-shadow: var(--shadow); display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  html[data-theme="dark"] .chk-sq-btn { border: 1px solid var(--line); }
+  .chk-sq-btn:hover { color: var(--text); }
+  .chk-memo-dot {
+    position: absolute; top: 10px; right: 10px; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--primary);
+  }
+  .chk-save-btn {
+    flex: 1; height: 52px; padding: 0 18px; border-radius: 16px; border: 0;
+    background: var(--primary); color: var(--primary-ink); font: inherit; font-size: 16px; font-weight: 800;
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(49, 130, 246, .24);
+  }
+  .chk-save-btn:hover { filter: brightness(.95); }
+
+  /* 특이사항 메모: 휴대폰(<1024px)은 평소 숨김, 시트로 열림 */
+  #chkMemoCard { display: none; }
+  body.chk-memo-open { overflow: hidden; }
+  body.chk-memo-open #chkMemoCard {
+    display: flex; flex-direction: column; gap: 10px;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 910; box-sizing: border-box;
+    padding: 16px 20px calc(24px + env(safe-area-inset-bottom));
+    border-radius: 22px 22px 0 0; background: var(--card);
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, .25);
+  }
+  #chkMemoCard .memo-label { display: none; }
+  #chkMemoCard .memo-input {
+    width: 100%; min-height: 96px; resize: vertical;
+    border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+    background: var(--card-2); color: var(--text); font-size: 14px; line-height: 1.5;
+  }
+  #chkMemoCard .memo-input:focus { outline: none; border-color: var(--primary); background: var(--card); }
+  #chkMemoCard .memo-sheet-foot { display: flex; justify-content: flex-end; }
+  #chkMemoCard .memo-sheet-foot .btn { min-height: 42px; border-radius: 12px; }
+
+  /* 점검표 미리보기 오버레이 (#chkDocWrap) */
+  #chkDocWrap { display: none; }
+  body.chk-doc-open { overflow: hidden; }
+  body.chk-doc-open #chkDocWrap {
+    display: block; position: fixed; inset: 0; z-index: 920; overflow: auto; box-sizing: border-box;
+    background: var(--bg); padding: 14px 12px 36px; border: 0; border-radius: 0; box-shadow: none;
+  }
+  .chk-doc-bar {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    margin: -14px -12px 12px; padding: 12px 14px;
+    background: var(--card); border-bottom: 1px solid var(--line);
+  }
+  .chk-doc-bar b { font-size: 17px; font-weight: 800; }
+  .chk-doc-bar-acts { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .chk-doc-bar-acts .btn { min-height: 38px; padding: 0 11px; font-size: 13px; border-radius: 10px; }
+  .chk-doc-bar-acts .sheet-done { min-height: 38px; padding: 0 14px; font-size: 14px; }
+
+  /* 지난 점검 보관함 시트/모달 (#chkArchivePanel) */
+  #chkArchivePanel { display: none; }
+  body.chk-archive-open { overflow: hidden; }
+  body.chk-archive-open #chkArchivePanel {
+    display: flex; flex-direction: column; position: fixed; left: 0; right: 0; bottom: 0; z-index: 910;
+    margin: 0; max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding: 16px 18px calc(24px + env(safe-area-inset-bottom));
+    border-radius: 22px 22px 0 0; border: 0; background: var(--card);
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, .25);
+  }
+  .archive-sheet-head {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 8px; margin-bottom: 12px;
+  }
+  .archive-sheet-head > b { display: inline-flex; align-items: center; gap: 6px; font-size: 18px; }
+  .archive-sheet-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .archive-sheet-tools .btn { min-height: 36px; padding: 0 11px; font-size: 13px; border-radius: 10px; }
+  .archive-sheet-tools .btn-danger { color: var(--bad); }
+  .archive-sheet-tools .sheet-done { min-height: 36px; padding: 0 14px; font-size: 14px; }
+  .archive-cards { display: flex; flex-direction: column; gap: 8px; }
+  .archive-table-wrap { display: none; }
+  .archive-empty { text-align: center; color: var(--muted); font-size: 14px; padding: 24px 8px; margin: 0; }
+  .acard {
+    display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 14px;
+    border-radius: 14px; background: var(--card-2);
+  }
+  .acard-main { flex: 1; min-width: 0; }
+  .acard-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .acard-top b { font-size: 15px; text-align: left !important; }
+  .acard-top .result { font-size: 12px; padding: 2px 7px; }
+  .acard-score { font-size: 13px; font-weight: 700; color: var(--muted); text-align: left !important; }
+  .acard-sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .acard-memo { font-size: 12.5px; color: var(--text); margin-top: 4px; word-break: keep-all; }
+  .acard-del { flex: none; width: 34px; height: 34px; }
+}
+
+@media screen and (min-width: 640px) {
+  .archive-cards { display: none; }
+  .archive-table-wrap { display: block; }
+}
+
+@media screen and (min-width: 700px) {
+  body.chk-archive-open #chkArchivePanel {
+    left: 50%; right: auto; bottom: auto; top: 50%;
+    width: min(860px, calc(100vw - 40px)); max-height: 84vh;
+    transform: translate(-50%, -50%); border-radius: 20px; padding: 20px 22px;
+  }
+}
+
+@media screen and (min-width: 700px) and (max-width: 1023.98px) {
+  body.chk-memo-open #chkMemoCard {
+    left: 50%; right: auto; bottom: auto; top: 50%;
+    width: 500px; max-width: calc(100vw - 32px);
+    transform: translate(-50%, -50%); border-radius: 20px; padding: 20px 22px;
+  }
+}
+
+@media screen and (max-width: 1023.98px) {
+  /* 휴대폰·태블릿 세로: 아래 고정 바를 하단 메뉴 바로 위에 고정 */
+  #tab-checklist .chk-bottom-bar {
+    position: fixed; left: 0; right: 0;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    padding: 8px 12px 10px; background: var(--bg);
+  }
+  #tab-checklist .chk-bottom-btns { max-width: 656px; margin: 0 auto; }
+  body.on-checklist:not(.locked) .app-footer {
+    padding-bottom: calc(166px + env(safe-area-inset-bottom));
+  }
+  body.on-checklist:not(.locked) .toast {
+    bottom: calc(150px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ==========================================================
+   넓은 화면(1024px 이상): wide/I_Chk.html 배치
+   왼쪽 분류 목록(진행도) | 오른쪽 온도 카드 + 선택 분류 항목 + 메모 + 저장 바
+   ========================================================== */
+@media screen and (min-width: 1024px) {
+  body.on-checklist:not(.locked) .container { max-width: none; padding: 0; }
+  body.on-checklist:not(.locked) .app-footer { display: none; }
+
+  #tab-checklist .chk-shell {
+    display: flex; align-items: stretch; min-height: 100vh; width: 100%;
+  }
+
+  /* 왼쪽 분류 묶음 목록 (.chk-cat-col) */
+  #tab-checklist .chk-cat-col {
+    display: flex; flex-direction: column; width: 276px; flex: none;
+    position: sticky; top: 0; height: 100vh; overflow: hidden;
+    background: var(--card); border-right: 1px solid var(--line);
+  }
+  @media (max-width: 1120px) {
+    #tab-checklist .chk-cat-col { width: 244px; }
+  }
+  .chk-cat-head {
+    padding: 20px 18px 14px; border-bottom: 1px solid var(--bg);
+    display: flex; flex-direction: column; gap: 8px; flex: none;
+  }
+  html[data-theme="dark"] .chk-cat-head { border-bottom-color: var(--line); }
+  .chk-cat-head-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .chk-cat-head-top h1 { margin: 0; font-size: 19px; font-weight: 800; color: var(--text); }
+  .chk-cat-prog { font-size: 13px; font-weight: 800; color: var(--text); text-align: right !important; }
+  .chk-cat-prog .need { color: var(--bad); }
+  .chk-cat-prog .ok { color: var(--ok); }
+  .chk-prog-track { width: 100%; height: 6px; border-radius: 3px; background: var(--bg); overflow: hidden; }
+  .chk-prog-fill { height: 100%; border-radius: 3px; background: var(--primary); transition: width .2s; }
+
+  .chk-cat-list {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 10px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .cat-item {
+    width: 100%; border: 0; background: transparent; border-radius: 14px;
+    padding: 11px 12px; display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; text-align: left; cursor: pointer; transition: background .12s;
+  }
+  .cat-item:hover { background: var(--card-2); }
+  .cat-item.active { background: var(--primary-weak); }
+  .cat-name {
+    font-size: 14px; font-weight: 700; color: var(--text);
+    display: flex; align-items: center; gap: 6px; min-width: 0;
+  }
+  .cat-name-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat-item.active .cat-name { color: var(--primary); font-weight: 800; }
+  .need-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bad); flex: none; }
+  .cat-count { font-size: 13px; font-weight: 700; color: var(--muted); flex: none; text-align: right !important; }
+  .cat-count.done { color: var(--ok); }
+  .cat-item.active .cat-count { color: var(--primary); }
+
+  .chk-cat-foot {
+    padding: 12px; border-top: 1px solid var(--bg);
+    display: flex; flex-direction: column; gap: 8px; flex: none;
+  }
+  html[data-theme="dark"] .chk-cat-foot { border-top-color: var(--line); }
+  .chk-cat-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .chk-sub-btn {
+    height: 36px; border-radius: 11px; border: 0; background: var(--bg); color: var(--muted);
+    font: inherit; font-size: 12px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;
+  }
+  html[data-theme="dark"] .chk-sub-btn { background: var(--card-2); }
+  .chk-sub-btn:hover { background: var(--line); color: var(--text); }
+  .chk-archive-btn {
+    width: 100%; height: 40px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font: inherit; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 12px; cursor: pointer;
+  }
+  .chk-archive-btn:hover { background: var(--card-2); }
+  .chk-archive-left { display: inline-flex; align-items: center; gap: 6px; }
+  .chk-archive-cnt { color: var(--primary); font-weight: 800; }
+
+  /* 오른쪽 본문: 머리 줄 + 4칸 온도 카드 + 선택 분류 + 메모 + 저장 바 */
+  #tab-checklist .chk-main {
+    flex: 1; min-width: 0; min-height: 100vh; padding: 18px 26px 14px; gap: 12px;
+  }
+  #tab-checklist .chk-topbar { padding: 0; min-height: 36px; }
+  #tab-checklist .chk-mob-title,
+  #tab-checklist #chkArchiveOpenBtn { display: none; }
+  #tab-checklist .chk-wide-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  #tab-checklist .chk-wide-title h2 { margin: 0; font-size: 20px; font-weight: 800; color: var(--text); }
+  #tab-checklist .chk-top-sub { font-size: 13px; color: var(--muted); font-weight: 600; }
+  #tab-checklist .chk-top-sub:empty { display: none; }
+  #tab-checklist .chk-topbar-tools { gap: 6px; }
+  #tab-checklist .chk-topbar-tools .tool-btn {
+    display: inline-flex; align-items: center; height: 34px; padding: 0 12px;
+    border-radius: 10px; border: 0; background: var(--card); color: var(--muted);
+    font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow);
+  }
+  #tab-checklist .chk-topbar-tools .tool-btn:hover { background: var(--line); color: var(--text); }
+  #tab-checklist #chkMoreMenu > summary {
+    width: 34px; height: 34px; min-width: 34px; min-height: 34px;
+    border-radius: 10px; background: var(--card); box-shadow: var(--shadow);
+  }
+  #tab-checklist .cm-mobile-only { display: none !important; }
+
+  #tab-checklist .chk-form { flex: 1; gap: 12px; }
+  #tab-checklist .chk-scroll { flex: 1; gap: 12px; }
+
+  /* 4칸 온도·점검 정보 카드 */
+  #tab-checklist .chk-info-card {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: 14px 20px; gap: 16px;
+  }
+  #tab-checklist .chk-info-cell { padding-right: 12px; border-right: 1px solid var(--bg); }
+  html[data-theme="dark"] #tab-checklist .chk-info-cell { border-right-color: var(--line); }
+  #tab-checklist .chk-info-cell:last-child { border-right: 0; padding-right: 0; }
+  #tab-checklist .chk-info-val,
+  #tab-checklist .chk-info-val.num { font-size: 16px; }
+  #tab-checklist .temp-ok { display: inline-flex; }
+
+  /* 선택된 분류 카드만 표시 */
+  #tab-checklist #chkFormList .chk-form-group { border-radius: 20px; }
+  #tab-checklist #chkFormList .chk-form-group:not(.cat-selected) { display: none; }
+  #tab-checklist #chkFormList .chk-form-sum { padding: 15px 20px; }
+  #tab-checklist #chkFormList .chk-form-title { font-size: 16px; font-weight: 800; }
+  #tab-checklist #chkFormList .chk-form-item {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 18px; padding: 15px 20px;
+  }
+  #tab-checklist #chkFormList .chk-fitem-text { flex: 1; gap: 10px; }
+  #tab-checklist #chkFormList .chk-no { width: 22px; }
+  #tab-checklist #chkFormList .chk-seg { margin: 0; flex: none; }
+
+  /* 넓은 화면: 특이사항 메모 카드가 항목 바로 아래에 표시 */
+  #tab-checklist #chkMemoCard {
+    display: flex; flex-direction: column; gap: 8px; position: static;
+    padding: 15px 20px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow);
+  }
+  html[data-theme="dark"] #tab-checklist #chkMemoCard { border: 1px solid var(--line); }
+  #tab-checklist #chkMemoCard .memo-sheet-head,
+  #tab-checklist #chkMemoCard .memo-sheet-foot { display: none; }
+  #tab-checklist #chkMemoCard .memo-label {
+    display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; color: var(--muted);
+  }
+  #tab-checklist #chkMemoCard .memo-input { min-height: 62px; height: 62px; }
+
+  /* 넓은 화면 하단 저장 바 */
+  #tab-checklist .chk-bottom-bar {
+    position: sticky; bottom: 0; flex: none;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 0 4px; background: var(--bg);
+  }
+  #tab-checklist .chk-save-hint { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+  #tab-checklist .chk-sq-btn { display: none; }
+  #tab-checklist .chk-bottom-btns { margin: 0; }
+  #tab-checklist .chk-save-btn { flex: none; height: 48px; padding: 0 26px; border-radius: 14px; font-size: 15px; }
+
+  /* 넓은 화면 점검표 미리보기 오버레이 */
+  body.chk-doc-open #chkDocWrap { padding: 24px max(24px, calc(50vw - 440px)); }
+  body.chk-doc-open .chk-doc-bar {
+    margin: -24px calc(-1 * max(24px, calc(50vw - 440px))) 16px;
+    padding: 14px max(24px, calc(50vw - 440px));
+  }
+}
+
+@media print {
+  .chk-cat-col, .chk-topbar, .chk-info-card, #chkForm, .chk-bottom-bar, #chkMemoCard, #chkArchivePanel, .chk-doc-bar, .chk-sr-hooks {
+    display: none !important;
+  }
+  #tab-checklist.active .chk-shell,
+  #tab-checklist.active .chk-main,
+  #tab-checklist.active #chkDocWrap,
+  #tab-checklist.active #chkDoc {
+    display: block !important; position: static !important;
+    padding: 0 !important; margin: 0 !important; min-height: 0 !important; background: #fff !important;
+  }
+}

@@ -60,6 +60,7 @@
     workers: loadWorkers(),
     selId: '',          // 지금 달력에 불러온 알바생
     archive: loadJson(KEYS.archive, []),
+    chkActiveGroup: -1, // 위생 점검 넓은 화면에서 선택된 분류 인덱스
     rightView: 'schedule', // 'schedule' | 'slip'
     calendar: null,
     dailyShifts: [],
@@ -219,6 +220,8 @@
         if (target === 'guide') { var st = document.querySelector('.tabs .tab[data-tab="settings"]'); if (st) st.classList.add('active'); }
         document.body.classList.toggle('on-punch', target === 'punch');
         document.body.classList.toggle('on-payroll', target === 'payroll');
+        document.body.classList.toggle('on-checklist', target === 'checklist');
+        if (target !== 'checklist') document.body.classList.remove('chk-memo-open', 'chk-archive-open', 'chk-doc-open');
         document.querySelectorAll('.tab-panel').forEach(function (panel) {
           panel.classList.toggle('active', panel.id === 'tab-' + target);
         });
@@ -1183,13 +1186,13 @@
       '</div></div>';
   }
 
-  function openSheet(kind) {   // 'set' | 'add' | 'roster'
-    document.body.classList.remove('set-open', 'add-open', 'roster-open');
+  function openSheet(kind) {   // 'set' | 'add' | 'roster' | 'chk-memo' | 'chk-archive'
+    document.body.classList.remove('set-open', 'add-open', 'roster-open', 'chk-memo-open', 'chk-archive-open');
     document.body.classList.add(kind + '-open');
     $('sheetBackdrop').hidden = false;
   }
   function closeSheets() {
-    document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open', 'roster-open');
+    document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open', 'roster-open', 'chk-memo-open', 'chk-archive-open', 'chk-doc-open');
     $('sheetBackdrop').hidden = true;
   }
 
@@ -1329,29 +1332,67 @@
     };
   }
 
-  /* 점검 항목 체크 목록(왼쪽 입력 폼)을 한 번만 그린다 */
+  /* 점검 항목 체크 목록(왼쪽 입력 폼 + 넓은 화면 분류 목록)을 한 번만 그린다 */
   /* 시안 I: 분류마다 접기/펼치기 + 항목마다 [적합 | 점검 필요].
      저장 형식은 그대로 — 항목마다 체크박스 하나(체크 = 적합, 안 체크 = 점검 필요)이고, 두 버튼은 그 체크박스를 켜고 끈다 */
+  var CHK_CHEV_SVG = '<svg class="chk-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  var CHK_WARN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>';
   function buildChecklistForm() {
-    var html = '';
+    var html = '', catHtml = '';
     E.getChecklistGroups().forEach(function (g, gi) {
       html += '<details class="chk-form-group" data-g="' + gi + '"><summary class="chk-form-sum">' +
         '<span class="chk-form-title">' + escHtml(g.title) + '</span>' +
-        '<span class="chk-gcount" data-gcount></span><span class="chk-gneed" data-gneed></span></summary>';
+        '<span class="chk-gcount num" data-gcount></span><span class="chk-gneed" data-gneed></span>' + CHK_CHEV_SVG + '</summary>';
       g.items.forEach(function (it) {
         html += '<div class="check-item chk-form-item" data-item="' + it.no + '">' +
           '<input type="checkbox" class="chk-in" value="' + it.no + '" tabindex="-1" aria-hidden="true">' +
-          '<div class="chk-fitem-text"><b>' + it.no + '.</b> ' + escHtml(it.text) +
+          '<div class="chk-fitem-text"><span class="chk-no num">' + it.no + '</span><div class="chk-fitem-body">' +
+          '<span class="chk-q">' + escHtml(it.text) + '</span>' +
           (it.standard ? '<small class="item-std">' + escHtml(it.standard) + '</small>' : '') +
-          '<div class="health-warn chk-item-warn" data-iwarn hidden></div></div>' +
+          '<div class="health-warn chk-item-warn" data-iwarn hidden></div></div></div>' +
           '<div class="chk-seg" role="group" aria-label="' + escHtml(tr('{n}번 결과', { n: it.no })) + '">' +
           '<button type="button" class="seg-ok" data-chk-set="' + it.no + '" data-v="1" aria-pressed="false">' + tr('적합') + '</button>' +
           '<button type="button" class="seg-bad" data-chk-set="' + it.no + '" data-v="0" aria-pressed="true">' + tr('점검 필요') + '</button>' +
           '</div></div>';
       });
       html += '</details>';
+      catHtml += '<button type="button" class="cat-item" data-cat-idx="' + gi + '" role="tab" aria-selected="false">' +
+        '<span class="cat-name"><span class="cat-name-txt">' + escHtml(g.title) + '</span><span class="need-dot" data-cat-dot hidden></span></span>' +
+        '<span class="cat-count num" data-cat-cnt></span>' +
+        '</button>';
     });
     $('chkFormList').innerHTML = html;
+    if ($('chkCatList')) $('chkCatList').innerHTML = catHtml;
+  }
+
+  function applyChkActiveGroup(openSelected) {
+    var groups = document.querySelectorAll('#chkFormList .chk-form-group');
+    if (!groups.length) return;
+    if (state.chkActiveGroup < 0 || state.chkActiveGroup >= groups.length) state.chkActiveGroup = 0;
+    var activeTitle = '';
+    Array.prototype.forEach.call(groups, function (gEl, gi) {
+      var on = gi === state.chkActiveGroup;
+      gEl.classList.toggle('cat-selected', on);
+      if (on) {
+        if (openSelected) gEl.open = true;
+        var t = gEl.querySelector('.chk-form-title');
+        if (t) activeTitle = t.textContent;
+      }
+    });
+    var catBtns = document.querySelectorAll('#chkCatList .cat-item');
+    Array.prototype.forEach.call(catBtns, function (b, gi) {
+      var on = gi === state.chkActiveGroup;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if ($('chkActiveTitle') && activeTitle) $('chkActiveTitle').textContent = activeTitle;
+  }
+
+  function selectChkGroup(gi) {
+    state.chkActiveGroup = gi;
+    applyChkActiveGroup(true);
+    var sc = document.querySelector('#tab-checklist .chk-scroll');
+    if (sc) sc.scrollTop = 0;
   }
 
   /* 체크 상태를 버튼 눌림·분류 개수·경고에 맞춘다(renderChecklist 끝에서 매번 부름).
@@ -1360,7 +1401,10 @@
   function syncChkForm(c, hNote) {
     var byNo = {};
     (c && c.groups || []).forEach(function (g) { g.items.forEach(function (it) { byNo[it.no] = it; }); });
-    Array.prototype.forEach.call(document.querySelectorAll('#chkFormList .chk-form-group'), function (gEl) {
+    var groups = document.querySelectorAll('#chkFormList .chk-form-group');
+    var catBtns = document.querySelectorAll('#chkCatList .cat-item');
+    var firstNeed = -1;
+    Array.prototype.forEach.call(groups, function (gEl, gi) {
       var boxes = gEl.querySelectorAll('input.chk-in'), on = 0;
       Array.prototype.forEach.call(boxes, function (cb) {
         var ok = cb.checked;
@@ -1371,23 +1415,48 @@
         row.querySelector('.seg-ok').setAttribute('aria-pressed', ok ? 'true' : 'false');
         row.querySelector('.seg-bad').setAttribute('aria-pressed', ok ? 'false' : 'true');
         var no = Number(cb.value), it = byNo[no], w = row.querySelector('[data-iwarn]'), msg = '';
-        if (no === 4 && hNote) msg = '⚠️ ' + hNote;                                   // 보건증 만료 경고
-        else if (it && ok && it.ok === false) msg = tr('⚠️ 체크했지만 온도가 기준을 벗어나 점검필요로 판정돼요');   // 20번 온도 자동 판정
-        w.textContent = msg; w.hidden = !msg;
+        if (no === 4 && hNote) msg = hNote;                                   // 보건증 만료 경고
+        else if (it && ok && it.ok === false) msg = tr('⚠️ 체크했지만 온도가 기준을 벗어나 점검필요로 판정돼요').replace(/^⚠️\s*/, '');   // 20번 온도 자동 판정
+        if (msg) { w.innerHTML = CHK_WARN_SVG + '<span>' + escHtml(msg) + '</span>'; w.hidden = false; }
+        else { w.innerHTML = ''; w.hidden = true; }
       });
       var need = boxes.length - on;
+      if (need > 0 && firstNeed < 0) firstNeed = gi;
       gEl.querySelector('[data-gcount]').textContent = on + '/' + boxes.length;
       var ne = gEl.querySelector('[data-gneed]');
       ne.textContent = need ? tr('필요 {n}', { n: need }) : '';
       ne.hidden = !need;
       gEl.classList.toggle('all-ok', !need);
       if (!gEl.dataset.init) { gEl.open = need > 0; gEl.dataset.init = '1'; }
+      var cbBtn = catBtns[gi];
+      if (cbBtn) {
+        var cnt = cbBtn.querySelector('[data-cat-cnt]');
+        if (cnt) { cnt.textContent = on + '/' + boxes.length; cnt.classList.toggle('done', !need); }
+        var dot = cbBtn.querySelector('[data-cat-dot]');
+        if (dot) { dot.hidden = !need; dot.title = need ? tr('점검 필요 {n}건', { n: need }) : ''; }
+      }
     });
+    var wasUnset = state.chkActiveGroup < 0 || state.chkActiveGroup >= groups.length;
+    if (wasUnset) {
+      state.chkActiveGroup = firstNeed >= 0 ? firstNeed : 0;
+    }
+    applyChkActiveGroup(wasUnset && window.innerWidth >= 1024);
   }
 
   function setAllChecks(on) {
     Array.prototype.forEach.call(document.querySelectorAll('#chkFormList input[type=checkbox]'), function (el) { el.checked = on; });
     recalcChecklist();
+  }
+
+  function shortMdDate(ymd) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+    return m ? (Number(m[2]) + '.' + pad2(Number(m[3]))) : '-';
+  }
+
+  function sizeTempInput(el) {
+    if (!el) return;
+    var len = String(el.value || '').length || 3;
+    el.style.width = Math.min(7.2, Math.max(2.6, len + 0.5)) + 'ch';
   }
 
   function renderChecklist(c) {
@@ -1408,6 +1477,36 @@
       : tr('⚠️ 점검필요 항목이 {n}건 있습니다. 체크하지 않은 항목과 온도를 확인하세요.', { n: c.failCount });
     $('chkScore').textContent = tr('적합 {p}/{n}', { p: c.passCount, n: c.total });
     $('chkProgress').textContent = tr('{a} / {b} 체크', { a: c.input.checks.length, b: c.total });
+
+    // 시안 I 2×2 정보 카드 & 넓은 화면 사이드바 진행도·온도 갱신
+    if ($('cDateDisp')) $('cDateDisp').textContent = shortMdDate(c.date);
+    if ($('chkProgCount')) $('chkProgCount').textContent = c.passCount + ' / ' + c.total;
+    var pn = $('chkProgNeed');
+    if (pn) {
+      pn.textContent = c.failCount > 0 ? ('· ' + tr('필요 {n}', { n: c.failCount })) : ('· ' + tr('모두 적합'));
+      pn.className = 'chk-info-need ' + (c.failCount > 0 ? 'is-bad' : 'is-ok');
+    }
+    var sp = $('chkSideProg');
+    if (sp) {
+      sp.innerHTML = c.passCount + '/' + c.total + (c.failCount > 0
+        ? ' <span class="need">· ' + escHtml(tr('필요 {n}', { n: c.failCount })) + '</span>'
+        : ' <span class="ok">· ' + escHtml(tr('모두 적합')) + '</span>');
+    }
+    if ($('chkSideProgFill')) $('chkSideProgFill').style.width = (c.total ? Math.round((c.passCount / c.total) * 100) : 0) + '%';
+    var fb = $('cFridgeBadge'), fzb = $('cFreezerBadge');
+    if (fb) { fb.textContent = c.fridgeOk ? tr('정상') : tr('이탈'); fb.className = c.fridgeOk ? 'temp-ok' : 'temp-bad'; }
+    if (fzb) { fzb.textContent = c.freezerOk ? tr('정상') : tr('이탈'); fzb.className = c.freezerOk ? 'temp-ok' : 'temp-bad'; }
+    if ($('chkFridgeCell')) $('chkFridgeCell').classList.toggle('is-bad', !c.fridgeOk);
+    if ($('chkFreezerCell')) $('chkFreezerCell').classList.toggle('is-bad', !c.freezerOk);
+    sizeTempInput($('cFridge'));
+    sizeTempInput($('cFreezer'));
+    if ($('chkStoreSub')) $('chkStoreSub').textContent = $('cStore').value.trim();
+    if ($('chkMemoDot')) $('chkMemoDot').hidden = !$('cMemo').value.trim();
+    if ($('chkSaveHint')) {
+      $('chkSaveHint').textContent = c.date
+        ? tr('저장하면 {d} 날짜로 점검 보관함에 기록돼요.', { d: ymdText(c.date) })
+        : tr('저장하면 오늘 날짜로 점검 보관함에 기록돼요.');
+    }
 
     $('chkStore').textContent = c.store;
     $('chkDate').textContent = c.date || '-';
@@ -1466,10 +1565,35 @@
   function renderArchive() {
     var results = state.archive.map(function (inp) { return E.buildChecklist(inp); });
     $('archiveCount').textContent = tr('{n}일', { n: results.length });
+    if ($('chkArchiveWideCnt')) $('chkArchiveWideCnt').textContent = tr('{n}일', { n: results.length }) + ' ›';
+    if ($('chkArchiveDot')) $('chkArchiveDot').textContent = results.length ? String(results.length) : '';
+    if ($('chkArchiveOpenBtn')) $('chkArchiveOpenBtn').setAttribute('aria-label', tr('점검 보관함 {n}일', { n: results.length }));
 
     if (!results.length) {
       $('archiveBody').innerHTML = '<tr class="empty"><td colspan="10">저장된 일별 점검 기록이 없습니다. [보관함에 저장] 버튼을 눌러 누적해보세요.</td></tr>';
+      if ($('archiveCards')) $('archiveCards').innerHTML = '<p class="archive-empty">' + tr('저장된 일별 점검 기록이 없습니다. [보관함에 저장] 버튼을 눌러 누적해보세요.') + '</p>';
       return;
+    }
+
+    if ($('archiveCards')) {
+      $('archiveCards').innerHTML = results.map(function (c, idx) {
+        var fTxt = c.fridgeTemp === null ? '-' : E.formatNum(c.fridgeTemp, 1) + '°C';
+        var fzTxt = c.freezerTemp === null ? '-' : E.formatNum(c.freezerTemp, 1) + '°C';
+        return '<div class="acard">' +
+          '<div class="acard-main">' +
+            '<div class="acard-top">' +
+              '<b class="num">' + escHtml(c.date || '-') + '</b>' +
+              '<span class="result ' + (c.allPass ? 'ok' : 'bad') + '">' + escHtml(c.verdict) + '</span>' +
+              '<span class="acard-score num">' + c.passCount + '/' + c.total + '</span>' +
+            '</div>' +
+            '<div class="acard-sub">' +
+              escName(c.inspector) + ' · ' + escHtml(tr('냉장')) + ' ' + escHtml(fTxt) + ' · ' + escHtml(tr('냉동')) + ' ' + escHtml(fzTxt) +
+            '</div>' +
+            (c.memo ? '<div class="acard-memo">' + escHtml(c.memo) + '</div>' : '') +
+          '</div>' +
+          '<button type="button" class="btn-del acard-del" data-del-archive="' + idx + '" aria-label="' + escHtml(tr('삭제')) + '">✕</button>' +
+          '</div>';
+      }).join('');
     }
 
     $('archiveBody').innerHTML = results.map(function (c, idx) {
@@ -1879,7 +2003,7 @@
     $('moneyBarBtn').addEventListener('click', function () { $('moneyToggle').click(); });
     document.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' && workerPickOpen) setWorkerPick(false);
-      if (ev.key === 'Escape' && /set-open|add-open|slip-open|export-open|roster-open/.test(document.body.className)) closeSheets();
+      if (ev.key === 'Escape' && /set-open|add-open|slip-open|export-open|roster-open|chk-memo-open|chk-archive-open|chk-doc-open/.test(document.body.className)) closeSheets();
     });
 
     // 카톡 명세서 복사
@@ -2047,8 +2171,13 @@
     });
 
     // 체크리스트 실시간 반응
+    $('chkForm').addEventListener('submit', function (ev) { ev.preventDefault(); });
     ['cDate', 'cInspector', 'cFridge', 'cFreezer', 'cMemo'].forEach(function (id) {
       $(id).addEventListener('input', recalcChecklist);
+    });
+    $('cDate').addEventListener('change', recalcChecklist);
+    $('cDate').addEventListener('click', function () {
+      try { if ($('cDate').showPicker) $('cDate').showPicker(); } catch (e) {}
     });
     $('chkFormList').addEventListener('change', recalcChecklist);
     // [적합]/[점검 필요] → 그 항목 체크박스를 켜고 끈 뒤, 체크박스를 직접 누른 것처럼 change를 올려 보낸다(저장·계산 경로 그대로)
@@ -2061,6 +2190,10 @@
       if (cb.checked === want) return;
       cb.checked = want;
       cb.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    if ($('chkCatList')) $('chkCatList').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-cat-idx]');
+      if (b) selectChkGroup(Number(b.getAttribute('data-cat-idx')));
     });
     $('btnCheckAll').addEventListener('click', function () { setAllChecks(true); });
     $('btnCheckNone').addEventListener('click', function () { setAllChecks(false); });
@@ -2078,7 +2211,36 @@
       showToast(tr('점검 보관함에 {d} 점검표 저장 ({v})', { d: c.date || tr('오늘'), v: c.verdict }));
     });
 
-    $('archiveBody').addEventListener('click', function (ev) {
+    // 시안 I 위생 점검: 보관함·메모·점검표 미리보기·⋯ 메뉴 연결
+    if ($('chkArchiveOpenBtn')) $('chkArchiveOpenBtn').addEventListener('click', function () { openSheet('chk-archive'); });
+    if ($('chkArchiveWideBtn')) $('chkArchiveWideBtn').addEventListener('click', function () { openSheet('chk-archive'); });
+    if ($('chkArchiveClose')) $('chkArchiveClose').addEventListener('click', closeSheets);
+    if ($('chkMemoOpenBtn')) $('chkMemoOpenBtn').addEventListener('click', function () {
+      openSheet('chk-memo');
+      setTimeout(function () { $('cMemo').focus(); }, 60);
+    });
+    if ($('chkMemoClose')) $('chkMemoClose').addEventListener('click', closeSheets);
+    if ($('chkDocClose')) $('chkDocClose').addEventListener('click', closeSheets);
+    $('tab-checklist').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-cm]');
+      if (!b) return;
+      var act = b.getAttribute('data-cm');
+      if ($('chkMoreMenu')) $('chkMoreMenu').open = false;
+      if (act === 'doc') { closeSheets(); document.body.classList.add('chk-doc-open'); }
+      else if (act === 'pdf') $('btnPrintChk').click();
+      else if (act === 'xlsx') $('btnXlsxChk').click();
+      else if (act === 'memo') { openSheet('chk-memo'); setTimeout(function () { $('cMemo').focus(); }, 60); }
+      else if (act === 'all') $('btnCheckAll').click();
+      else if (act === 'none') $('btnCheckNone').click();
+      else if (act === 'archive') openSheet('chk-archive');
+      else if (act === 'archive-xlsx') $('btnArchiveXlsx').click();
+      else if (act === 'archive-clear') $('btnArchiveClear').click();
+      else if (act === 'store') $('cStoreGo').click();
+      else if (act === 'cloud') $('cloudBtn').click();
+      else if (act === 'lock') $('lockBtn').click();
+    });
+
+    function onArchiveDelClick(ev) {
       var btn = ev.target.closest('[data-del-archive]');
       if (!btn) return;
       var idx = Number(btn.getAttribute('data-del-archive'));
@@ -2088,7 +2250,9 @@
         saveJson(KEYS.archive, state.archive);
         renderArchive();
       }
-    });
+    }
+    $('archiveBody').addEventListener('click', onArchiveDelClick);
+    if ($('archiveCards')) $('archiveCards').addEventListener('click', onArchiveDelClick);
 
     $('btnArchiveXlsx').addEventListener('click', function () {
       if (!state.archive.length) {
@@ -2467,12 +2631,13 @@
     else if (kind === 'saving') { btn.textContent = tr('저장 중…'); btn.className = 'cloud-btn'; }
     else if (kind === 'needLogin' || kind === 'error') { btn.textContent = tr('⚠️ 다시 연결'); btn.className = 'cloud-btn bad'; }
     else { btn.textContent = tr('저장됨') + (clock ? ' ' + clock : ''); btn.className = 'cloud-btn ok'; }
-    var pmc = $('pmCloud');
-    if (pmc) {
-      pmc.textContent = btn.textContent;
-      pmc.classList.toggle('is-ok', btn.classList.contains('ok'));
-      pmc.classList.toggle('is-bad', btn.classList.contains('bad'));
-    }
+    ['pmCloud', 'chkCloud'].forEach(function (cid) {
+      var el = $(cid);
+      if (!el) return;
+      el.textContent = btn.textContent;
+      el.classList.toggle('is-ok', btn.classList.contains('ok'));
+      el.classList.toggle('is-bad', btn.classList.contains('bad'));
+    });
 
     var html;
     if (!connected) {
@@ -2550,7 +2715,7 @@
 
   function initCloud() {
     var C = window.AlbaCloud;
-    if (!C) { var b = $('cloudBtn'); if (b) b.hidden = true; var pmc = $('pmCloud'); if (pmc) pmc.hidden = true; return; }
+    if (!C) { ['cloudBtn', 'pmCloud', 'chkCloud'].forEach(function (cid) { var el = $(cid); if (el) el.hidden = true; }); return; }
     C.init({
       getData: cloudData,
       getTables: cloudTables,
@@ -2673,8 +2838,10 @@
     var enL = E.getLang() === 'en';
     $('lockBtn').textContent = locked ? (enL ? 'Admin' : '관리자') : (enL ? 'Lock' : '잠그기');
     $('lockBtn').classList.toggle('is-open', !locked);
-    var pml = $('pmLock');
-    if (pml) { pml.hidden = !pin; pml.textContent = $('lockBtn').textContent; }
+    ['pmLock', 'chkLock'].forEach(function (lid) {
+      var el = $(lid);
+      if (el) { el.hidden = !pin; el.textContent = $('lockBtn').textContent; }
+    });
     if (typeof healthDay === 'string' && $('bellBtn')) { renderHealth(); if (locked) closeHealth(); }
     $('pinState').textContent = (pin ? tr('· 설정됨') : tr('· 아직 없음')).replace(/^·\s*/, '');
     if (locked) openTab('punch');
@@ -2731,7 +2898,7 @@
     document.body.classList.remove('money-show');   // 잠갔다 풀었을 때 금액이 열린 채로 남지 않게
     syncMoneyUi();
     if (punchState.idleTimer) { clearTimeout(punchState.idleTimer); punchState.idleTimer = null; }
-    document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open', 'roster-open', 'modal-open');
+    document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open', 'roster-open', 'chk-memo-open', 'chk-archive-open', 'chk-doc-open', 'modal-open');
     $('sheetBackdrop').hidden = true;
     $('dayModal').hidden = true;
     $('cloudModal').hidden = true;
