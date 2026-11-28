@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 I 넓은 화면 설정</title>
+<!-- 디자인 시안(정적 목업). 실제 앱 코드가 아님. 예시 데이터만 들어 있음. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&amp;family=Inter:wght@500;600;700;800&amp;display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: #f2f4f6;
+  font-family: 'Noto Sans KR', sans-serif;
+  color: #191f28;
+}
+button, a { font: inherit; }
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; }
+.num {
+  font-family: Inter, 'Noto Sans KR', sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+.app {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 왼쪽 세로 메뉴 */
+.sidenav {
+  width: 88px;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid #e5e8eb;
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.sidenav-brand { display: none; }
+.sidenav-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.nav-item {
+  width: 72px;
+  padding: 10px 4px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: #8b95a1;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.15s, color 0.15s;
+}
+.nav-item:hover { background: #f8f9fa; color: #4e5968; }
+.nav-item[aria-current="page"] { background: #f2f4f6; color: #191f28; }
+.sidenav-foot { display: none; }
+
+@media (min-width: 1300px) {
+  .sidenav {
+    width: 220px;
+    padding: 22px 14px 18px;
+    align-items: stretch;
+  }
+  .sidenav-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 12px 18px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #f2f4f6;
+  }
+  .brand-name { font-size: 16px; font-weight: 800; color: #191f28; }
+  .brand-sub { font-size: 12px; font-weight: 500; color: #8b95a1; }
+  .sidenav-list { align-items: stretch; gap: 4px; }
+  .nav-item {
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 12px 14px;
+    gap: 12px;
+    font-size: 15px;
+  }
+  .sidenav-foot {
+    margin-top: auto;
+    padding: 12px 12px 4px;
+    border-top: 1px solid #f2f4f6;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #8b95a1;
+  }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #3182f6; flex-shrink: 0; }
+}
+
+/* 왼쪽 설정 분류 열 */
+.set-cat-col {
+  width: 260px;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid #e5e8eb;
+  padding: 22px 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+@media (max-width: 1120px) {
+  .set-cat-col { width: 224px; }
+}
+.set-col-head {
+  padding: 0 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.set-col-head h1 { margin: 0; font-size: 21px; font-weight: 800; }
+.set-ver { font-size: 12px; color: #8b95a1; font-weight: 600; }
+
+.set-cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.set-cat-btn {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 14px;
+  padding: 12px 14px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: background 0.12s;
+}
+.set-cat-btn:hover { background: #f8f9fa; }
+.set-cat-btn.active { background: #e8f3ff; }
+.set-cat-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #191f28;
+}
+.set-cat-btn.active .set-cat-title { color: #1b64da; }
+.set-cat-desc {
+  font-size: 12px;
+  color: #8b95a1;
+  line-height: 1.35;
+}
+.set-cat-btn.active .set-cat-desc { color: #4e5968; }
+
+.set-col-foot {
+  margin-top: auto;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f2f4f6;
+  font-size: 12px;
+  color: #6b7684;
+  line-height: 1.5;
+}
+.set-col-foot strong { color: #191f28; display: block; margin-bottom: 2px; }
+
+/* 오른쪽 선택한 분류의 항목 카드 */
+.set-main {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 26px 34px 32px;
+}
+.set-panel {
+  max-width: 780px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.set-panel[hidden] { display: none; }
+.panel-head {
+  margin-bottom: 4px;
+}
+.panel-head h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.panel-head p { margin: 5px 0 0; font-size: 14px; color: #6b7684; }
+
+.card-group {
+  background: #fff;
+  border-radius: 20px;
+  overflow: hidden;
+}
+.set-row {
+  padding: 18px 22px;
+  border-top: 1px solid #f2f4f6;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.set-row:first-child { border-top: 0; }
+.row-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #f2f4f6;
+  color: #4e5968;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.row-title { font-size: 15px; font-weight: 700; color: #191f28; }
+.row-sub { font-size: 13px; color: #6b7684; line-height: 1.4; }
+.row-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.row-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4e5968;
+}
+.row-val.blue { color: #1b64da; }
+
+.chip-btn {
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 10px;
+  border: 0;
+  background: #f2f4f6;
+  color: #4e5968;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.chip-btn:hover { background: #e5e8eb; }
+.chip-btn.primary { background: #e8f3ff; color: #1b64da; }
+.chip-btn.primary:hover { background: #d4e8ff; }
+
+.seg-group {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: #f2f4f6;
+  gap: 2px;
+}
+.seg-btn {
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: #6b7684;
+  font-size: 12px;
+  font-weight: 700;
+}
+.seg-btn.on { background: #fff; color: #191f28; box-shadow: 0 1px 2px rgba(25, 31, 40, 0.08); }
+
+/* 세금·4대보험 비율 상세 표 */
+.rate-grid {
+  padding: 0 22px 18px 74px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.rate-box {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f2f4f6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #6b7684;
+}
+.rate-box strong { color: #191f28; font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 왼쪽 세로 메뉴 -->
+  <nav class="sidenav" aria-label="메뉴">
+    <div class="sidenav-brand">
+      <span class="brand-name">우리분식 본점</span>
+      <span class="brand-sub">사장님 도우미 · 김사장</span>
+    </div>
+    <div class="sidenav-list">
+      <a class="nav-item" href="I_Punch.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>출퇴근</span>
+      </a>
+      <a class="nav-item" href="I_Pay.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg>
+        <span>근무·급여</span>
+      </a>
+      <a class="nav-item" href="I_Chk.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>위생 점검</span>
+      </a>
+      <a class="nav-item" href="I_Set.html" aria-current="page">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        <span>설정</span>
+      </a>
+    </div>
+    <div class="sidenav-foot">
+      <span class="sync-dot"></span>
+      <span>구글 시트 연결됨</span>
+    </div>
+  </nav>
+
+  <!-- 왼쪽 분류 목록 -->
+  <aside class="set-cat-col" aria-label="설정 분류">
+    <div class="set-col-head">
+      <h1>설정</h1>
+      <span class="set-ver num">v1.7.1</span>
+    </div>
+
+    <div class="set-cat-list" role="tablist" aria-label="설정 분류 선택">
+      <button type="button" class="set-cat-btn active" data-cat="store" role="tab" aria-selected="true">
+        <span class="set-cat-title">매장·기기</span>
+        <span class="set-cat-desc">매장 정보, 구글 시트, 관리자 PIN, 기기, QR</span>
+      </button>
+      <button type="button" class="set-cat-btn" data-cat="punch" role="tab" aria-selected="false">
+        <span class="set-cat-title">출퇴근</span>
+        <span class="set-cat-desc">시간 끊기, 자동 퇴근, 알림음, 화면 보호기</span>
+      </button>
+      <button type="button" class="set-cat-btn" data-cat="rules" role="tab" aria-selected="false">
+        <span class="set-cat-title">급여·위생 기준</span>
+        <span class="set-cat-desc">최저시급, 식사 시간대, 보건증 알림, 세율</span>
+      </button>
+      <button type="button" class="set-cat-btn" data-cat="app" role="tab" aria-selected="false">
+        <span class="set-cat-title">앱</span>
+        <span class="set-cat-desc">언어, 글자 크기, 다크 모드, 사용 방법, 공유</span>
+      </button>
+    </div>
+
+    <div class="set-col-foot">
+      <strong>우리분식 본점</strong>
+      구글 시트 자동 저장 연결됨<br>
+      알림음·화면 보호기는 이 기기에만 적용돼요.
+    </div>
+  </aside>
+
+  <!-- 오른쪽 선택한 분류의 항목 카드 -->
+  <main class="set-main">
+    <!-- 1. 매장·기기 -->
+    <section class="set-panel" data-panel="store">
+      <div class="panel-head">
+        <h2>매장·기기</h2>
+        <p>매장 기본 정보와 구글 시트 동기화, 출퇴근 기기, 손님 계좌이체 QR을 관리해요.</p>
+      </div>
+
+      <div class="card-group">
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9h16"/><path d="M9 20v-6h6v6"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">매장 정보</span>
+            <span class="row-sub">매장명: 우리분식 본점 · 사장님 이름: 김사장</span>
+          </div>
+          <div class="row-right">
+            <button type="button" class="chip-btn">수정</button>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19.5 10 4 4 0 0 1 18 18z"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">구글 시트 저장</span>
+            <span class="row-sub">자동 동기화 켜짐 · 마지막 저장 방금 전</span>
+          </div>
+          <div class="row-right">
+            <span class="row-val blue">연결됨</span>
+            <button type="button" class="chip-btn">연결 관리</button>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">관리자 비밀번호</span>
+            <span class="row-sub">잠그면 출퇴근 화면만 열리고 급여·위생·설정은 보호돼요</span>
+          </div>
+          <div class="row-right">
+            <span class="row-val">설정됨</span>
+            <button type="button" class="chip-btn">변경</button>
+            <button type="button" class="chip-btn">없애기</button>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">출퇴근 기기</span>
+            <span class="row-sub">매장 계산대 태블릿으로 지정돼 있어요</span>
+          </div>
+          <div class="row-right">
+            <span class="row-val blue">이 기기</span>
+            <button type="button" class="chip-btn">해제</button>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">손님 계좌이체 QR</span>
+            <span class="row-sub num">예시은행 1234-56-789012 · 예금주 우리분식</span>
+          </div>
+          <div class="row-right">
+            <a href="I_QR.html" class="chip-btn primary">QR 보기</a>
+            <button type="button" class="chip-btn">안내판 인쇄</button>
+            <button type="button" class="chip-btn">수정</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. 출퇴근 -->
+    <section class="set-panel" data-panel="punch" hidden>
+      <div class="panel-head">
+        <h2>출퇴근</h2>
+        <p>출퇴근 시간 끊기 기준, 자동 퇴근, 알림음과 화면 보호기를 설정해요.</p>
+      </div>
+
+      <div class="card-group">
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5h4"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">출퇴근 시간 끊기</span>
+            <span class="row-sub num">단위 30분 · 출근 올림(지각 봐주기 5분) · 퇴근 내림(조기퇴근 5분) · 자동 퇴근 23:00</span>
+          </div>
+          <div class="row-right">
+            <span class="row-val blue num">30분</span>
+            <button type="button" class="chip-btn">설정</button>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">알림음 (이 기기만)</span>
+            <span class="row-sub num">소리 크기 80% · 출근 소리: 맑은 종소리 · 퇴근 소리: 부드러운 차임</span>
+          </div>
+          <div class="row-right">
+            <span class="row-val blue">켜짐</span>
+            <button type="button" class="chip-btn">듣기</button>
+            <button type="button" class="chip-btn">변경</button>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10z"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">화면 보호기 (이 기기만)</span>
+            <span class="row-sub">사용 안 함 ~ 30분 후 중 선택할 수 있어요</span>
+          </div>
+          <div class="row-right">
+            <span class="row-val num">5분 후</span>
+            <button type="button" class="chip-btn">변경</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 급여·위생 기준 -->
+    <section class="set-panel" data-panel="rules" hidden>
+      <div class="panel-head">
+        <h2>급여·위생 기준</h2>
+        <p>최저시급, 식대 인정 시간대, 보건증 만료 알림, 세금·4대보험 비율을 관리해요.</p>
+      </div>
+
+      <div class="card-group">
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l3 12 5-10 5 10 3-12M3 11h18"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">최저시급·식사 시간대</span>
+            <span class="row-sub num">올해 최저시급 10,320원 · 점심 11:00~14:00 · 저녁 17:00~20:00</span>
+          </div>
+          <div class="row-right">
+            <button type="button" class="chip-btn">수정</button>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M12 9v6M9 12h6"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">보건증 알림</span>
+            <span class="row-sub">만료 전 알림 시점 선택 (7일 전부터는 빨간 경고 표시)</span>
+          </div>
+          <div class="row-right">
+            <div class="seg-group">
+              <button type="button" class="seg-btn on num">30일 전</button>
+              <button type="button" class="seg-btn num">14일 전</button>
+              <button type="button" class="seg-btn num">7일 전</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-row" style="padding-bottom: 12px">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">세금·4대보험 비율</span>
+            <span class="row-sub">근로자 부담 기준 요율</span>
+          </div>
+          <div class="row-right">
+            <button type="button" class="chip-btn">처음 값으로 되돌리기</button>
+          </div>
+        </div>
+        <div class="rate-grid num">
+          <div class="rate-box"><span>소득세</span><strong>3.0%</strong></div>
+          <div class="rate-box"><span>지방소득세</span><strong>0.3%</strong></div>
+          <div class="rate-box"><span>국민연금</span><strong>4.5%</strong></div>
+          <div class="rate-box"><span>건강보험</span><strong>3.545%</strong></div>
+          <div class="rate-box"><span>장기요양</span><strong>12.95%</strong></div>
+          <div class="rate-box"><span>고용보험</span><strong>0.9%</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 앱 -->
+    <section class="set-panel" data-panel="app" hidden>
+      <div class="panel-head">
+        <h2>앱</h2>
+        <p>화면 언어, 글자 크기, 다크 모드와 사용 방법 가이드를 확인할 수 있어요.</p>
+      </div>
+
+      <div class="card-group">
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">언어</span>
+            <span class="row-sub">앱 전체 표시 언어</span>
+          </div>
+          <div class="row-right">
+            <div class="seg-group">
+              <button type="button" class="seg-btn on">한국어</button>
+              <button type="button" class="seg-btn">English</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18L9 6l5 12M6 14h6M16 11h6M19 8v6"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">글자 크기 · 다크 모드</span>
+            <span class="row-sub">큰 글자(가+)와 어두운 화면을 켤 수 있어요</span>
+          </div>
+          <div class="row-right">
+            <div class="seg-group">
+              <button type="button" class="seg-btn on">보통</button>
+              <button type="button" class="seg-btn">크게 가+</button>
+            </div>
+            <div class="seg-group">
+              <button type="button" class="seg-btn on">라이트</button>
+              <button type="button" class="seg-btn">다크</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">사용 방법</span>
+            <span class="row-sub">출퇴근·급여·위생 점검·QR·구글 시트 가이드 14개 항목</span>
+          </div>
+          <div class="row-right">
+            <button type="button" class="chip-btn primary">가이드 보기</button>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <span class="row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>
+          <div class="row-body">
+            <span class="row-title">앱 정보·공유</span>
+            <span class="row-sub num">사장님 도우미 v1.7.1 · 개인정보 처리 안내</span>
+          </div>
+          <div class="row-right">
+            <button type="button" class="chip-btn">주소 복사</button>
+            <button type="button" class="chip-btn">공유</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  var tabs = document.querySelectorAll('.set-cat-btn');
+  var panels = document.querySelectorAll('.set-panel');
+
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var key = tab.dataset.cat;
+      tabs.forEach(function (t) {
+        var on = t === tab;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      panels.forEach(function (p) {
+        p.hidden = p.dataset.panel !== key;
+      });
+    });
+  });
+
+  document.querySelectorAll('.seg-group').forEach(function (group) {
+    var btns = group.querySelectorAll('.seg-btn');
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        btns.forEach(function (x) { x.classList.toggle('on', x === b); });
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

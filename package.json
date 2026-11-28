@@ -9,7 +9,7 @@
     "web": "node server/app.js --static",
     "test": "node tests/test_main.js && node tests/test_cloud.js && node tests/test_server.js && node tests/test_stress.js 3 && node tests/test_punch_fuzz.js 50 && node tests/test_single.js 20",
     "stress": "node tests/test_stress.js 30 && node tests/test_punch_fuzz.js 1000 && node tests/test_single.js 300",
-    "clean": "node tools/build.js --clean"
+    "clean": "node tools/build.js --clean",
+    "collab": "node tools/collab-watch.js"
   }
 }
-

@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 L 넓은 화면 출퇴근</title>
+<!-- 디자인 시안(정적 목업). 실제 앱 코드가 아님. 예시 데이터만 들어 있음. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&amp;family=Inter:wght@500;600;700;800&amp;display=swap">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; background: #f2f4f6; color: #191f28; font-family: 'Noto Sans KR', sans-serif; overflow: hidden; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; cursor: pointer; }
+  .num { font-family: Inter, 'Noto Sans KR', sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+
+  .app { width: 100%; height: 100vh; display: flex; overflow: hidden; }
+
+  /* 왼쪽 세로 메뉴: 1300px 미만 88px / 1300px 이상 220px */
+  .sidebar {
+    width: 88px; flex: none; background: #fff; border-right: 1px solid #e5e8eb;
+    display: flex; flex-direction: column; padding: 16px 8px; gap: 6px;
+  }
+  .brand { display: none; padding: 6px 12px 18px; border-bottom: 1px solid #f2f4f6; margin-bottom: 8px; }
+  .brand-name { font-size: 17px; font-weight: 800; color: #191f28; }
+  .brand-sub { font-size: 12px; color: #8b95a1; margin-top: 2px; }
+  .brand-mini {
+    width: 44px; height: 44px; margin: 0 auto 12px; border-radius: 14px;
+    background: #191f28; color: #fff; font-size: 14px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nav-list { display: flex; flex-direction: column; gap: 4px; }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 5px; padding: 12px 4px; border-radius: 14px;
+    color: #8b95a1; font-size: 12px; font-weight: 700; transition: background 0.15s;
+  }
+  .nav-item:hover { background: #f2f4f6; color: #4e5968; }
+  .nav-item[aria-current="page"] { background: #f2f4f6; color: #191f28; font-weight: 800; }
+
+  @media (min-width: 1300px) {
+    .sidebar { width: 220px; padding: 20px 14px; }
+    .brand { display: block; }
+    .brand-mini { display: none; }
+    .nav-item { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; font-size: 15px; }
+  }
+
+  /* 오른쪽 본문: 왼쪽 원형 이름 격자 + 오른쪽 상시 비밀번호 키패드 패널 */
+  .workspace {
+    flex: 1; min-width: 0; height: 100vh;
+    display: flex; gap: 20px; padding: 20px 24px; overflow: hidden;
+  }
+
+  .left-pane {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; overflow: hidden;
+  }
+
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex: none; flex-wrap: wrap;
+  }
+  .clock-wrap { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+  .clock-time { font-size: 42px; font-weight: 800; line-height: 1; letter-spacing: -1.5px; }
+  @media (min-width: 1300px) { .clock-time { font-size: 48px; } }
+  .clock-date { display: flex; flex-direction: column; gap: 2px; }
+  .clock-day { font-size: 16px; font-weight: 700; color: #4e5968; }
+  .clock-store { font-size: 13px; color: #8b95a1; }
+
+  .top-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+  .action-btn {
+    height: 42px; padding: 0 14px; border-radius: 21px; border: 0;
+    background: #fff; color: #4e5968; font-size: 14px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  }
+  .action-btn:hover { background: #e8f3ff; color: #1b64da; }
+  .action-btn.qr { background: #e8f3ff; color: #1b64da; }
+
+  .notice-bar {
+    flex: none; background: #fff4e5; color: #b25e00; border-radius: 14px;
+    padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    font-size: 13px; font-weight: 700;
+  }
+  .notice-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+  .notice-sep { opacity: 0.4; }
+  .notice-link {
+    flex: none; padding: 5px 12px; border-radius: 10px; background: rgba(178, 94, 0, 0.12);
+    color: #b25e00; font-size: 12px; font-weight: 800; white-space: nowrap;
+  }
+
+  /* 원형 이름 격자 (시안 L 핵심 개성: 4~5열) */
+  .staff-area {
+    flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+    background: #fff; border-radius: 24px; padding: 28px 24px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 20px;
+  }
+  .staff-head { display: flex; align-items: center; justify-content: space-between; }
+  .staff-title { font-size: 17px; font-weight: 800; color: #191f28; }
+  .staff-count { font-size: 13px; font-weight: 700; color: #6b7684; }
+
+  .staff-grid {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 28px 16px; align-content: start; flex: 1; padding-top: 10px;
+  }
+  @media (min-width: 1360px) {
+    .staff-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  }
+
+  .person-btn {
+    border: 0; background: transparent; padding: 8px 4px; border-radius: 18px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; color: #191f28;
+    transition: background 0.15s;
+  }
+  .person-btn:hover { background: #f8f9fa; }
+  .avatar {
+    position: relative; width: 88px; height: 88px; border-radius: 44px;
+    background: #f2f4f6; color: #191f28;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; font-weight: 800; transition: box-shadow 0.15s, background 0.15s;
+  }
+  .person-btn.working .avatar { background: #3182f6; color: #fff; }
+  .person-btn.selected .avatar {
+    background: #fff; color: #191f28;
+    box-shadow: 0 0 0 3px #3182f6, 0 0 0 8px #e8f3ff;
+  }
+  .person-btn.working.selected .avatar {
+    background: #3182f6; color: #fff;
+    box-shadow: 0 0 0 3px #1b64da, 0 0 0 8px #e8f3ff;
+  }
+  .person-name { font-size: 17px; font-weight: 800; line-height: 1.2; }
+  .person-status { font-size: 13px; font-weight: 700; color: #8b95a1; line-height: 1.3; text-align: center; }
+  .person-btn.working .person-status { color: #1b64da; }
+  .person-badge {
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px;
+    background: #fff4e5; color: #b25e00;
+  }
+  .person-badge.check { background: #fff0f1; color: #f04452; }
+
+  .bottom-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding-top: 16px; border-top: 1px solid #f2f4f6; flex: none;
+  }
+  .device-hint { font-size: 13px; color: #8b95a1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .all-out-btn {
+    height: 44px; padding: 0 18px; border-radius: 14px; border: 1px solid #e5e8eb;
+    background: #fff; color: #4e5968; font-size: 14px; font-weight: 800;
+    display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  }
+  .all-out-btn:hover { background: #fff0f1; border-color: #ffd6da; color: #f04452; }
+
+  /* 오른쪽 상시 비밀번호 키패드 패널 (시트가 아니라 항상 보이는 패널) */
+  .keypad-panel {
+    width: 340px; flex: none; background: #fff; border-radius: 24px;
+    padding: 26px 24px; display: flex; flex-direction: column; justify-content: space-between;
+    overflow-y: auto;
+  }
+  @media (min-width: 1300px) {
+    .keypad-panel { width: 376px; padding: 30px 28px; }
+  }
+
+  .kp-header { display: flex; align-items: center; gap: 14px; }
+  .kp-avatar {
+    width: 52px; height: 52px; border-radius: 26px; background: #e8f3ff; color: #1b64da;
+    font-size: 20px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: none;
+  }
+  .kp-avatar.working { background: #3182f6; color: #fff; }
+  .kp-title { font-size: 22px; font-weight: 800; margin: 0; }
+  .kp-sub { font-size: 14px; color: #6b7684; margin-top: 2px; }
+
+  .kp-meta {
+    margin-top: 16px; padding: 12px 14px; border-radius: 14px; background: #f2f4f6;
+    display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #4e5968;
+  }
+  .kp-meta strong { color: #191f28; font-weight: 800; }
+
+  .pin-dots {
+    margin: 26px 0; display: flex; justify-content: center; gap: 18px;
+  }
+  .pin-dot {
+    width: 16px; height: 16px; border-radius: 8px; background: #e5e8eb; transition: background 0.12s;
+  }
+  .pin-dot.filled { background: #3182f6; }
+
+  .keypad-grid {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
+  }
+  .key-btn {
+    height: 60px; border-radius: 16px; border: 0; background: #f2f4f6; color: #191f28;
+    font-size: 22px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    transition: background 0.1s;
+  }
+  .key-btn:hover { background: #e5e8eb; }
+  .key-btn:active { background: #d5dce3; }
+  .key-btn.sub { font-size: 14px; font-weight: 700; color: #6b7684; background: #f8f9fa; }
+
+  .kp-submit {
+    margin-top: 18px; width: 100%; height: 54px; border-radius: 16px; border: 0;
+    background: #3182f6; color: #fff; font-size: 16px; font-weight: 800;
+  }
+  .kp-submit:hover { background: #1b64da; }
+  .kp-submit.out { background: #191f28; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar" aria-label="주 메뉴">
+    <div class="brand">
+      <div class="brand-name">우리분식 본점</div>
+      <div class="brand-sub">사장 김사장</div>
+    </div>
+    <div class="brand-mini" aria-hidden="true">우리</div>
+    <div class="nav-list">
+      <a class="nav-item" href="L_Punch.html" aria-current="page">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>출퇴근</span>
+      </a>
+      <a class="nav-item" href="L_Pay.html">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg>
+        <span>근무·급여</span>
+      </a>
+      <a class="nav-item" href="L_Chk.html">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>위생 점검</span>
+      </a>
+      <a class="nav-item" href="L_Set.html">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        <span>설정</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="workspace">
+    <div class="left-pane">
+      <header class="top-bar">
+        <div class="clock-wrap">
+          <span class="clock-time num">09:41</span>
+          <div class="clock-date">
+            <span class="clock-day">2026년 11월 23일 월요일</span>
+            <span class="clock-store">우리분식 본점 · 출퇴근 기기</span>
+          </div>
+        </div>
+        <div class="top-actions">
+          <a class="action-btn qr" href="L_QR.html">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/></svg>
+            <span>계좌이체 QR</span>
+          </a>
+          <button type="button" class="action-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+            <span>English</span>
+          </button>
+          <button type="button" class="action-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            <span>관리자</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="notice-bar" role="status">
+        <div class="notice-left">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5h.01"/></svg>
+          <span>퇴근 확인 필요 · 이영희 11.20 자동 퇴근</span>
+          <span class="notice-sep">|</span>
+          <span>김철수 보건증 만료 5일 전</span>
+        </div>
+        <a class="notice-link" href="L_Pay.html">퇴근 시각 입력</a>
+      </div>
+
+      <main class="staff-area">
+        <div class="staff-head">
+          <span class="staff-title">이름을 누르고 오른쪽에서 비밀번호를 입력하세요</span>
+          <span class="staff-count num">근무 중 1명 · 전체 5명</span>
+        </div>
+
+        <div class="staff-grid" id="staffGrid">
+          <button type="button" class="person-btn working" data-name="홍길동" data-init="홍" data-action="퇴근" data-sub="09:00 출근 · 근무 중" data-working="true">
+            <span class="avatar">홍</span>
+            <span class="person-name">홍길동</span>
+            <span class="person-status num">근무 중 · 09:00</span>
+          </button>
+
+          <button type="button" class="person-btn selected" data-name="김철수" data-init="김" data-action="출근" data-sub="출근 전 · 보건증 만료 5일 전" data-working="false">
+            <span class="avatar">김</span>
+            <span class="person-name">김철수</span>
+            <span class="person-status">출근 전</span>
+            <span class="person-badge">보건증 5일 전</span>
+          </button>
+
+          <button type="button" class="person-btn" data-name="이영희" data-init="이" data-action="출근" data-sub="08:02 퇴근 · 새벽 근무" data-working="false">
+            <span class="avatar">이</span>
+            <span class="person-name">이영희</span>
+            <span class="person-status num">퇴근 · 08:02</span>
+            <span class="person-badge check">11.20 확인</span>
+          </button>
+
+          <button type="button" class="person-btn" data-name="박민수" data-init="박" data-action="출근" data-sub="오늘 휴무" data-working="false">
+            <span class="avatar">박</span>
+            <span class="person-name">박민수</span>
+            <span class="person-status">휴무</span>
+          </button>
+
+          <button type="button" class="person-btn" data-name="최지은" data-init="최" data-action="출근" data-sub="출근 전" data-working="false">
+            <span class="avatar">최</span>
+            <span class="person-name">최지은</span>
+            <span class="person-status">출근 전</span>
+          </button>
+        </div>
+
+        <div class="bottom-bar">
+          <div class="device-hint">
+            <span>알림음 켜짐</span>
+            <span>·</span>
+            <span>화면 보호기 5분 후</span>
+            <span>·</span>
+            <span class="num">자동 퇴근 23:00</span>
+          </div>
+          <button type="button" class="all-out-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+            <span>모두 퇴근 (1명)</span>
+          </button>
+        </div>
+      </main>
+    </div>
+
+    <aside class="keypad-panel" aria-label="출퇴근 비밀번호 입력">
+      <div>
+        <div class="kp-header">
+          <div class="kp-avatar" id="kpAvatar">김</div>
+          <div>
+            <h1 class="kp-title" id="kpTitle">김철수 출근</h1>
+            <div class="kp-sub" id="kpSub">출퇴근 비밀번호 4자리</div>
+          </div>
+        </div>
+
+        <div class="kp-meta">
+          <span id="kpStatusText">출근 전 · 보건증 만료 5일 전</span>
+          <strong class="num" id="kpTimeText">기록 09:41</strong>
+        </div>
+
+        <div class="pin-dots" id="pinDots" aria-label="입력된 비밀번호 자리">
+          <span class="pin-dot filled"></span>
+          <span class="pin-dot filled"></span>
+          <span class="pin-dot"></span>
+          <span class="pin-dot"></span>
+        </div>
+      </div>
+
+      <div>
+        <div class="keypad-grid" id="keypad">
+          <button type="button" class="key-btn num" data-key="1">1</button>
+          <button type="button" class="key-btn num" data-key="2">2</button>
+          <button type="button" class="key-btn num" data-key="3">3</button>
+          <button type="button" class="key-btn num" data-key="4">4</button>
+          <button type="button" class="key-btn num" data-key="5">5</button>
+          <button type="button" class="key-btn num" data-key="6">6</button>
+          <button type="button" class="key-btn num" data-key="7">7</button>
+          <button type="button" class="key-btn num" data-key="8">8</button>
+          <button type="button" class="key-btn num" data-key="9">9</button>
+          <button type="button" class="key-btn sub" data-key="clear">초기화</button>
+          <button type="button" class="key-btn num" data-key="0">0</button>
+          <button type="button" class="key-btn num" data-key="back" aria-label="지우기">←</button>
+        </div>
+        <button type="button" class="kp-submit" id="kpSubmit">김철수 출근 찍기</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+  var pinLen = 2;
+  var dots = document.querySelectorAll('#pinDots .pin-dot');
+  function renderDots() {
+    dots.forEach(function (d, i) { d.classList.toggle('filled', i < pinLen); });
+  }
+  document.getElementById('keypad').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-key]');
+    if (!btn) return;
+    var k = btn.dataset.key;
+    if (k === 'clear') pinLen = 0;
+    else if (k === 'back') pinLen = Math.max(0, pinLen - 1);
+    else if (pinLen < 4) pinLen++;
+    renderDots();
+  });
+  document.getElementById('staffGrid').addEventListener('click', function (e) {
+    var btn = e.target.closest('.person-btn');
+    if (!btn) return;
+    document.querySelectorAll('.person-btn').forEach(function (b) { b.classList.remove('selected'); });
+    btn.classList.add('selected');
+    var name = btn.dataset.name;
+    var action = btn.dataset.action;
+    var working = btn.dataset.working === 'true';
+    document.getElementById('kpAvatar').textContent = btn.dataset.init;
+    document.getElementById('kpAvatar').classList.toggle('working', working);
+    document.getElementById('kpTitle').textContent = name + ' ' + action;
+    document.getElementById('kpStatusText').textContent = btn.dataset.sub;
+    var submit = document.getElementById('kpSubmit');
+    submit.textContent = name + ' ' + action + ' 찍기';
+    submit.classList.toggle('out', working);
+    pinLen = 0;
+    renderDots();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 J 넓은 화면 근무·급여</title>
+<!-- 디자인 시안(정적 목업). 실제 앱 코드가 아님. 예시 데이터만 들어 있음. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&amp;family=Inter:wght@500;600;700;800&amp;display=swap">
+<style>
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #f2f4f6;
+  color: #191f28;
+  font-family: 'Noto Sans KR', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+button { font: inherit; cursor: pointer; }
+.num {
+  font-family: Inter, 'Noto Sans KR', sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+.app-shell {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: #f2f4f6;
+}
+
+/* 왼쪽 세로 메뉴 */
+.side-nav {
+  flex: none;
+  width: 88px;
+  height: 100vh;
+  background: #ffffff;
+  border-right: 1px solid #e5e8eb;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 8px;
+  gap: 8px;
+}
+.side-brand { display: none; }
+.side-brand-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid #f2f4f6;
+  margin-bottom: 4px;
+}
+.brand-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #3182f6;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-links { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 4px;
+  border-radius: 14px;
+  text-decoration: none;
+  color: #8b95a1;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.15s, color 0.15s;
+}
+.nav-item:hover { background: #f2f4f6; color: #4e5968; }
+.nav-item[aria-current="page"] { background: #e8f3ff; color: #1b64da; }
+.side-footer {
+  padding-top: 10px;
+  border-top: 1px solid #f2f4f6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7684;
+}
+.sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #3182f6; flex: none; }
+.sync-label-full { display: none; }
+
+@media (min-width: 1300px) {
+  .side-nav { width: 220px; padding: 20px 14px; }
+  .side-brand-compact { display: none; }
+  .side-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px 16px;
+    border-bottom: 1px solid #f2f4f6;
+    margin-bottom: 6px;
+  }
+  .side-brand-text { display: flex; flex-direction: column; min-width: 0; }
+  .side-brand-name { font-size: 16px; font-weight: 800; color: #191f28; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .side-brand-sub { font-size: 12px; font-weight: 500; color: #8b95a1; margin-top: 2px; }
+  .nav-item { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; font-size: 15px; }
+  .side-footer { align-items: flex-start; padding: 12px 10px 4px; }
+  .sync-label-short { display: none; }
+  .sync-label-full { display: inline; }
+}
+
+/* 오른쪽 작업 영역 */
+.workspace {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 맨 위 알바생 이름 칩 + 월 이동 */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.staff-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.staff-chip {
+  height: 40px;
+  padding: 0 14px 0 6px;
+  border-radius: 20px;
+  border: 1.5px solid transparent;
+  background: #ffffff;
+  color: #4e5968;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.15s;
+}
+.staff-chip:hover { border-color: #d1d6db; color: #191f28; }
+.staff-chip.active {
+  background: #191f28;
+  color: #ffffff;
+}
+.chip-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f2f4f6;
+  color: #4e5968;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.staff-chip.active .chip-avatar { background: #3182f6; color: #ffffff; }
+.chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.chip-dot.blue { background: #3182f6; }
+.chip-dot.red { background: #f04452; }
+.chip-dot.amber { background: #b25e00; }
+.add-staff-btn {
+  height: 40px;
+  padding: 0 13px;
+  border-radius: 20px;
+  border: 1px dashed #b0b8c1;
+  background: transparent;
+  color: #4e5968;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.add-staff-btn:hover { background: #ffffff; color: #191f28; border-style: solid; }
+
+.top-right-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.month-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 4px 6px;
+}
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: #4e5968;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-btn:hover { background: #f2f4f6; color: #191f28; }
+.month-label {
+  font-size: 16px;
+  font-weight: 800;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.today-pill {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 0;
+  background: #f2f4f6;
+  color: #4e5968;
+  font-size: 12px;
+  font-weight: 700;
+}
+.today-pill:hover { background: #e5e8eb; color: #191f28; }
+.bell-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 0;
+  background: #ffffff;
+  color: #4e5968;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bell-btn:hover { background: #e5e8eb; color: #191f28; }
+.bell-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #f04452;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 알림 노랑 띠 (퇴근 확인 필요 + 보건증 경고) */
+.alert-strip {
+  background: #fff4e5;
+  color: #b25e00;
+  border-radius: 14px;
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  flex-wrap: wrap;
+}
+.alert-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.alert-sep { opacity: 0.4; }
+.alert-action {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 0;
+  background: #ffffff;
+  color: #b25e00;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* 메인 2단: 가운데 주차 탭+달력 / 오른쪽 320px 패널 */
+.pay-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* 왼쪽: 주차 탭 + 달력 */
+.calendar-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.week-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.week-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.week-tab {
+  min-width: 72px;
+  height: 52px;
+  padding: 0 14px;
+  border-radius: 16px;
+  border: 0;
+  background: #ffffff;
+  color: #191f28;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: background 0.15s, color 0.15s;
+}
+.week-tab:hover { background: #e8f3ff; }
+.week-tab.active { background: #3182f6; color: #ffffff; }
+.week-tab-name { font-size: 11px; font-weight: 700; opacity: 0.78; }
+.week-tab-val { font-size: 15px; font-weight: 800; }
+
+.cal-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tool-chip {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e8eb;
+  background: #ffffff;
+  color: #4e5968;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tool-chip:hover { background: #f9fafb; color: #191f28; }
+
+.calendar-card {
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 16px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  padding-bottom: 8px;
+}
+.cal-weekdays span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #8b95a1;
+  padding-left: 8px;
+}
+.cal-weekdays span.sun { color: #f04452; }
+
+.cal-week-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cal-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-radius: 14px;
+  transition: background 0.15s;
+}
+.cal-week.highlight {
+  background: #e8f3ff;
+}
+.cal-cell {
+  min-height: 90px;
+  padding: 7px 8px 6px;
+  border-top: 1px solid #f2f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.cal-week.highlight .cal-cell {
+  border-top-color: transparent;
+}
+.cal-day {
+  font-size: 13px;
+  font-weight: 800;
+  color: #191f28;
+  line-height: 1.2;
+}
+.cal-day.sun { color: #f04452; font-weight: 600; }
+.cal-day.sat { color: #8b95a1; font-weight: 600; }
+.cal-day.future { color: #b0b8c1; font-weight: 600; }
+.cal-day.today {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #191f28;
+  color: #ffffff;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.punch-in {
+  font-size: 12px;
+  font-weight: 700;
+  color: #191f28;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.punch-in.live { color: #1b64da; }
+.punch-out {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7684;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.punch-out.live { color: #1b64da; font-weight: 700; }
+.meal-badge {
+  align-self: flex-start;
+  margin-top: 2px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: #3182f6;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+}
+.meal-badge.none {
+  background: transparent;
+  border: 1px solid #d1d6db;
+  color: #8b95a1;
+}
+
+/* 시안 J 특유의 강조 주 아래 파란 요약 줄 */
+.inline-week-bar {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: #3182f6;
+  color: #ffffff;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+}
+.inline-week-bar.show { display: flex; }
+.inline-week-stats { display: flex; align-items: center; gap: 18px; }
+
+.cal-foot-hint {
+  padding: 10px 8px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #8b95a1;
+  font-weight: 500;
+  flex-wrap: wrap;
+}
+.legend-group { display: flex; align-items: center; gap: 10px; }
+
+/* 오른쪽 320px 패널 */
+.right-panel {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.panel-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.panel-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #191f28;
+}
+.panel-sub { font-size: 12px; font-weight: 600; color: #8b95a1; }
+.blue-pill {
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: #e8f3ff;
+  color: #1b64da;
+  font-size: 12px;
+  font-weight: 800;
+}
+.gray-pill {
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: #f2f4f6;
+  color: #6b7684;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* 선택 주 요약 2x2 */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.stat-box {
+  background: #f2f4f6;
+  border-radius: 14px;
+  padding: 11px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.stat-label { font-size: 12px; font-weight: 600; color: #6b7684; }
+.stat-val { font-size: 18px; font-weight: 800; color: #191f28; }
+.stat-val.blue { color: #1b64da; }
+.month-total-bar {
+  padding-top: 10px;
+  border-top: 1px solid #f2f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #6b7684;
+  font-weight: 600;
+}
+.month-total-bar strong { color: #191f28; font-weight: 800; }
+
+/* 줄 돈 (기본 숨김) */
+.pay-amount-box {
+  background: #f2f4f6;
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pay-amount {
+  font-size: 24px;
+  font-weight: 800;
+  color: #b0b8c1;
+  letter-spacing: 0.5px;
+}
+.pay-amount.revealed {
+  color: #191f28;
+  letter-spacing: -0.5px;
+}
+.toggle-pay-btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 0;
+  background: #ffffff;
+  color: #3182f6;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.toggle-pay-btn:hover { background: #e8f3ff; }
+
+.pay-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.pay-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #6b7684;
+}
+.pay-detail-row strong { color: #191f28; font-weight: 700; }
+.pay-detail-row strong.muted { color: #b0b8c1; }
+
+.pay-rule-strip {
+  padding-top: 10px;
+  border-top: 1px solid #f2f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b7684;
+  font-weight: 600;
+}
+.edit-link-btn {
+  border: 0;
+  background: transparent;
+  color: #3182f6;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 4px;
+}
+
+/* 명세서·내보내기 버튼 */
+.primary-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: 14px;
+  border: 0;
+  background: #3182f6;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.primary-btn:hover { background: #1b64da; }
+.export-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.export-btn {
+  height: 40px;
+  border-radius: 12px;
+  border: 0;
+  background: #f2f4f6;
+  color: #4e5968;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.export-btn:hover { background: #e5e8eb; color: #191f28; }
+.sub-full-btn {
+  width: 100%;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid #e5e8eb;
+  background: #ffffff;
+  color: #4e5968;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.sub-full-btn:hover { background: #f9fafb; color: #191f28; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="side-nav" aria-label="주 메뉴">
+    <div class="side-brand-compact" aria-label="우리분식 본점">
+      <div class="brand-mark">우</div>
+    </div>
+    <div class="side-brand">
+      <div class="brand-mark">우</div>
+      <div class="side-brand-text">
+        <span class="side-brand-name">우리분식 본점</span>
+        <span class="side-brand-sub">사장 김사장</span>
+      </div>
+    </div>
+    <nav class="nav-links" aria-label="화면 이동">
+      <a class="nav-item" href="J_Punch.html">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>출퇴근</span>
+      </a>
+      <a class="nav-item" href="J_Pay.html" aria-current="page">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg>
+        <span>근무·급여</span>
+      </a>
+      <a class="nav-item" href="J_Chk.html">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>위생 점검</span>
+      </a>
+      <a class="nav-item" href="J_Set.html">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        <span>설정</span>
+      </a>
+    </nav>
+    <div class="side-footer">
+      <span class="sync-pill">
+        <span class="sync-dot"></span>
+        <span class="sync-label-short">저장됨</span>
+        <span class="sync-label-full">구글 시트 자동 저장됨</span>
+      </span>
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <!-- 맨 위 알바생 이름 칩 + 월 이동 -->
+    <header class="top-bar">
+      <div class="staff-chips" role="tablist" aria-label="알바생 선택 (정산 명단 5명)">
+        <button type="button" class="staff-chip active" role="tab" aria-selected="true">
+          <span class="chip-avatar">홍</span>홍길동<span class="chip-dot blue" title="근무 중"></span>
+        </button>
+        <button type="button" class="staff-chip" role="tab" aria-selected="false">
+          <span class="chip-avatar">김</span>김철수<span class="chip-dot red" title="보건증 만료 5일 전"></span>
+        </button>
+        <button type="button" class="staff-chip" role="tab" aria-selected="false">
+          <span class="chip-avatar">이</span>이영희<span class="chip-dot amber" title="퇴근 확인 필요"></span>
+        </button>
+        <button type="button" class="staff-chip" role="tab" aria-selected="false">
+          <span class="chip-avatar">박</span>박민수
+        </button>
+        <button type="button" class="staff-chip" role="tab" aria-selected="false">
+          <span class="chip-avatar">최</span>최지은
+        </button>
+        <button type="button" class="add-staff-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          알바생 추가
+        </button>
+      </div>
+
+      <div class="top-right-controls">
+        <div class="month-nav">
+          <button type="button" class="icon-btn" aria-label="이전 달">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+          </button>
+          <span class="month-label num">2026년 11월</span>
+          <button type="button" class="icon-btn" aria-label="다음 달">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <button type="button" class="today-pill">이번 달</button>
+        </div>
+        <button type="button" class="bell-btn" aria-label="알림 2건: 퇴근 확인 필요, 보건증 만료 5일 전">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+          <span class="bell-badge num">2</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 퇴근 확인 필요 + 보건증 알림 띠 -->
+    <div class="alert-strip" role="status">
+      <div class="alert-left">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>
+        <span>퇴근 확인 필요 1건 · 이영희 <span class="num">11.20</span> 자동 퇴근</span>
+        <span class="alert-sep">|</span>
+        <span>김철수 보건증 만료 <span class="num">5</span>일 전</span>
+      </div>
+      <button type="button" class="alert-action">퇴근 시각 확인</button>
+    </div>
+
+    <div class="pay-layout">
+      <!-- 가운데: 주차 탭 + 달력 -->
+      <div class="calendar-col">
+        <div class="week-tabs-row">
+          <div class="week-tabs" id="weekTabs" role="tablist" aria-label="주차 선택">
+            <button type="button" class="week-tab" data-week="all" role="tab" aria-selected="false">
+              <span class="week-tab-name">전체</span>
+              <span class="week-tab-val num">120h</span>
+            </button>
+            <button type="button" class="week-tab" data-week="1" role="tab" aria-selected="false">
+              <span class="week-tab-name">1주차</span>
+              <span class="week-tab-val num">40h</span>
+            </button>
+            <button type="button" class="week-tab" data-week="2" role="tab" aria-selected="false">
+              <span class="week-tab-name">2주차</span>
+              <span class="week-tab-val num">40h</span>
+            </button>
+            <button type="button" class="week-tab active" data-week="3" role="tab" aria-selected="true">
+              <span class="week-tab-name">3주차</span>
+              <span class="week-tab-val num">40h</span>
+            </button>
+            <button type="button" class="week-tab" data-week="4" role="tab" aria-selected="false">
+              <span class="week-tab-name">4주차</span>
+              <span class="week-tab-val">진행</span>
+            </button>
+            <button type="button" class="week-tab" data-week="5" role="tab" aria-selected="false">
+              <span class="week-tab-name">5주차</span>
+              <span class="week-tab-val num">0h</span>
+            </button>
+          </div>
+          <div class="cal-tools">
+            <button type="button" class="tool-chip">여러 날 적용</button>
+            <button type="button" class="tool-chip" aria-label="명단 관리 및 초기화">⋯ 관리</button>
+          </div>
+        </div>
+
+        <main class="calendar-card" aria-label="홍길동 11월 출퇴근 달력">
+          <div class="cal-weekdays">
+            <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+          </div>
+
+          <!-- 1주차 -->
+          <div class="cal-week-wrap" data-week-group="1">
+            <div class="cal-week">
+              <div class="cal-cell"><span class="cal-day sun num">1</span></div>
+              <div class="cal-cell"><span class="cal-day num">2</span><span class="punch-in num">↑09:00</span><span class="punch-out num">↓18:02</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">3</span><span class="punch-in num">↑08:57</span><span class="punch-out num">↓18:00</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">4</span><span class="punch-in num">↑09:01</span><span class="punch-out num">↓18:05</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">5</span><span class="punch-in num">↑09:00</span><span class="punch-out num">↓18:00</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">6</span><span class="punch-in num">↑08:59</span><span class="punch-out num">↓18:03</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day sat num">7</span></div>
+            </div>
+            <div class="inline-week-bar num" data-bar="1">
+              <span>1주차 (11.01 ~ 11.07)</span>
+              <div class="inline-week-stats"><span>5일</span><span>40시간</span><span>식대 5회</span><span>주휴 O</span></div>
+            </div>
+          </div>
+
+          <!-- 2주차 -->
+          <div class="cal-week-wrap" data-week-group="2">
+            <div class="cal-week">
+              <div class="cal-cell"><span class="cal-day sun num">8</span></div>
+              <div class="cal-cell"><span class="cal-day num">9</span><span class="punch-in num">↑09:00</span><span class="punch-out num">↓18:00</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">10</span><span class="punch-in num">↑09:04</span><span class="punch-out num">↓18:01</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">11</span><span class="punch-in num">↑09:00</span><span class="punch-out num">↓18:00</span><span class="meal-badge none">–</span></div>
+              <div class="cal-cell"><span class="cal-day num">12</span><span class="punch-in num">↑08:58</span><span class="punch-out num">↓18:02</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">13</span><span class="punch-in num">↑09:00</span><span class="punch-out num">↓18:04</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day sat num">14</span></div>
+            </div>
+            <div class="inline-week-bar num" data-bar="2">
+              <span>2주차 (11.08 ~ 11.14)</span>
+              <div class="inline-week-stats"><span>5일</span><span>40시간</span><span>식대 4회</span><span>주휴 O</span></div>
+            </div>
+          </div>
+
+          <!-- 3주차 (기본 강조) -->
+          <div class="cal-week-wrap" data-week-group="3">
+            <div class="cal-week highlight">
+              <div class="cal-cell"><span class="cal-day sun num">15</span></div>
+              <div class="cal-cell"><span class="cal-day num">16</span><span class="punch-in num">↑09:00</span><span class="punch-out num">↓18:00</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">17</span><span class="punch-in num">↑08:56</span><span class="punch-out num">↓18:01</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">18</span><span class="punch-in num">↑09:02</span><span class="punch-out num">↓18:00</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">19</span><span class="punch-in num">↑09:00</span><span class="punch-out num">↓18:06</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day num">20</span><span class="punch-in num">↑09:02</span><span class="punch-out num">↓18:05</span><span class="meal-badge">식</span></div>
+              <div class="cal-cell"><span class="cal-day sat num">21</span></div>
+            </div>
+            <div class="inline-week-bar show num" data-bar="3">
+              <span>3주차 (11.15 ~ 11.21)</span>
+              <div class="inline-week-stats"><span>5일</span><span>40시간</span><span>식대 5회</span><span>주휴 O</span></div>
+            </div>
+          </div>
+
+          <!-- 4주차 -->
+          <div class="cal-week-wrap" data-week-group="4">
+            <div class="cal-week">
+              <div class="cal-cell"><span class="cal-day sun num">22</span></div>
+              <div class="cal-cell"><span class="cal-day today num">23</span><span class="punch-in live num">↑09:00</span><span class="punch-out live">근무 중</span></div>
+              <div class="cal-cell"><span class="cal-day future num">24</span></div>
+              <div class="cal-cell"><span class="cal-day future num">25</span></div>
+              <div class="cal-cell"><span class="cal-day future num">26</span></div>
+              <div class="cal-cell"><span class="cal-day future num">27</span></div>
+              <div class="cal-cell"><span class="cal-day future num">28</span></div>
+            </div>
+            <div class="inline-week-bar num" data-bar="4">
+              <span>4주차 (11.22 ~ 11.28)</span>
+              <div class="inline-week-stats"><span>1일 (진행 중)</span><span>근무 중</span><span>식대 0회</span><span>주휴 예정</span></div>
+            </div>
+          </div>
+
+          <!-- 5주차 -->
+          <div class="cal-week-wrap" data-week-group="5">
+            <div class="cal-week">
+              <div class="cal-cell"><span class="cal-day future num">29</span></div>
+              <div class="cal-cell"><span class="cal-day future num">30</span></div>
+              <div class="cal-cell"></div>
+              <div class="cal-cell"></div>
+              <div class="cal-cell"></div>
+              <div class="cal-cell"></div>
+              <div class="cal-cell"></div>
+            </div>
+            <div class="inline-week-bar num" data-bar="5">
+              <span>5주차 (11.29 ~ 11.30)</span>
+              <div class="inline-week-stats"><span>0일</span><span>0시간</span><span>식대 0회</span><span>주휴 –</span></div>
+            </div>
+          </div>
+
+          <div class="cal-foot-hint">
+            <span>날짜를 누르면 근무 시각·휴게·식사(프리셋 포함)를 수정할 수 있어요</span>
+            <div class="legend-group">
+              <span>↑ 출근</span>
+              <span>↓ 퇴근</span>
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="meal-badge" style="margin:0">식</span> 식대 지급</span>
+              <span style="display:inline-flex;align-items:center;gap:4px"><span class="meal-badge none" style="margin:0">–</span> 식대 없음</span>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <!-- 오른쪽 320px 패널 -->
+      <aside class="right-panel" aria-label="선택 주 요약 및 급여 정산">
+        <!-- 선택 주 요약 카드 -->
+        <section class="panel-card">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title" id="summaryTitle">3주차 요약</h2>
+              <div class="panel-sub num" id="summaryRange">2026.11.15 ~ 11.21</div>
+            </div>
+            <span class="blue-pill" id="summaryHolidayBadge">주휴 O</span>
+          </div>
+
+          <div class="stat-grid">
+            <div class="stat-box">
+              <span class="stat-label">근무일 수</span>
+              <span class="stat-val num" id="sumDays">5일</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">근무 시간</span>
+              <span class="stat-val num" id="sumHours">40h</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">식대 횟수</span>
+              <span class="stat-val num" id="sumMeals">5회</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-label">주휴 여부</span>
+              <span class="stat-val blue" id="sumHoliday">충족 (O)</span>
+            </div>
+          </div>
+
+          <div class="month-total-bar">
+            <span>11월 누적 (총 5주차)</span>
+            <strong class="num">16일 · 120h · 식대 14회</strong>
+          </div>
+        </section>
+
+        <!-- 줄 돈 카드 (기본 숨김) -->
+        <section class="panel-card">
+          <div class="panel-head">
+            <h2 class="panel-title">11월 줄 돈</h2>
+            <span class="gray-pill num">3.3% 공제</span>
+          </div>
+
+          <div class="pay-amount-box">
+            <span class="pay-amount num" id="payAmount">●●●,●●●원</span>
+            <button type="button" class="toggle-pay-btn" id="togglePayBtn" aria-expanded="false">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+              <span id="togglePayText">보기</span>
+            </button>
+          </div>
+
+          <div class="pay-detail-list">
+            <div class="pay-detail-row">
+              <span>기본급 (<span class="num">120h</span>)</span>
+              <strong class="num muted" data-real="1,238,400원">●●●,●●●원</strong>
+            </div>
+            <div class="pay-detail-row">
+              <span>주휴수당 (<span class="num">1~3주</span>)</span>
+              <strong class="num muted" data-real="247,680원">●●●,●●●원</strong>
+            </div>
+            <div class="pay-detail-row">
+              <span>식대 (<span class="num">14회</span>)</span>
+              <strong class="num muted" data-real="추가지급 포함">●●●,●●●원</strong>
+            </div>
+            <div class="pay-detail-row">
+              <span>공제 (<span class="num">3.3%</span>)</span>
+              <strong class="num muted" data-real="-49,040원">-●●,●●●원</strong>
+            </div>
+          </div>
+
+          <div class="pay-rule-strip">
+            <span class="num">시급 10,320원 · 주 5일 · 주휴 포함</span>
+            <button type="button" class="edit-link-btn">정산 설정</button>
+          </div>
+        </section>
+
+        <!-- 명세서·내보내기 카드 -->
+        <section class="panel-card">
+          <button type="button" class="primary-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/></svg>
+            급여명세서 보기
+          </button>
+          <div class="export-row">
+            <button type="button" class="export-btn">카톡 복사</button>
+            <button type="button" class="export-btn">PDF</button>
+            <button type="button" class="export-btn">엑셀</button>
+          </div>
+          <button type="button" class="sub-full-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></svg>
+            일괄 내보내기 · 알바생 본인용
+          </button>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var weekData = {
+    all: { title: '11월 전체 요약', range: '2026.11.01 ~ 11.30', days: '16일', hours: '120h', meals: '14회', holiday: '3주 충족', badge: '주휴 3주', blue: true },
+    '1': { title: '1주차 요약', range: '2026.11.01 ~ 11.07', days: '5일', hours: '40h', meals: '5회', holiday: '충족 (O)', badge: '주휴 O', blue: true },
+    '2': { title: '2주차 요약', range: '2026.11.08 ~ 11.14', days: '5일', hours: '40h', meals: '4회', holiday: '충족 (O)', badge: '주휴 O', blue: true },
+    '3': { title: '3주차 요약', range: '2026.11.15 ~ 11.21', days: '5일', hours: '40h', meals: '5회', holiday: '충족 (O)', badge: '주휴 O', blue: true },
+    '4': { title: '4주차 요약', range: '2026.11.22 ~ 11.28', days: '1일', hours: '진행 중', meals: '0회', holiday: '진행 중', badge: '진행 중', blue: false },
+    '5': { title: '5주차 요약', range: '2026.11.29 ~ 11.30', days: '0일', hours: '0h', meals: '0회', holiday: '예정', badge: '예정', blue: false }
+  };
+
+  document.getElementById('weekTabs').addEventListener('click', function (e) {
+    var tab = e.target.closest('.week-tab');
+    if (!tab) return;
+    var wk = tab.getAttribute('data-week');
+    document.querySelectorAll('.week-tab').forEach(function (t) {
+      var active = t === tab;
+      t.classList.toggle('active', active);
+      t.setAttribute('aria-selected', String(active));
+    });
+    document.querySelectorAll('.cal-week-wrap').forEach(function (wrap) {
+      var g = wrap.getAttribute('data-week-group');
+      var row = wrap.querySelector('.cal-week');
+      var bar = wrap.querySelector('.inline-week-bar');
+      var match = wk !== 'all' && g === wk;
+      row.classList.toggle('highlight', match);
+      bar.classList.toggle('show', match);
+    });
+    var d = weekData[wk];
+    document.getElementById('summaryTitle').textContent = d.title;
+    document.getElementById('summaryRange').textContent = d.range;
+    document.getElementById('sumDays').textContent = d.days;
+    document.getElementById('sumHours').textContent = d.hours;
+    document.getElementById('sumMeals').textContent = d.meals;
+    document.getElementById('sumHoliday').textContent = d.holiday;
+    var badge = document.getElementById('summaryHolidayBadge');
+    badge.textContent = d.badge;
+    badge.className = d.blue ? 'blue-pill' : 'gray-pill';
+  });
+
+  var shown = false;
+  var payBtn = document.getElementById('togglePayBtn');
+  var payAmount = document.getElementById('payAmount');
+  var payText = document.getElementById('togglePayText');
+  var details = document.querySelectorAll('.pay-detail-row strong[data-real]');
+  var maskedVals = ['●●●,●●●원', '●●●,●●●원', '●●●,●●●원', '-●●,●●●원'];
+
+  payBtn.addEventListener('click', function () {
+    shown = !shown;
+    payAmount.textContent = shown ? '1,437,040원' : '●●●,●●●원';
+    payAmount.classList.toggle('revealed', shown);
+    payText.textContent = shown ? '숨기기' : '보기';
+    payBtn.setAttribute('aria-expanded', String(shown));
+    details.forEach(function (el, idx) {
+      el.textContent = shown ? el.getAttribute('data-real') : maskedVals[idx];
+      el.classList.toggle('muted', !shown);
+    });
+  });
+})();
+</script>
+</body>
+</html>

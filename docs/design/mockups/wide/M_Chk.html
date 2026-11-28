@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 M 넓은 화면 위생 점검</title>
+<!-- 디자인 시안(정적 목업). 실제 앱 코드가 아님. 예시 데이터만 들어 있음. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&amp;family=Inter:wght@500;600;700;800&amp;display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #f2f4f6; font-family: 'Noto Sans KR', sans-serif; color: #191f28; }
+button, textarea, input { font: inherit; }
+button { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+.num { font-family: 'Inter', 'Noto Sans KR', sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.4px; }
+
+.app { width: 100%; height: 100vh; display: flex; overflow: hidden; }
+
+/* 왼쪽 세로 메뉴 */
+.sidebar {
+  width: 88px; flex: none; background: #fff; border-right: 1px solid #e5e8eb;
+  display: flex; flex-direction: column; padding: 18px 10px; gap: 16px;
+}
+.brand { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 4px 2px 10px; border-bottom: 1px solid #f2f4f6; }
+.brand-mark {
+  width: 38px; height: 38px; border-radius: 13px; background: #3182f6; color: #fff;
+  font-size: 16px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: none;
+}
+.brand-text { display: none; min-width: 0; }
+.brand-name { font-size: 15px; font-weight: 800; color: #191f28; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub { font-size: 11px; color: #8b95a1; margin-top: 1px; }
+.nav-list { display: flex; flex-direction: column; gap: 6px; }
+.nav-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  padding: 10px 4px; border-radius: 14px; color: #8b95a1; font-size: 11px; font-weight: 700;
+}
+.nav-item:hover { background: #f2f4f6; color: #4e5968; }
+.nav-item[aria-current="page"] { background: #e8f3ff; color: #1b64da; }
+.nav-item svg { flex: none; }
+.sidebar-foot { margin-top: auto; display: none; padding: 12px; border-radius: 14px; background: #f2f4f6; font-size: 12px; color: #6b7684; line-height: 1.5; }
+.sidebar-foot b { color: #191f28; display: block; margin-bottom: 2px; }
+
+@media (min-width: 1300px) {
+  .sidebar { width: 220px; padding: 20px 14px; }
+  .brand { justify-content: flex-start; padding: 4px 6px 14px; }
+  .brand-text { display: block; }
+  .nav-item { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; font-size: 14px; }
+  .sidebar-foot { display: block; }
+}
+
+.workspace { flex: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.topbar {
+  flex: none; padding: 16px 24px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.topbar-left { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.topbar-left h1 { margin: 0; font-size: 20px; font-weight: 800; }
+.topbar-meta { font-size: 13px; color: #6b7684; font-weight: 600; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.top-btn {
+  height: 36px; padding: 0 13px; border-radius: 11px; border: 0; background: #fff; color: #4e5968;
+  font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;
+}
+.top-btn:hover { background: #e5e8eb; color: #191f28; }
+.top-btn.primary { background: #3182f6; color: #fff; font-weight: 800; }
+.top-btn.primary:hover { background: #1b64da; }
+
+.content {
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  padding: 0 24px 20px;
+}
+
+/* 왼쪽(큰 진행 도넛 + 온도 + 8개 분류 타일 2열) / 오른쪽(선택한 분류 '개인위생' 항목 목록 + 메모) */
+.chk-layout {
+  display: grid; grid-template-columns: minmax(360px, 0.92fr) minmax(0, 1.18fr);
+  gap: 16px; align-items: start;
+}
+.left-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* 큰 진행 도넛 + 점검일/점검자/온도 카드 */
+.donut-card {
+  background: #fff; border-radius: 22px; padding: 18px 20px;
+  display: flex; align-items: center; gap: 20px;
+}
+.donut-wrap { position: relative; width: 134px; height: 134px; flex: none; }
+.donut-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.donut-big { font-size: 30px; font-weight: 800; line-height: 1; color: #191f28; }
+.donut-sub { font-size: 12px; color: #8b95a1; font-weight: 700; margin-top: 3px; }
+
+.meta-list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.meta-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 13px; padding: 6px 10px; border-radius: 10px; background: #f2f4f6;
+}
+.meta-row span { color: #6b7684; font-weight: 600; }
+.meta-row b { color: #191f28; font-weight: 800; }
+.temp-ok { font-size: 11px; font-weight: 700; color: #1b64da; margin-left: 4px; }
+.meta-row.danger { background: #ffebee; }
+.meta-row.danger span, .meta-row.danger b { color: #f04452; }
+
+/* 8개 분류 타일 2열 (시안 M 고유 특징) */
+.tile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cat-tile {
+  border: 2px solid transparent; background: #fff; border-radius: 16px; padding: 13px 14px;
+  text-align: left; color: #191f28; display: flex; flex-direction: column; gap: 8px;
+  transition: border-color .15s, background .15s;
+}
+.cat-tile:hover { border-color: #d1d6db; }
+.cat-tile.selected { border-color: #3182f6; background: #f8fbff; }
+.cat-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 13.5px; font-weight: 800; }
+.cat-ratio { font-size: 12px; font-weight: 800; flex: none; }
+.cat-ratio.done { color: #1b64da; }
+.cat-ratio.warn { color: #f04452; }
+.cat-ratio.idle { color: #8b95a1; }
+.bar-track { height: 6px; border-radius: 3px; background: #f2f4f6; overflow: hidden; }
+.bar-fill { display: block; height: 100%; border-radius: 3px; background: #3182f6; }
+.bar-fill.idle { background: #b0b8c1; }
+.bar-fill.warn { background: #f04452; }
+.cat-alert { font-size: 11px; font-weight: 700; color: #f04452; }
+
+/* 오른쪽: 선택한 분류 항목 목록 패널 */
+.right-panel { background: #fff; border-radius: 22px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.right-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid #e5e8eb; }
+.right-title-wrap { display: flex; align-items: center; gap: 10px; }
+.right-title-wrap h2 { margin: 0; font-size: 18px; font-weight: 800; }
+.right-badge { padding: 4px 10px; border-radius: 8px; background: #ffebee; color: #f04452; font-size: 12px; font-weight: 800; }
+.right-tools { display: flex; gap: 6px; }
+.tool-pill {
+  height: 30px; padding: 0 11px; border-radius: 9px; border: 0; background: #f2f4f6; color: #4e5968;
+  font-size: 12px; font-weight: 700;
+}
+.tool-pill:hover { background: #e5e8eb; color: #191f28; }
+
+.item-list { display: flex; flex-direction: column; gap: 10px; }
+.chk-item {
+  border: 1px solid #e5e8eb; border-radius: 16px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 10px; background: #fff;
+}
+.chk-item.is-fail { border-color: #ffd3d7; background: #fffafa; }
+.item-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.item-text-wrap { display: flex; gap: 10px; min-width: 0; flex: 1; }
+.item-no {
+  width: 24px; height: 24px; border-radius: 8px; background: #f2f4f6; color: #4e5968;
+  font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: none; margin-top: 1px;
+}
+.chk-item.is-fail .item-no { background: #ffebee; color: #f04452; }
+.item-text { font-size: 14px; font-weight: 600; line-height: 1.5; color: #191f28; }
+
+.seg-check { display: inline-flex; gap: 6px; flex: none; }
+.seg-btn {
+  height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid #e5e8eb; background: #fff; color: #6b7684;
+  font-size: 12.5px; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;
+}
+.seg-btn.ok.active { background: #3182f6; border-color: #3182f6; color: #fff; }
+.seg-btn.fail.active { background: #f04452; border-color: #f04452; color: #fff; }
+
+/* 4번 보건증 만료 경고 (3-6) */
+.health-warn {
+  background: #fff4e5; color: #b25e00; border-radius: 11px; padding: 10px 12px;
+  font-size: 12.5px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.health-warn-left { display: flex; align-items: center; gap: 8px; }
+.health-warn-tag { font-size: 11px; font-weight: 800; color: #f04452; background: #fff; padding: 3px 8px; border-radius: 6px; flex: none; }
+
+/* 특이사항 메모 + 하단 액션 */
+.memo-box { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.memo-label { font-size: 13px; font-weight: 800; color: #4e5968; display: flex; justify-content: space-between; }
+.memo-input {
+  width: 100%; height: 64px; resize: none; border-radius: 12px; border: 1px solid #e5e8eb;
+  background: #f9fafb; padding: 10px 12px; font-size: 13px; color: #191f28; line-height: 1.45;
+}
+.bottom-actions {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 6px; border-top: 1px solid #f2f4f6;
+}
+.bottom-left { display: flex; gap: 6px; }
+.save-btn {
+  height: 44px; padding: 0 22px; border-radius: 14px; border: 0; background: #3182f6; color: #fff;
+  font-size: 14px; font-weight: 800; display: inline-flex; align-items: center; gap: 7px;
+}
+.save-btn:hover { background: #1b64da; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" aria-label="주 메뉴">
+    <div class="brand">
+      <span class="brand-mark">우</span>
+      <div class="brand-text">
+        <div class="brand-name">우리분식 본점</div>
+        <div class="brand-sub">사장 김사장</div>
+      </div>
+    </div>
+    <nav class="nav-list" aria-label="메뉴">
+      <a class="nav-item" href="M_Punch.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>출퇴근</span>
+      </a>
+      <a class="nav-item" href="M_Pay.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg>
+        <span>근무·급여</span>
+      </a>
+      <a class="nav-item" href="M_Chk.html" aria-current="page">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>위생 점검</span>
+      </a>
+      <a class="nav-item" href="M_Set.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        <span>설정</span>
+      </a>
+    </nav>
+    <div class="sidebar-foot">
+      <b>오늘 점검 진행 중</b>
+      27/38 적합 · 점검 필요 1개
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1>위생 점검</h1>
+        <span class="topbar-meta num">우리분식 본점 · 2026.11.23 · 점검자 김사장</span>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="top-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/></svg>
+          <span class="num">지난 점검 보관함 (12일)</span>
+        </button>
+        <button type="button" class="top-btn">점검표 미리보기</button>
+        <button type="button" class="top-btn">PDF · 엑셀</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="chk-layout">
+        <!-- 왼쪽: 큰 진행 도넛 + 온도 + 8개 분류 타일(2열) -->
+        <div class="left-col">
+          <section class="donut-card" aria-label="점검 진행률 및 온도">
+            <div class="donut-wrap">
+              <svg width="134" height="134" viewBox="0 0 134 134" aria-hidden="true">
+                <circle cx="67" cy="67" r="55" fill="none" stroke="#f2f4f6" stroke-width="14"/>
+                <circle cx="67" cy="67" r="55" fill="none" stroke="#3182f6" stroke-width="14" stroke-linecap="round" stroke-dasharray="245.5 345.6" transform="rotate(-90 67 67)"/>
+              </svg>
+              <span class="donut-center num">
+                <span class="donut-big">27</span>
+                <span class="donut-sub">/ 38 적합</span>
+              </span>
+            </div>
+            <div class="meta-list">
+              <div class="meta-row"><span>점검일 · 점검자</span><b class="num">11.23 · 김사장</b></div>
+              <div class="meta-row"><span>냉장 온도 (0~5°C)</span><b class="num">3.0°C<span class="temp-ok">정상</span></b></div>
+              <div class="meta-row"><span>냉동 온도 (−18°C↓)</span><b class="num">−20.0°C<span class="temp-ok">정상</span></b></div>
+              <div class="meta-row danger"><span>점검 필요</span><b class="num">1개</b></div>
+            </div>
+          </section>
+
+          <section class="tile-grid" aria-label="위생 점검 분류 8개">
+            <button type="button" class="cat-tile">
+              <span class="cat-head"><span>식재료·조리 기본</span><span class="cat-ratio done num">3/3</span></span>
+              <span class="bar-track"><span class="bar-fill" style="width: 100%"></span></span>
+            </button>
+
+            <button type="button" class="cat-tile selected" aria-current="true">
+              <span class="cat-head"><span>개인위생</span><span class="cat-ratio warn num">3/5</span></span>
+              <span class="bar-track"><span class="bar-fill warn" style="width: 60%"></span></span>
+              <span class="cat-alert">필요 1 · 보건증 경고</span>
+            </button>
+
+            <button type="button" class="cat-tile">
+              <span class="cat-head"><span>이물 관리</span><span class="cat-ratio done num">2/2</span></span>
+              <span class="bar-track"><span class="bar-fill" style="width: 100%"></span></span>
+            </button>
+
+            <button type="button" class="cat-tile">
+              <span class="cat-head"><span>원재료 보관·관리</span><span class="cat-ratio done num">8/8</span></span>
+              <span class="bar-track"><span class="bar-fill" style="width: 100%"></span></span>
+            </button>
+
+            <button type="button" class="cat-tile">
+              <span class="cat-head"><span>온도 관리</span><span class="cat-ratio done num">3/3</span></span>
+              <span class="bar-track"><span class="bar-fill" style="width: 100%"></span></span>
+            </button>
+
+            <button type="button" class="cat-tile">
+              <span class="cat-head"><span>소도구·화학제품</span><span class="cat-ratio done num">2/2</span></span>
+              <span class="bar-track"><span class="bar-fill" style="width: 100%"></span></span>
+            </button>
+
+            <button type="button" class="cat-tile">
+              <span class="cat-head"><span>주방 청결</span><span class="cat-ratio idle num">6/10</span></span>
+              <span class="bar-track"><span class="bar-fill idle" style="width: 60%"></span></span>
+            </button>
+
+            <button type="button" class="cat-tile">
+              <span class="cat-head"><span>매장·외부·방충</span><span class="cat-ratio idle num">0/5</span></span>
+              <span class="bar-track"><span class="bar-fill idle" style="width: 0%"></span></span>
+            </button>
+          </section>
+        </div>
+
+        <!-- 오른쪽: 선택한 분류(개인위생)의 항목 목록 -->
+        <section class="right-panel" aria-label="개인위생 점검 항목">
+          <div class="right-head">
+            <div class="right-title-wrap">
+              <h2>개인위생</h2>
+              <span class="right-badge num">3/5 적합 · 점검 필요 1</span>
+            </div>
+            <div class="right-tools">
+              <button type="button" class="tool-pill">전체 적합</button>
+              <button type="button" class="tool-pill">전체 해제</button>
+            </div>
+          </div>
+
+          <div class="item-list">
+            <!-- 4번: 보건증 (점검 필요 + 만료 경고) -->
+            <div class="chk-item is-fail">
+              <div class="item-top">
+                <div class="item-text-wrap">
+                  <span class="item-no num">4</span>
+                  <span class="item-text">모든 근무자의 건강진단결과서가 발급되어 있으며, 만료일이 경과되지 않았는가?</span>
+                </div>
+                <div class="seg-check" role="group" aria-label="4번 판정">
+                  <button type="button" class="seg-btn ok">적합</button>
+                  <button type="button" class="seg-btn fail active">점검 필요</button>
+                </div>
+              </div>
+              <div class="health-warn">
+                <div class="health-warn-left">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                  <span>보건증 경고 · 김철수 만료 5일 전 (2026.11.28 만료 예정)</span>
+                </div>
+                <span class="health-warn-tag">자동 체크 안 됨</span>
+              </div>
+            </div>
+
+            <!-- 5번: 적합 -->
+            <div class="chk-item">
+              <div class="item-top">
+                <div class="item-text-wrap">
+                  <span class="item-no num">5</span>
+                  <span class="item-text">모자, 머리망, 마스크를 올바르게 착용하고 있는가?</span>
+                </div>
+                <div class="seg-check" role="group" aria-label="5번 판정">
+                  <button type="button" class="seg-btn ok active">적합</button>
+                  <button type="button" class="seg-btn fail">점검 필요</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 6번: 적합 -->
+            <div class="chk-item">
+              <div class="item-top">
+                <div class="item-text-wrap">
+                  <span class="item-no num">6</span>
+                  <span class="item-text">손에 의한 오염이 없도록 관리하며, 손에 상처가 있는 근무자는 올바른 처치 후 근무하고 있는가?</span>
+                </div>
+                <div class="seg-check" role="group" aria-label="6번 판정">
+                  <button type="button" class="seg-btn ok active">적합</button>
+                  <button type="button" class="seg-btn fail">점검 필요</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 7번: 적합 -->
+            <div class="chk-item">
+              <div class="item-top">
+                <div class="item-text-wrap">
+                  <span class="item-no num">7</span>
+                  <span class="item-text">모든 싱크에 손 세척에 필요한 용품이 비치되어 있으며, 손 소독제는 사용기한 내의 제품을 구비하여 올바르게 사용하고 있는가?</span>
+                </div>
+                <div class="seg-check" role="group" aria-label="7번 판정">
+                  <button type="button" class="seg-btn ok active">적합</button>
+                  <button type="button" class="seg-btn fail">점검 필요</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 8번: 미체크 -->
+            <div class="chk-item">
+              <div class="item-top">
+                <div class="item-text-wrap">
+                  <span class="item-no num">8</span>
+                  <span class="item-text">유니폼 가이드를 올바르게 준수하고 있는가?</span>
+                </div>
+                <div class="seg-check" role="group" aria-label="8번 판정">
+                  <button type="button" class="seg-btn ok">적합</button>
+                  <button type="button" class="seg-btn fail">점검 필요</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="memo-box">
+            <label class="memo-label" for="chkMemo">
+              <span>특이사항 메모</span>
+              <span style="font-size: 11px; color: #8b95a1; font-weight: 500;">보관함·PDF 출력에 함께 기록됩니다</span>
+            </label>
+            <textarea id="chkMemo" class="memo-input">김철수 보건증 이번 주 수요일(11.25) 재검진 예약 완료.</textarea>
+          </div>
+
+          <div class="bottom-actions">
+            <div class="bottom-left">
+              <button type="button" class="tool-pill">남은 항목 전체 적합</button>
+              <button type="button" class="tool-pill">보관함 엑셀 받기</button>
+            </div>
+            <button type="button" class="save-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/></svg>
+              보관함에 저장
+            </button>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+(function () {
+  document.querySelectorAll('.seg-check').forEach(function (group) {
+    var btns = group.querySelectorAll('.seg-btn');
+    var card = group.closest('.chk-item');
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        btns.forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        card.classList.toggle('is-fail', btn.classList.contains('fail'));
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

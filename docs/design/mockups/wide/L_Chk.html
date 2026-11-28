@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 L 넓은 화면 위생 점검</title>
+<!-- 디자인 시안(정적 목업). 실제 앱 코드가 아님. 예시 데이터만 들어 있음. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&amp;family=Inter:wght@500;600;700;800&amp;display=swap">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; background: #f2f4f6; color: #191f28; font-family: 'Noto Sans KR', sans-serif; overflow: hidden; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; cursor: pointer; }
+  .num { font-family: Inter, 'Noto Sans KR', sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+
+  .app { width: 100%; height: 100vh; display: flex; overflow: hidden; }
+
+  /* 왼쪽 세로 메뉴 */
+  .sidebar {
+    width: 88px; flex: none; background: #fff; border-right: 1px solid #e5e8eb;
+    display: flex; flex-direction: column; padding: 16px 8px; gap: 6px;
+  }
+  .brand { display: none; padding: 6px 12px 18px; border-bottom: 1px solid #f2f4f6; margin-bottom: 8px; }
+  .brand-name { font-size: 17px; font-weight: 800; color: #191f28; }
+  .brand-sub { font-size: 12px; color: #8b95a1; margin-top: 2px; }
+  .brand-mini {
+    width: 44px; height: 44px; margin: 0 auto 12px; border-radius: 14px;
+    background: #191f28; color: #fff; font-size: 14px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nav-list { display: flex; flex-direction: column; gap: 4px; }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 5px; padding: 12px 4px; border-radius: 14px;
+    color: #8b95a1; font-size: 12px; font-weight: 700; transition: background 0.15s;
+  }
+  .nav-item:hover { background: #f2f4f6; color: #4e5968; }
+  .nav-item[aria-current="page"] { background: #f2f4f6; color: #191f28; font-weight: 800; }
+
+  @media (min-width: 1300px) {
+    .sidebar { width: 220px; padding: 20px 14px; }
+    .brand { display: block; }
+    .brand-mini { display: none; }
+    .nav-item { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; font-size: 15px; }
+  }
+
+  /* 오른쪽 본문 */
+  .main-wrap {
+    flex: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  .header-area {
+    flex: none; padding: 16px 24px 12px; display: flex; flex-direction: column; gap: 10px;
+    background: #f2f4f6;
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .title-wrap { display: flex; align-items: baseline; gap: 10px; }
+  .page-title { margin: 0; font-size: 22px; font-weight: 800; }
+  .page-sub { font-size: 13px; color: #6b7684; font-weight: 600; }
+
+  .header-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+  .h-btn {
+    height: 36px; padding: 0 13px; border-radius: 10px; border: 0;
+    background: #fff; color: #4e5968; font-size: 13px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .h-btn:hover { background: #e8f3ff; color: #1b64da; }
+
+  /* 종이 점검표 머리말 정보 바 */
+  .meta-bar {
+    background: #fff; border-radius: 16px; padding: 11px 0;
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); text-align: center;
+  }
+  .meta-cell { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
+  .meta-cell + .meta-cell { border-left: 1px solid #f2f4f6; }
+  .meta-k { font-size: 11px; font-weight: 700; color: #8b95a1; }
+  .meta-v { font-size: 15px; font-weight: 800; color: #191f28; }
+  .meta-v.blue { color: #1b64da; }
+  .meta-v.red { color: #f04452; }
+
+  /* 스크롤 본문: 종이 점검표 2단 나란히 + 아래 메모와 저장 */
+  .scroll-body {
+    flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+    padding: 0 24px 24px;
+  }
+
+  .two-col {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start;
+  }
+  .col-stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+  /* 종이 점검표 표 (시안 L 개성: 번호 | 항목 | 적합 | 필요 두 열 라디오) */
+  .paper-table {
+    background: #fff; border-radius: 16px; overflow: hidden; border: 1px solid #e5e8eb;
+  }
+  .tbl-head {
+    display: grid; grid-template-columns: 28px 1fr 48px 48px; align-items: center; gap: 6px;
+    height: 40px; padding: 0 12px; background: #f2f4f6;
+    font-size: 13px; font-weight: 800; color: #191f28;
+  }
+  .tbl-cat-cnt { color: #8b95a1; font-weight: 700; margin-left: 4px; }
+  .tbl-col-ok { text-align: center; color: #1b64da; font-size: 12px; }
+  .tbl-col-no { text-align: center; color: #f04452; font-size: 12px; }
+
+  .tbl-row {
+    display: grid; grid-template-columns: 28px 1fr 48px 48px; align-items: center; gap: 6px;
+    padding: 10px 12px; border-top: 1px solid #f2f4f6;
+  }
+  .tbl-row.warn-row { background: #fffbf5; }
+  .tbl-row.fail-row { background: #fff7f8; }
+  .item-no { font-size: 12px; font-weight: 800; color: #8b95a1; }
+  .item-text { font-size: 13.5px; line-height: 1.45; color: #191f28; }
+  .item-std { display: block; margin-top: 2px; font-size: 11.5px; color: #8b95a1; }
+  .item-warn {
+    display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 6px;
+    background: #fff4e5; color: #b25e00; font-size: 11.5px; font-weight: 800;
+  }
+
+  .radio-cell { display: flex; justify-content: center; }
+  .radio-btn {
+    width: 30px; height: 30px; border: 0; background: transparent;
+    display: flex; align-items: center; justify-content: center; padding: 0; border-radius: 15px;
+  }
+  .radio-ring {
+    width: 22px; height: 22px; border-radius: 11px; border: 2px solid #d5dce3;
+    display: block; transition: border 0.12s;
+  }
+  .radio-btn.ok[aria-checked="true"] .radio-ring { border: 7px solid #3182f6; }
+  .radio-btn.no[aria-checked="true"] .radio-ring { border: 7px solid #f04452; }
+
+  /* 아래 메모와 저장 영역 */
+  .memo-save-card {
+    margin-top: 16px; background: #fff; border-radius: 18px; border: 1px solid #e5e8eb;
+    padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .memo-head { display: flex; align-items: center; justify-content: space-between; }
+  .memo-title { font-size: 15px; font-weight: 800; color: #191f28; }
+  .memo-hint { font-size: 12px; color: #8b95a1; }
+  .memo-input {
+    width: 100%; min-height: 76px; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid #e5e8eb; background: #f8f9fa; color: #191f28;
+    font: inherit; font-size: 14px; line-height: 1.5; resize: vertical;
+  }
+  .memo-input:focus { outline: 2px solid #3182f6; background: #fff; }
+
+  .save-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .save-left { display: flex; align-items: center; gap: 8px; }
+  .sec-btn {
+    height: 46px; padding: 0 16px; border-radius: 12px; border: 1px solid #e5e8eb;
+    background: #fff; color: #4e5968; font-size: 14px; font-weight: 800;
+  }
+  .sec-btn:hover { background: #f2f4f6; }
+  .save-btn {
+    height: 46px; padding: 0 28px; border-radius: 12px; border: 0;
+    background: #3182f6; color: #fff; font-size: 15px; font-weight: 800;
+  }
+  .save-btn:hover { background: #1b64da; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar" aria-label="주 메뉴">
+    <div class="brand">
+      <div class="brand-name">우리분식 본점</div>
+      <div class="brand-sub">사장 김사장</div>
+    </div>
+    <div class="brand-mini" aria-hidden="true">우리</div>
+    <div class="nav-list">
+      <a class="nav-item" href="L_Punch.html">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>출퇴근</span>
+      </a>
+      <a class="nav-item" href="L_Pay.html">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg>
+        <span>근무·급여</span>
+      </a>
+      <a class="nav-item" href="L_Chk.html" aria-current="page">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>위생 점검</span>
+      </a>
+      <a class="nav-item" href="L_Set.html">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        <span>설정</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="main-wrap">
+    <header class="header-area">
+      <div class="header-top">
+        <div class="title-wrap">
+          <h1 class="page-title">매장 위생 점검표</h1>
+          <span class="page-sub">우리분식 본점 · 8개 분류 38개 항목</span>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="h-btn">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/></svg>
+            <span>점검 보관함 (12일)</span>
+          </button>
+          <button type="button" class="h-btn">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>
+            <span>미리보기 · PDF</span>
+          </button>
+          <button type="button" class="h-btn">엑셀</button>
+        </div>
+      </div>
+
+      <section class="meta-bar num" aria-label="점검 기본 정보 및 온도">
+        <div class="meta-cell"><span class="meta-k">점검일</span><span class="meta-v">2026.11.23 (월)</span></div>
+        <div class="meta-cell"><span class="meta-k">점검자</span><span class="meta-v">김사장</span></div>
+        <div class="meta-cell"><span class="meta-k">냉장 (0~5°C)</span><span class="meta-v blue">3.0°C</span></div>
+        <div class="meta-cell"><span class="meta-k">냉동 (−18°C 이하)</span><span class="meta-v blue">−20.0°C</span></div>
+        <div class="meta-cell"><span class="meta-k">진행</span><span class="meta-v" id="metaProg">27 / 38</span></div>
+        <div class="meta-cell"><span class="meta-k">점검 필요</span><span class="meta-v red" id="metaFail">1개</span></div>
+      </section>
+    </header>
+
+    <main class="scroll-body">
+      <div class="two-col" id="chkTables">
+        <!-- 왼쪽 단: 1~4 분류 (18항목) -->
+        <div class="col-stack">
+          <!-- 1. 식재료·조리 기본 3/3 -->
+          <section class="paper-table" data-group="basic">
+            <div class="tbl-head"><span></span><span>식재료·조리 기본 <span class="tbl-cat-cnt num">3/3</span></span><span class="tbl-col-ok">적합</span><span class="tbl-col-no">필요</span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">1</span><span class="item-text">소비기한이 경과된 원재료를 보관·사용·판매하지 않는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="1번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="1번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">2</span><span class="item-text">오일 산가는 3.0 이하로 관리하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="2번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="2번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">3</span><span class="item-text">조리 매뉴얼을 지키고 내부까지 완전히 조리되었는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="3번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="3번 점검 필요"><span class="radio-ring"></span></button></span></div>
+          </section>
+
+          <!-- 2. 개인위생 3/5 -->
+          <section class="paper-table" data-group="person">
+            <div class="tbl-head"><span></span><span>개인위생 <span class="tbl-cat-cnt num">3/5</span></span><span class="tbl-col-ok">적합</span><span class="tbl-col-no">필요</span></div>
+            <div class="tbl-row warn-row" data-state="ok"><span class="item-no num">4</span><span class="item-text">모든 근무자의 건강진단결과서가 발급되어 있으며, 만료일이 경과되지 않았는가?<br><span class="item-warn">김철수 보건증 만료 5일 전</span></span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="4번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="4번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">5</span><span class="item-text">모자, 머리망, 마스크를 올바르게 착용하고 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="5번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="5번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">6</span><span class="item-text">손 오염이 없도록 관리하며, 손 상처가 있으면 처치 후 근무하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="6번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="6번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row fail-row" data-state="no"><span class="item-no num">7</span><span class="item-text">모든 싱크에 손 세척 용품과 사용기한 내 손 소독제가 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="7번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="true" aria-label="7번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state=""><span class="item-no num">8</span><span class="item-text">유니폼 가이드를 올바르게 준수하고 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="8번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="8번 점검 필요"><span class="radio-ring"></span></button></span></div>
+          </section>
+
+          <!-- 3. 이물 관리 2/2 -->
+          <section class="paper-table" data-group="foreign">
+            <div class="tbl-head"><span></span><span>이물 관리 <span class="tbl-cat-cnt num">2/2</span></span><span class="tbl-col-ok">적합</span><span class="tbl-col-no">필요</span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">9</span><span class="item-text">중대 이물이 혼입되지 않도록 관리하고 있는가?<span class="item-std">철수세미 보관·사용 / 금속·유리·칼날 파손 / 중대해충</span></span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="9번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="9번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">10</span><span class="item-text">기타 이물이 혼입되지 않도록 관리하고 있는가?<span class="item-std">종이, 플라스틱, 비닐, 알루미늄 호일 등</span></span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="10번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="10번 점검 필요"><span class="radio-ring"></span></button></span></div>
+          </section>
+
+          <!-- 4. 원재료 보관·관리 8/8 -->
+          <section class="paper-table" data-group="material">
+            <div class="tbl-head"><span></span><span>원재료 보관·관리 <span class="tbl-cat-cnt num">8/8</span></span><span class="tbl-col-ok">적합</span><span class="tbl-col-no">필요</span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">11</span><span class="item-text">원산지 게시물에 기재된 원산지와 동일한 원재료를 사용·보관하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="11번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="11번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">12</span><span class="item-text">야채 세척·소독 방법을 정확히 알고 실행하며, 올바른 소독제를 사용하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="12번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="12번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">13</span><span class="item-text">식품표시사항에 기재된 보관 방법(온도)에 따라 원재료를 보관하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="13번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="13번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">14</span><span class="item-text">해동하여 사용하는 원재료는 올바른 기준에 따라 해동 관리하는가?<span class="item-std">해동: 냉장 24시간, 사용기한: 48h (기본)</span></span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="14번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="14번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">15</span><span class="item-text">모든 원재료는 식품표시사항이 훼손되거나 누락되지 않게 관리하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="15번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="15번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">16</span><span class="item-text">원재료 및 제조 관련 부자재는 오염되지 않도록 안전하게 보관하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="16번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="16번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">17</span><span class="item-text">근무자용 식품 또는 물품을 판매용 원·부재료와 분리·구분하여 보관하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="17번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="17번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">18</span><span class="item-text">전처리가 완료된 원재료에 사용기한 스티커를 부착하고 기한을 준수하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="18번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="18번 점검 필요"><span class="radio-ring"></span></button></span></div>
+          </section>
+        </div>
+
+        <!-- 오른쪽 단: 5~8 분류 (20항목) -->
+        <div class="col-stack">
+          <!-- 5. 온도 관리 3/3 -->
+          <section class="paper-table" data-group="temp">
+            <div class="tbl-head"><span></span><span>온도 관리 <span class="tbl-cat-cnt num">3/3</span></span><span class="tbl-col-ok">적합</span><span class="tbl-col-no">필요</span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">19</span><span class="item-text">조리 완료 및 조리 후 보관 중인 제품의 품온은 기준에 적합한가?<span class="item-std">조리 완료 즉시 75°C 이상 / 보관 시 60°C 이상</span></span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="19번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="19번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">20</span><span class="item-text">냉장 및 냉동고는 기준 온도로 세팅되어 적절한 온도를 유지하는가?<span class="item-std">냉장 3.0°C (적합) · 냉동 −20.0°C (적합)</span></span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="20번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="20번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">21</span><span class="item-text">후라이어 오일 온도 170°C 이상 유지 및 그리들 조리 온도를 체크하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="21번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="21번 점검 필요"><span class="radio-ring"></span></button></span></div>
+          </section>
+
+          <!-- 6. 소도구·화학제품 2/2 -->
+          <section class="paper-table" data-group="tools">
+            <div class="tbl-head"><span></span><span>소도구·화학제품 <span class="tbl-cat-cnt num">2/2</span></span><span class="tbl-col-ok">적합</span><span class="tbl-col-no">필요</span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">22</span><span class="item-text">소도구(도마, 칼, 집게, 소스병 등) 및 고객 제공용 식기류를 올바르게 관리하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="22번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="22번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">23</span><span class="item-text">허가된 주방용 화학제품만 용도에 맞게 보관·사용하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="23번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="23번 점검 필요"><span class="radio-ring"></span></button></span></div>
+          </section>
+
+          <!-- 7. 주방 청결 6/10 -->
+          <section class="paper-table" data-group="kitchen">
+            <div class="tbl-head"><span></span><span>주방 청결 <span class="tbl-cat-cnt num">6/10</span></span><span class="tbl-col-ok">적합</span><span class="tbl-col-no">필요</span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">24</span><span class="item-text">후드 및 환기구는 청결하게 관리하고 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="24번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="24번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">25</span><span class="item-text">조리 및 보관 장비는 청결히 관리되고 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="25번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="25번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">26</span><span class="item-text">제조 구역(배터테이블, 버거테이블, 제조선반 등)은 청결히 관리되는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="26번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="26번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">27</span><span class="item-text">제빙기, 음료 제조 기기는 청결히 관리되고 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="27번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="27번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">28</span><span class="item-text">냉장고, 냉동고에 파손된 부분이 없으며 청결하게 관리하고 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="28번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="28번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state="ok"><span class="item-no num">29</span><span class="item-text">기타 장비·기기(키오스크, POS, 빌지출력기, 정제기 등)는 청결한가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="true" aria-label="29번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="29번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state=""><span class="item-no num">30</span><span class="item-text">주방 구역의 바닥, 벽, 천장 및 냉·난방기를 청결하게 관리하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="30번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="30번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state=""><span class="item-no num">31</span><span class="item-text">선반, 기타 보관 공간(창고 등)을 청결하게 관리하고 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="31번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="31번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state=""><span class="item-no num">32</span><span class="item-text">타월은 용도를 구분하여 사용하고 있으며 청결한 상태를 유지하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="32번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="32번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state=""><span class="item-no num">33</span><span class="item-text">싱크, 배수구는 오염이 없도록 청결하게 관리하고 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="33번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="33번 점검 필요"><span class="radio-ring"></span></button></span></div>
+          </section>
+
+          <!-- 8. 매장·외부·방충 0/5 -->
+          <section class="paper-table" data-group="shop">
+            <div class="tbl-head"><span></span><span>매장·외부·방충 <span class="tbl-cat-cnt num">0/5</span></span><span class="tbl-col-ok">적합</span><span class="tbl-col-no">필요</span></div>
+            <div class="tbl-row" data-state=""><span class="item-no num">34</span><span class="item-text">고객 구역의 바닥, 벽, 천장, 조명 및 환기·냉난방기를 청결하게 관리하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="34번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="34번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state=""><span class="item-no num">35</span><span class="item-text">고객 구역의 테이블과 의자를 올바르게 관리하고 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="35번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="35번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state=""><span class="item-no num">36</span><span class="item-text">출입문 내·외부 및 주변, 간판, 어닝, 외부 조명을 올바르게 관리하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="36번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="36번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state=""><span class="item-no num">37</span><span class="item-text">뚜껑 있는 쓰레기통을 구비하고 넘치지 않게 밀폐 관리하고 있는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="37번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="37번 점검 필요"><span class="radio-ring"></span></button></span></div>
+            <div class="tbl-row" data-state=""><span class="item-no num">38</span><span class="item-text">방충·방서 관리를 하고 있으며 침입 요소를 올바르게 차단·관리하는가?</span><span class="radio-cell"><button type="button" class="radio-btn ok" role="radio" aria-checked="false" aria-label="38번 적합"><span class="radio-ring"></span></button></span><span class="radio-cell"><button type="button" class="radio-btn no" role="radio" aria-checked="false" aria-label="38번 점검 필요"><span class="radio-ring"></span></button></span></div>
+          </section>
+        </div>
+      </div>
+
+      <!-- 아래 메모와 저장 -->
+      <section class="memo-save-card" aria-label="특이사항 메모 및 저장">
+        <div class="memo-head">
+          <label class="memo-title" for="memoBox">특이사항 메모</label>
+          <span class="memo-hint">점검표 PDF·보관함에 함께 저장됩니다</span>
+        </div>
+        <textarea class="memo-input" id="memoBox" placeholder="특이사항이나 조치 예정 내용을 적어 두세요.">7번 항목: 주방 안쪽 싱크 손 소독제 리필 주문 완료 (11.24 도착 예정). 김철수 보건증 재발급 안내 완료.</textarea>
+        <div class="save-bar">
+          <div class="save-left">
+            <button type="button" class="sec-btn" id="allOkBtn">전체 적합</button>
+            <button type="button" class="sec-btn" id="clearAllBtn">전체 해제</button>
+          </div>
+          <button type="button" class="save-btn num" id="saveBtn">보관함에 저장 · 27/38</button>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+  function updateCounts() {
+    var rows = document.querySelectorAll('#chkTables .tbl-row');
+    var okTotal = 0, failTotal = 0;
+    rows.forEach(function (r) {
+      if (r.dataset.state === 'ok') okTotal++;
+      if (r.dataset.state === 'no') failTotal++;
+    });
+    document.querySelectorAll('#chkTables .paper-table').forEach(function (tbl) {
+      var tRows = tbl.querySelectorAll('.tbl-row');
+      var ok = 0;
+      tRows.forEach(function (r) { if (r.dataset.state === 'ok') ok++; });
+      tbl.querySelector('.tbl-cat-cnt').textContent = ok + '/' + tRows.length;
+    });
+    document.getElementById('metaProg').textContent = okTotal + ' / ' + rows.length;
+    document.getElementById('metaFail').textContent = failTotal + '개';
+    document.getElementById('saveBtn').textContent = '보관함에 저장 · ' + okTotal + '/' + rows.length;
+  }
+
+  document.getElementById('chkTables').addEventListener('click', function (e) {
+    var btn = e.target.closest('.radio-btn');
+    if (!btn) return;
+    var row = btn.closest('.tbl-row');
+    var isOk = btn.classList.contains('ok');
+    var next = isOk ? 'ok' : 'no';
+    if (row.dataset.state === next) next = '';
+    row.dataset.state = next;
+    row.classList.toggle('fail-row', next === 'no');
+    row.querySelector('.radio-btn.ok').setAttribute('aria-checked', String(next === 'ok'));
+    row.querySelector('.radio-btn.no').setAttribute('aria-checked', String(next === 'no'));
+    updateCounts();
+  });
+
+  document.getElementById('allOkBtn').addEventListener('click', function () {
+    document.querySelectorAll('#chkTables .tbl-row').forEach(function (row) {
+      row.dataset.state = 'ok';
+      row.classList.remove('fail-row');
+      row.querySelector('.radio-btn.ok').setAttribute('aria-checked', 'true');
+      row.querySelector('.radio-btn.no').setAttribute('aria-checked', 'false');
+    });
+    updateCounts();
+  });
+
+  document.getElementById('clearAllBtn').addEventListener('click', function () {
+    document.querySelectorAll('#chkTables .tbl-row').forEach(function (row) {
+      row.dataset.state = '';
+      row.classList.remove('fail-row');
+      row.querySelector('.radio-btn.ok').setAttribute('aria-checked', 'false');
+      row.querySelector('.radio-btn.no').setAttribute('aria-checked', 'false');
+    });
+    updateCounts();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 K 넓은 화면 위생 점검</title>
+<!-- 디자인 시안(정적 목업). 실제 앱 코드가 아님. 예시 데이터만 들어 있음. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&amp;family=Inter:wght@500;600;700;800&amp;display=swap">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #f2f4f6; color: #191f28;
+    font-family: 'Noto Sans KR', system-ui, sans-serif;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; cursor: pointer; }
+  .num { font-family: Inter, 'Noto Sans KR', sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+
+  .app { display: flex; width: 100%; height: 100vh; overflow: hidden; }
+
+  /* 시안 K 개성: 떠 있는 둥근 흰 왼쪽 메뉴 */
+  .nav-wrap { flex: none; padding: 16px 0 16px 16px; display: flex; }
+  .sidenav {
+    width: 88px; background: #fff; border-radius: 28px;
+    box-shadow: 0 8px 28px rgba(25, 31, 40, 0.10);
+    padding: 12px 8px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .brand {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 6px 4px 12px; border-bottom: 1px solid #f2f4f6; margin-bottom: 4px;
+  }
+  .brand-mark {
+    width: 40px; height: 40px; border-radius: 14px;
+    background: #e8f3ff; color: #3182f6;
+    display: flex; align-items: center; justify-content: center; flex: none;
+  }
+  .brand-text { display: none; min-width: 0; }
+  .brand-name { font-size: 15px; font-weight: 800; color: #191f28; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brand-sub { font-size: 12px; color: #8b95a1; margin-top: 1px; }
+  .nav-list { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 5px; padding: 11px 4px; border-radius: 18px;
+    color: #8b95a1; font-size: 11px; font-weight: 800;
+    transition: background .15s, color .15s;
+  }
+  .nav-item:hover { background: #f2f4f6; color: #4e5968; }
+  .nav-item[aria-current="page"] { background: #191f28; color: #fff; }
+  .nav-foot {
+    padding-top: 10px; border-top: 1px solid #f2f4f6;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    font-size: 12px; font-weight: 700; color: #6b7684;
+  }
+  .nav-sync-label { display: none; }
+  .dot-ok { width: 8px; height: 8px; border-radius: 50%; background: #3182f6; flex: none; }
+
+  /* 오른쪽 워크스페이스 */
+  .workspace {
+    flex: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    padding: 18px 24px 0 20px; position: relative;
+  }
+
+  /* 상단 헤더 */
+  .topbar {
+    flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding-bottom: 14px; flex-wrap: wrap;
+  }
+  .head-left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .page-title { margin: 0; font-size: 22px; font-weight: 800; }
+  .meta-pills { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .meta-pill {
+    height: 32px; padding: 0 12px; border-radius: 12px; background: #fff;
+    font-size: 13px; font-weight: 700; color: #4e5968;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .meta-pill span { color: #8b95a1; font-weight: 600; }
+
+  .head-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .tool-btn {
+    height: 36px; padding: 0 12px; border-radius: 13px; border: 0;
+    background: #fff; color: #4e5968; font-size: 13px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .tool-btn:hover { background: #e5e8eb; color: #191f28; }
+
+  /* 2열 본문: 왼쪽(온도 카드 2개 + 8개 분류 진행 목록), 오른쪽(체크 목록 + 메모) */
+  .cols {
+    flex: 1; min-height: 0; display: grid;
+    grid-template-columns: 310px minmax(0, 1fr);
+    gap: 16px; overflow: hidden;
+  }
+
+  .left-col {
+    overflow-y: auto; padding-bottom: 24px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  /* 온도 카드 2개 */
+  .temp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .temp-card {
+    background: #fff; border-radius: 20px; padding: 14px;
+    display: flex; flex-direction: column; gap: 8px;
+    box-shadow: 0 2px 10px rgba(25, 31, 40, 0.04);
+  }
+  .temp-top { display: flex; align-items: center; justify-content: space-between; }
+  .temp-icon {
+    width: 34px; height: 34px; border-radius: 12px; background: #e8f3ff; color: #3182f6;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .temp-ok { font-size: 11px; font-weight: 800; color: #1b64da; background: #e8f3ff; padding: 2px 7px; border-radius: 8px; }
+  .temp-label { font-size: 11.5px; color: #8b95a1; font-weight: 600; }
+  .temp-val { font-size: 23px; font-weight: 800; color: #191f28; line-height: 1.1; }
+
+  /* 분류 진행 목록 카드 */
+  .cat-card {
+    background: #fff; border-radius: 22px; padding: 14px 10px;
+    box-shadow: 0 2px 10px rgba(25, 31, 40, 0.04);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .cat-head { padding: 2px 8px 8px; display: flex; flex-direction: column; gap: 7px; border-bottom: 1px solid #f2f4f6; }
+  .cat-head-row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 800; }
+  .prog-track { height: 7px; border-radius: 4px; background: #f2f4f6; overflow: hidden; }
+  .prog-fill { height: 100%; width: 71%; background: #3182f6; border-radius: 4px; }
+
+  .cat-item {
+    border: 0; background: transparent; border-radius: 14px; padding: 10px 10px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    text-align: left; color: #191f28; font-size: 13.5px; font-weight: 700;
+  }
+  .cat-item:hover { background: #f2f4f6; }
+  .cat-item.active { background: #191f28; color: #fff; }
+  .cat-cnt { font-size: 12px; font-weight: 800; color: #8b95a1; display: inline-flex; align-items: center; gap: 5px; flex: none; }
+  .cat-cnt.done { color: #1b64da; }
+  .cat-item.active .cat-cnt { color: rgba(255, 255, 255, 0.85); }
+  .dot-fail { width: 7px; height: 7px; border-radius: 50%; background: #f04452; }
+
+  /* 오른쪽 체크 목록 열 */
+  .right-col {
+    overflow-y: auto; padding-bottom: 104px;
+    display: flex; flex-direction: column; gap: 14px; min-width: 0;
+  }
+  .chk-card {
+    background: #fff; border-radius: 22px; overflow: hidden;
+    box-shadow: 0 2px 10px rgba(25, 31, 40, 0.04);
+  }
+  .chk-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 15px 18px; border-bottom: 1px solid #f2f4f6; flex-wrap: wrap;
+  }
+  .chk-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .chk-sub { font-size: 13px; color: #8b95a1; font-weight: 700; }
+  .chk-btns { display: flex; align-items: center; gap: 6px; }
+  .btn-soft {
+    height: 32px; padding: 0 12px; border-radius: 10px; border: 0;
+    background: #e8f3ff; color: #1b64da; font-size: 12.5px; font-weight: 800;
+  }
+  .btn-muted {
+    height: 32px; padding: 0 12px; border-radius: 10px; border: 0;
+    background: #f2f4f6; color: #6b7684; font-size: 12.5px; font-weight: 700;
+  }
+
+  .chk-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 18px; border-top: 1px solid #f2f4f6;
+  }
+  .chk-row:first-of-type { border-top: 0; }
+  .chk-row.is-fail { background: #fff8f8; }
+  .chk-no { width: 24px; font-size: 13px; font-weight: 800; color: #8b95a1; flex: none; text-align: center; }
+  .chk-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  .chk-text { font-size: 14.5px; font-weight: 600; line-height: 1.45; color: #191f28; }
+  .chk-std { font-size: 12px; color: #8b95a1; }
+  .health-warn {
+    align-self: flex-start; background: #fff4e5; color: #b25e00;
+    padding: 4px 10px; border-radius: 9px; font-size: 12px; font-weight: 800;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+
+  .chk-ctrl { display: flex; align-items: center; gap: 6px; flex: none; }
+  .state-btn {
+    height: 34px; padding: 0 12px; border-radius: 17px; border: 1.5px solid #e5e8eb;
+    background: #fff; color: #6b7684; font-size: 12.5px; font-weight: 800;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .state-btn.ok.on { background: #3182f6; border-color: #3182f6; color: #fff; }
+  .state-btn.fail.on { background: #f04452; border-color: #f04452; color: #fff; }
+
+  /* 특이사항 메모 카드 */
+  .memo-card {
+    background: #fff; border-radius: 22px; padding: 16px 18px;
+    box-shadow: 0 2px 10px rgba(25, 31, 40, 0.04);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .memo-label { font-size: 14px; font-weight: 800; color: #191f28; }
+  .memo-input {
+    width: 100%; min-height: 70px; border: 1.5px solid #e5e8eb; border-radius: 14px;
+    padding: 10px 12px; font: inherit; font-size: 13.5px; color: #191f28; resize: vertical;
+    background: #f9fafb;
+  }
+  .memo-input:focus { outline: none; border-color: #3182f6; background: #fff; }
+
+  /* 시안 K 개성: 오른쪽 아래 떠 있는 진행/저장 바 */
+  .float-bar {
+    position: absolute; right: 28px; bottom: 20px;
+    height: 58px; border-radius: 20px; background: #191f28; color: #fff;
+    display: flex; align-items: center; gap: 14px; padding: 0 8px 0 20px;
+    box-shadow: 0 10px 30px rgba(25, 31, 40, 0.24); z-index: 20;
+  }
+  .float-stat { font-size: 14.5px; font-weight: 700; white-space: nowrap; }
+  .float-fail { color: #ff8a95; }
+  .float-sub-btn {
+    height: 40px; padding: 0 13px; border-radius: 13px; border: 0;
+    background: rgba(255, 255, 255, 0.14); color: #fff; font-size: 13px; font-weight: 700;
+  }
+  .float-save-btn {
+    height: 42px; padding: 0 18px; border-radius: 14px; border: 0;
+    background: #3182f6; color: #fff; font-size: 14px; font-weight: 800;
+  }
+  .float-save-btn:hover { background: #1b64da; }
+
+  @media (min-width: 1300px) {
+    .sidenav { width: 220px; padding: 16px 12px; }
+    .brand { flex-direction: row; align-items: center; gap: 10px; padding: 6px 8px 16px; }
+    .brand-text { display: flex; flex-direction: column; }
+    .nav-item { flex-direction: row; justify-content: flex-start; gap: 10px; padding: 13px 14px; font-size: 15px; }
+    .nav-foot { justify-content: flex-start; padding: 12px 10px 4px; }
+    .nav-sync-label { display: inline; }
+    .workspace { padding: 22px 32px 0 24px; }
+    .cols { grid-template-columns: 340px minmax(0, 1fr); gap: 20px; }
+    .float-bar { right: 36px; bottom: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="nav-wrap">
+    <nav class="sidenav" aria-label="주 메뉴">
+      <div class="brand">
+        <span class="brand-mark">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1.5-5h13L20 9M4 9v11h16V9M4 9h16"/><path d="M9 20v-6h6v6"/></svg>
+        </span>
+        <div class="brand-text">
+          <span class="brand-name">우리분식 본점</span>
+          <span class="brand-sub">사장 김사장</span>
+        </div>
+      </div>
+      <div class="nav-list">
+        <a class="nav-item" href="K_Punch.html">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <span>출퇴근</span>
+        </a>
+        <a class="nav-item" href="K_Pay.html">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg>
+          <span>근무·급여</span>
+        </a>
+        <a class="nav-item" href="K_Chk.html" aria-current="page">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+          <span>위생 점검</span>
+        </a>
+        <a class="nav-item" href="K_Set.html">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+          <span>설정</span>
+        </a>
+      </div>
+      <div class="nav-foot" title="구글 시트 자동 저장 연결됨">
+        <span class="dot-ok" aria-hidden="true"></span>
+        <span class="nav-sync-label">구글 시트 연결됨</span>
+      </div>
+    </nav>
+  </div>
+
+  <div class="workspace">
+    <header class="topbar">
+      <div class="head-left">
+        <h1 class="page-title">위생 점검</h1>
+        <div class="meta-pills">
+          <span class="meta-pill"><span>매장</span> 우리분식 본점</span>
+          <span class="meta-pill num"><span>점검일</span> 2026-11-23 (월)</span>
+          <span class="meta-pill"><span>점검자</span> 김사장</span>
+        </div>
+      </div>
+      <div class="head-actions">
+        <button type="button" class="tool-btn">미리보기</button>
+        <button type="button" class="tool-btn">PDF</button>
+        <button type="button" class="tool-btn">엑셀</button>
+        <button type="button" class="tool-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/></svg>
+          <span>점검 보관함 <b class="num">14</b></span>
+        </button>
+        <button type="button" class="tool-btn" aria-label="더보기: 보관함 엑셀·비우기">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="cols">
+      <!-- 왼쪽 열: 온도 카드 2개 + 8개 분류 진행 목록 -->
+      <aside class="left-col" aria-label="온도 및 분류 목록">
+        <section class="temp-grid" aria-label="냉장·냉동 온도">
+          <div class="temp-card">
+            <div class="temp-top">
+              <span class="temp-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 14V5a2 2 0 0 0-4 0v9a4 4 0 1 0 4 0z"/></svg>
+              </span>
+              <span class="temp-ok">기준 적합</span>
+            </div>
+            <div>
+              <div class="temp-label num">냉장 0~5°C</div>
+              <div class="temp-val num">3.0°C</div>
+            </div>
+          </div>
+
+          <div class="temp-card">
+            <div class="temp-top">
+              <span class="temp-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 14V5a2 2 0 0 0-4 0v9a4 4 0 1 0 4 0z"/></svg>
+              </span>
+              <span class="temp-ok">기준 적합</span>
+            </div>
+            <div>
+              <div class="temp-label num">냉동 −18°C 이하</div>
+              <div class="temp-val num">−20.0°C</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="cat-card" aria-label="8개 점검 분류 진행도">
+          <div class="cat-head">
+            <div class="cat-head-row">
+              <span>점검 분류 (8개)</span>
+              <span class="num" style="color:#3182f6">27/38</span>
+            </div>
+            <div class="prog-track"><div class="prog-fill"></div></div>
+          </div>
+          <button type="button" class="cat-item"><span>식재료·조리 기본</span><span class="cat-cnt done num">3/3</span></button>
+          <button type="button" class="cat-item active"><span>개인위생</span><span class="cat-cnt num"><span class="dot-fail"></span>3/5</span></button>
+          <button type="button" class="cat-item"><span>이물 관리</span><span class="cat-cnt done num">2/2</span></button>
+          <button type="button" class="cat-item"><span>원재료 보관·관리</span><span class="cat-cnt done num">8/8</span></button>
+          <button type="button" class="cat-item"><span>온도 관리</span><span class="cat-cnt done num">3/3</span></button>
+          <button type="button" class="cat-item"><span>소도구·화학제품</span><span class="cat-cnt done num">2/2</span></button>
+          <button type="button" class="cat-item"><span>주방 청결</span><span class="cat-cnt num">6/10</span></button>
+          <button type="button" class="cat-item"><span>매장·외부·방충</span><span class="cat-cnt num">0/5</span></button>
+        </section>
+      </aside>
+
+      <!-- 오른쪽 열: 체크 목록 + 특이사항 메모 -->
+      <main class="right-col" aria-label="위생 점검 항목 목록">
+        <section class="chk-card">
+          <div class="chk-head">
+            <div class="chk-title">개인위생 <span class="chk-sub num">3/5 적합 · 점검 필요 1</span></div>
+            <div class="chk-btns">
+              <button type="button" class="btn-soft">이 묶음 전체 적합</button>
+              <button type="button" class="btn-muted">전체 해제</button>
+            </div>
+          </div>
+
+          <div class="chk-row" data-state="ok">
+            <span class="chk-no num">4</span>
+            <div class="chk-body">
+              <span class="chk-text">모든 근무자의 건강진단결과서가 발급되어 있으며, 만료일이 경과되지 않았는가?</span>
+              <span class="health-warn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5h.01"/></svg>
+                김철수 보건증 만료 5일 전 (자동 안내 · 직접 체크해 주세요)
+              </span>
+            </div>
+            <div class="chk-ctrl">
+              <button type="button" class="state-btn ok on" data-set="ok">적합</button>
+              <button type="button" class="state-btn fail" data-set="fail">점검 필요</button>
+            </div>
+          </div>
+
+          <div class="chk-row" data-state="ok">
+            <span class="chk-no num">5</span>
+            <div class="chk-body">
+              <span class="chk-text">모자, 머리망, 마스크를 올바르게 착용하고 있는가?</span>
+            </div>
+            <div class="chk-ctrl">
+              <button type="button" class="state-btn ok on" data-set="ok">적합</button>
+              <button type="button" class="state-btn fail" data-set="fail">점검 필요</button>
+            </div>
+          </div>
+
+          <div class="chk-row" data-state="ok">
+            <span class="chk-no num">6</span>
+            <div class="chk-body">
+              <span class="chk-text">손 오염이 없도록 관리하며, 손 상처가 있으면 처치 후 근무하는가?</span>
+            </div>
+            <div class="chk-ctrl">
+              <button type="button" class="state-btn ok on" data-set="ok">적합</button>
+              <button type="button" class="state-btn fail" data-set="fail">점검 필요</button>
+            </div>
+          </div>
+
+          <div class="chk-row is-fail" data-state="fail">
+            <span class="chk-no num">7</span>
+            <div class="chk-body">
+              <span class="chk-text">모든 싱크에 손 세척 용품과 사용기한 내 손 소독제가 있는가?</span>
+            </div>
+            <div class="chk-ctrl">
+              <button type="button" class="state-btn ok" data-set="ok">적합</button>
+              <button type="button" class="state-btn fail on" data-set="fail">점검 필요</button>
+            </div>
+          </div>
+
+          <div class="chk-row" data-state="none">
+            <span class="chk-no num">8</span>
+            <div class="chk-body">
+              <span class="chk-text">유니폼 가이드를 올바르게 준수하고 있는가?</span>
+            </div>
+            <div class="chk-ctrl">
+              <button type="button" class="state-btn ok" data-set="ok">적합</button>
+              <button type="button" class="state-btn fail" data-set="fail">점검 필요</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="chk-card">
+          <div class="chk-head">
+            <div class="chk-title">주방 청결 <span class="chk-sub num">6/10 진행 중 · 남은 항목</span></div>
+            <div class="chk-btns">
+              <button type="button" class="btn-soft">이 묶음 전체 적합</button>
+            </div>
+          </div>
+
+          <div class="chk-row" data-state="none">
+            <span class="chk-no num">30</span>
+            <div class="chk-body">
+              <span class="chk-text">주방 구역의 바닥, 벽, 천장 등을 청결하게 관리하고 있는가?</span>
+              <span class="chk-std">기준: 냉·난방기 포함</span>
+            </div>
+            <div class="chk-ctrl">
+              <button type="button" class="state-btn ok" data-set="ok">적합</button>
+              <button type="button" class="state-btn fail" data-set="fail">점검 필요</button>
+            </div>
+          </div>
+
+          <div class="chk-row" data-state="none">
+            <span class="chk-no num">31</span>
+            <div class="chk-body">
+              <span class="chk-text">선반, 기타 보관 공간(창고 등)을 청결하게 관리하고 있는가?</span>
+            </div>
+            <div class="chk-ctrl">
+              <button type="button" class="state-btn ok" data-set="ok">적합</button>
+              <button type="button" class="state-btn fail" data-set="fail">점검 필요</button>
+            </div>
+          </div>
+
+          <div class="chk-row" data-state="none">
+            <span class="chk-no num">32</span>
+            <div class="chk-body">
+              <span class="chk-text">타월은 용도를 구분하여 사용하고 있으며, 청결한 상태를 유지하고 있는가?</span>
+            </div>
+            <div class="chk-ctrl">
+              <button type="button" class="state-btn ok" data-set="ok">적합</button>
+              <button type="button" class="state-btn fail" data-set="fail">점검 필요</button>
+            </div>
+          </div>
+
+          <div class="chk-row" data-state="none">
+            <span class="chk-no num">33</span>
+            <div class="chk-body">
+              <span class="chk-text">싱크, 배수구는 오염이 없도록 청결하게 관리하고 있는가?</span>
+            </div>
+            <div class="chk-ctrl">
+              <button type="button" class="state-btn ok" data-set="ok">적합</button>
+              <button type="button" class="state-btn fail" data-set="fail">점검 필요</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="memo-card" aria-label="특이사항 메모">
+          <label class="memo-label" for="memoBox">특이사항 메모</label>
+          <textarea class="memo-input" id="memoBox">7번 주방 안쪽 싱크 손 소독제 잔량 부족 — 오늘 오후 발주 예정</textarea>
+        </section>
+      </main>
+    </div>
+
+    <!-- 오른쪽 아래 떠 있는 진행/저장 바 -->
+    <div class="float-bar" role="region" aria-label="점검 진행 상태 및 저장">
+      <span class="float-stat num"><span id="okCount">27</span>/38 적합 · <span class="float-fail">점검 필요 <span id="failCount">1</span></span></span>
+      <button type="button" class="float-sub-btn">전체 적합</button>
+      <button type="button" class="float-save-btn">보관함에 저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var baseOk = 24; // 개인위생 외 다른 분류 적합 수 (3+2+8+3+2+6 = 24)
+    var okEl = document.getElementById('okCount');
+    var failEl = document.getElementById('failCount');
+    function recount() {
+      var rows = document.querySelectorAll('.chk-row');
+      var ok = baseOk, fail = 0;
+      rows.forEach(function (r) {
+        if (r.dataset.state === 'ok') ok++;
+        if (r.dataset.state === 'fail') fail++;
+      });
+      okEl.textContent = ok;
+      failEl.textContent = fail;
+    }
+    document.querySelectorAll('.chk-row').forEach(function (row) {
+      row.querySelectorAll('.state-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var target = btn.dataset.set;
+          var next = row.dataset.state === target ? 'none' : target;
+          row.dataset.state = next;
+          row.classList.toggle('is-fail', next === 'fail');
+          row.querySelector('.state-btn.ok').classList.toggle('on', next === 'ok');
+          row.querySelector('.state-btn.fail').classList.toggle('on', next === 'fail');
+          recount();
+        });
+      });
+    });
+    document.querySelectorAll('.cat-item').forEach(function (item) {
+      item.addEventListener('click', function () {
+        document.querySelectorAll('.cat-item').forEach(function (x) { x.classList.remove('active'); });
+        item.classList.add('active');
+      });
+    });
+  })();
+</script>
+</body>
+</html>

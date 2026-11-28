@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 I 넓은 화면 출퇴근</title>
+<!-- 디자인 시안(정적 목업). 실제 앱 코드가 아님. 예시 데이터만 들어 있음. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&amp;family=Inter:wght@500;600;700;800&amp;display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: #f2f4f6;
+  font-family: 'Noto Sans KR', sans-serif;
+  color: #191f28;
+}
+button, a { font: inherit; }
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; }
+.num {
+  font-family: Inter, 'Noto Sans KR', sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+/* 앱 전체 골격 */
+.app {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 왼쪽 세로 메뉴: 1300px 미만 88px / 1300px 이상 220px */
+.sidenav {
+  width: 88px;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid #e5e8eb;
+  padding: 16px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.sidenav-brand { display: none; }
+.sidenav-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.nav-item {
+  width: 72px;
+  padding: 10px 4px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: #8b95a1;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.15s, color 0.15s;
+}
+.nav-item:hover { background: #f8f9fa; color: #4e5968; }
+.nav-item[aria-current="page"] { background: #f2f4f6; color: #191f28; }
+.sidenav-foot { display: none; }
+
+@media (min-width: 1300px) {
+  .sidenav {
+    width: 220px;
+    padding: 22px 14px 18px;
+    align-items: stretch;
+  }
+  .sidenav-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 12px 18px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #f2f4f6;
+  }
+  .brand-name { font-size: 16px; font-weight: 800; color: #191f28; }
+  .brand-sub { font-size: 12px; font-weight: 500; color: #8b95a1; }
+  .sidenav-list { align-items: stretch; gap: 4px; }
+  .nav-item {
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 12px 14px;
+    gap: 12px;
+    font-size: 15px;
+  }
+  .sidenav-foot {
+    margin-top: auto;
+    padding: 12px 12px 4px;
+    border-top: 1px solid #f2f4f6;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #8b95a1;
+  }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #3182f6; flex-shrink: 0; }
+}
+
+/* 출퇴근 작업 영역: 왼쪽 큰 시계 패널 + 오른쪽 알바생 2열 줄 목록 */
+.workspace {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.clock-panel {
+  width: 340px;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid #e5e8eb;
+  padding: 24px 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+@media (max-width: 1120px) {
+  .clock-panel { width: 300px; padding: 20px; }
+}
+@media (min-width: 1300px) {
+  .clock-panel { width: 380px; padding: 28px 30px; }
+}
+
+.clock-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.store-badge {
+  font-size: 15px;
+  font-weight: 800;
+  color: #4e5968;
+}
+.admin-btn {
+  height: 36px;
+  padding: 0 13px;
+  border-radius: 18px;
+  border: 0;
+  background: #f2f4f6;
+  color: #4e5968;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.admin-btn:hover { background: #e5e8eb; }
+
+.clock-center {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: auto 0;
+}
+.clock-date {
+  font-size: 17px;
+  font-weight: 600;
+  color: #6b7684;
+}
+.clock-time {
+  font-size: 82px;
+  font-weight: 800;
+  letter-spacing: -3.5px;
+  line-height: 1.02;
+  color: #191f28;
+}
+@media (max-width: 1120px) {
+  .clock-time { font-size: 72px; }
+}
+@media (min-width: 1300px) {
+  .clock-time { font-size: 92px; }
+}
+.clock-status {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #f2f4f6;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4e5968;
+}
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3182f6;
+}
+
+.clock-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.qr-btn {
+  width: 100%;
+  height: 54px;
+  border-radius: 16px;
+  background: #f2f4f6;
+  color: #191f28;
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.qr-btn:hover { background: #e5e8eb; }
+.clock-sub-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.lang-btn {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 14px;
+  border: 1px solid #e5e8eb;
+  background: #fff;
+  color: #4e5968;
+  font-size: 14px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lang-btn:hover { background: #f8f9fa; }
+.kiosk-meta {
+  font-size: 12px;
+  color: #8b95a1;
+  text-align: right;
+  line-height: 1.4;
+}
+
+/* 오른쪽 알바생 줄 목록 (2열 격자) */
+.staff-panel {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 26px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.staff-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.staff-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.staff-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+.staff-guide {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7684;
+}
+.all-out-btn {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 19px;
+  border: 0;
+  background: #fff;
+  color: #4e5968;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(25, 31, 40, 0.04);
+  flex-shrink: 0;
+}
+.all-out-btn:hover { background: #e5e8eb; }
+
+/* 퇴근 확인 필요 노란 띠 (시안 I 특징) */
+.warn-strip {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: #fff4e5;
+  color: #b25e00;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.warn-strip-right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+}
+
+/* 2열 격자 이름 줄 + 버튼 */
+.staff-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.staff-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 86px;
+  padding: 16px 16px 16px 22px;
+  background: #fff;
+  border-radius: 20px;
+}
+.staff-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.staff-name-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #191f28;
+}
+.pin-icon {
+  color: #b0b8c1;
+  display: inline-flex;
+  align-items: center;
+}
+.staff-sub {
+  font-size: 14px;
+  color: #6b7684;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.staff-sub.working { color: #1b64da; font-weight: 600; }
+.punch-btn {
+  width: 86px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+.punch-btn.in { background: #3182f6; color: #fff; }
+.punch-btn.in:hover { background: #1b64da; }
+.punch-btn.out { background: #191f28; color: #fff; }
+.punch-btn.out:hover { background: #333d4b; }
+
+.pin-hint {
+  margin-top: auto;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #6b7684;
+}
+.pin-hint-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pin-demo-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 0;
+  background: #f2f4f6;
+  color: #4e5968;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pin-demo-btn:hover { background: #e5e8eb; }
+
+/* 간단한 비밀번호 입력 창 (토글 시 표시) */
+.pin-modal-bg {
+  position: fixed;
+  inset: 0;
+  background: rgba(25, 31, 40, 0.42);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.pin-modal-bg.open { display: flex; }
+.pin-modal {
+  width: 320px;
+  background: #fff;
+  border-radius: 24px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.pin-modal-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pin-modal-title { font-size: 17px; font-weight: 800; }
+.pin-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 17px;
+  border: 0;
+  background: #f2f4f6;
+  color: #4e5968;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pin-dots { display: flex; gap: 12px; padding: 6px 0; }
+.pin-dot { width: 12px; height: 12px; border-radius: 6px; background: #e5e8eb; }
+.pin-dot.filled { background: #3182f6; }
+.pin-pad {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.pin-key {
+  height: 48px;
+  border-radius: 12px;
+  border: 0;
+  background: #f2f4f6;
+  color: #191f28;
+  font-size: 18px;
+  font-weight: 700;
+}
+.pin-key.primary { background: #3182f6; color: #fff; font-size: 14px; font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 왼쪽 세로 메뉴 -->
+  <nav class="sidenav" aria-label="메뉴">
+    <div class="sidenav-brand">
+      <span class="brand-name">우리분식 본점</span>
+      <span class="brand-sub">사장님 도우미 · 김사장</span>
+    </div>
+    <div class="sidenav-list">
+      <a class="nav-item" href="I_Punch.html" aria-current="page">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>출퇴근</span>
+      </a>
+      <a class="nav-item" href="I_Pay.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg>
+        <span>근무·급여</span>
+      </a>
+      <a class="nav-item" href="I_Chk.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>위생 점검</span>
+      </a>
+      <a class="nav-item" href="I_Set.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        <span>설정</span>
+      </a>
+    </div>
+    <div class="sidenav-foot">
+      <span class="sync-dot"></span>
+      <span>구글 시트 연결됨</span>
+    </div>
+  </nav>
+
+  <!-- 출퇴근 본문 -->
+  <div class="workspace">
+    <!-- 왼쪽 큰 시계 패널 -->
+    <section class="clock-panel" aria-label="현재 시각 및 매장 도구">
+      <div class="clock-top">
+        <span class="store-badge">우리분식 본점</span>
+        <button type="button" class="admin-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          <span>관리자</span>
+        </button>
+      </div>
+
+      <div class="clock-center">
+        <div class="clock-date" id="clockDate">2026년 11월 23일 월요일</div>
+        <div class="clock-time num">09:41</div>
+        <div class="clock-status">
+          <span class="live-dot"></span>
+          <span class="num">근무 중 1명 · 전체 5명</span>
+        </div>
+      </div>
+
+      <div class="clock-bottom">
+        <a href="I_QR.html" class="qr-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/></svg>
+          <span>계좌이체 QR</span>
+        </a>
+        <div class="clock-sub-row">
+          <button type="button" class="lang-btn" id="langToggle">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+            <span id="langLabel">English</span>
+          </button>
+          <div class="kiosk-meta">
+            <div>알림음 켜짐 · 자동 퇴근 23:00</div>
+            <div>화면 보호기 5분 후</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 오른쪽 알바생 줄 목록 (2열 격자) -->
+    <main class="staff-panel">
+      <div class="staff-head">
+        <div class="staff-title-wrap">
+          <h1 class="staff-title" id="punchHeading">알바생 출퇴근</h1>
+          <span class="staff-guide" id="punchGuide">이름을 누르고 비밀번호를 넣어요</span>
+        </div>
+        <button type="button" class="all-out-btn">모두 퇴근</button>
+      </div>
+
+      <a href="I_Pay.html" class="warn-strip">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>
+        <span>퇴근 확인 필요 1건 · 이영희 <span class="num">11.20</span> (자동 퇴근)</span>
+        <span class="warn-strip-right">
+          <span>실제 시각 입력</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </span>
+      </a>
+
+      <section class="staff-grid" aria-label="알바생 목록">
+        <!-- 1. 홍길동 -->
+        <div class="staff-row">
+          <div class="staff-info">
+            <span class="staff-name-line">
+              <span>홍길동</span>
+              <span class="live-dot" aria-label="근무 중"></span>
+              <span class="pin-icon" title="비밀번호 설정됨">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+              </span>
+            </span>
+            <span class="staff-sub working num">09:00 출근 · 41분째</span>
+          </div>
+          <button type="button" class="punch-btn out" data-name="홍길동" data-action="퇴근">퇴근</button>
+        </div>
+
+        <!-- 2. 김철수 -->
+        <div class="staff-row">
+          <div class="staff-info">
+            <span class="staff-name-line">
+              <span>김철수</span>
+              <span class="pin-icon" title="비밀번호 설정됨">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+              </span>
+            </span>
+            <span class="staff-sub">출근 전 · 오늘 기록 없음</span>
+          </div>
+          <button type="button" class="punch-btn in" data-name="김철수" data-action="출근">출근</button>
+        </div>
+
+        <!-- 3. 이영희 -->
+        <div class="staff-row">
+          <div class="staff-info">
+            <span class="staff-name-line">
+              <span>이영희</span>
+              <span class="pin-icon" title="비밀번호 설정됨">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+              </span>
+            </span>
+            <span class="staff-sub num">08:02 퇴근 · 새벽 근무</span>
+          </div>
+          <button type="button" class="punch-btn in" data-name="이영희" data-action="출근">출근</button>
+        </div>
+
+        <!-- 4. 박민수 -->
+        <div class="staff-row">
+          <div class="staff-info">
+            <span class="staff-name-line">
+              <span>박민수</span>
+            </span>
+            <span class="staff-sub">휴무 · 오늘 기록 없음</span>
+          </div>
+          <button type="button" class="punch-btn in" data-name="박민수" data-action="출근">출근</button>
+        </div>
+
+        <!-- 5. 최지은 -->
+        <div class="staff-row">
+          <div class="staff-info">
+            <span class="staff-name-line">
+              <span>최지은</span>
+              <span class="pin-icon" title="비밀번호 설정됨">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+              </span>
+            </span>
+            <span class="staff-sub">출근 전 · 오늘 기록 없음</span>
+          </div>
+          <button type="button" class="punch-btn in" data-name="최지은" data-action="출근">출근</button>
+        </div>
+      </section>
+
+      <div class="pin-hint">
+        <div class="pin-hint-left">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          <span>비밀번호를 설정한 알바생은 버튼을 누르면 비밀번호 입력 창이 열려요.</span>
+        </div>
+        <button type="button" class="pin-demo-btn" id="openPinDemo">비밀번호 창 미리보기</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- 비밀번호 입력 창 (미리보기 토글) -->
+<div class="pin-modal-bg" id="pinModal" role="dialog" aria-modal="true" aria-labelledby="pinModalTitle">
+  <div class="pin-modal">
+    <div class="pin-modal-head">
+      <span class="pin-modal-title" id="pinModalTitle">홍길동 · 퇴근 비밀번호</span>
+      <button type="button" class="pin-close" id="closePinModal" aria-label="닫기">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="pin-dots" aria-hidden="true">
+      <span class="pin-dot filled"></span>
+      <span class="pin-dot filled"></span>
+      <span class="pin-dot"></span>
+      <span class="pin-dot"></span>
+    </div>
+    <div class="pin-pad num">
+      <button type="button" class="pin-key">1</button>
+      <button type="button" class="pin-key">2</button>
+      <button type="button" class="pin-key">3</button>
+      <button type="button" class="pin-key">4</button>
+      <button type="button" class="pin-key">5</button>
+      <button type="button" class="pin-key">6</button>
+      <button type="button" class="pin-key">7</button>
+      <button type="button" class="pin-key">8</button>
+      <button type="button" class="pin-key">9</button>
+      <button type="button" class="pin-key" id="pinCancel">취소</button>
+      <button type="button" class="pin-key">0</button>
+      <button type="button" class="pin-key primary" id="pinOk">확인</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var modal = document.getElementById('pinModal');
+  var title = document.getElementById('pinModalTitle');
+  function openModal(label) {
+    title.textContent = label;
+    modal.classList.add('open');
+  }
+  function closeModal() { modal.classList.remove('open'); }
+  document.getElementById('openPinDemo').addEventListener('click', function () {
+    openModal('홍길동 · 퇴근 비밀번호');
+  });
+  document.querySelectorAll('.punch-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      openModal(btn.dataset.name + ' · ' + btn.dataset.action + ' 비밀번호');
+    });
+  });
+  document.getElementById('closePinModal').addEventListener('click', closeModal);
+  document.getElementById('pinCancel').addEventListener('click', closeModal);
+  document.getElementById('pinOk').addEventListener('click', closeModal);
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+
+  var isEn = false;
+  document.getElementById('langToggle').addEventListener('click', function () {
+    isEn = !isEn;
+    document.getElementById('langLabel').textContent = isEn ? '한국어' : 'English';
+    document.getElementById('clockDate').textContent = isEn ? 'Mon, Nov 23, 2026' : '2026년 11월 23일 월요일';
+    document.getElementById('punchHeading').textContent = isEn ? 'Staff Clock-in / Out' : '알바생 출퇴근';
+    document.getElementById('punchGuide').textContent = isEn ? 'Tap your name and enter your PIN' : '이름을 누르고 비밀번호를 넣어요';
+  });
+})();
+</script>
+</body>
+</html>

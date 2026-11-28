@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 M 넓은 화면 설정</title>
+<!-- 디자인 시안(정적 목업). 실제 앱 코드가 아님. 예시 데이터만 들어 있음. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&amp;family=Inter:wght@500;600;700;800&amp;display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #f2f4f6; font-family: 'Noto Sans KR', sans-serif; color: #191f28; }
+button { font: inherit; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+.num { font-family: 'Inter', 'Noto Sans KR', sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.4px; }
+
+.app { width: 100%; height: 100vh; display: flex; overflow: hidden; }
+
+/* 왼쪽 세로 메뉴 */
+.sidebar {
+  width: 88px; flex: none; background: #fff; border-right: 1px solid #e5e8eb;
+  display: flex; flex-direction: column; padding: 18px 10px; gap: 16px;
+}
+.brand { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 4px 2px 10px; border-bottom: 1px solid #f2f4f6; }
+.brand-mark {
+  width: 38px; height: 38px; border-radius: 13px; background: #3182f6; color: #fff;
+  font-size: 16px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: none;
+}
+.brand-text { display: none; min-width: 0; }
+.brand-name { font-size: 15px; font-weight: 800; color: #191f28; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-sub { font-size: 11px; color: #8b95a1; margin-top: 1px; }
+.nav-list { display: flex; flex-direction: column; gap: 6px; }
+.nav-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  padding: 10px 4px; border-radius: 14px; color: #8b95a1; font-size: 11px; font-weight: 700;
+}
+.nav-item:hover { background: #f2f4f6; color: #4e5968; }
+.nav-item[aria-current="page"] { background: #e8f3ff; color: #1b64da; }
+.nav-item svg { flex: none; }
+.sidebar-foot { margin-top: auto; display: none; padding: 12px; border-radius: 14px; background: #f2f4f6; font-size: 12px; color: #6b7684; line-height: 1.5; }
+.sidebar-foot b { color: #191f28; display: block; margin-bottom: 2px; }
+
+@media (min-width: 1300px) {
+  .sidebar { width: 220px; padding: 20px 14px; }
+  .brand { justify-content: flex-start; padding: 4px 6px 14px; }
+  .brand-text { display: block; }
+  .nav-item { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; font-size: 14px; }
+  .sidebar-foot { display: block; }
+}
+
+.workspace { flex: 1; min-width: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.topbar {
+  flex: none; padding: 16px 24px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.topbar-left { display: flex; align-items: baseline; gap: 10px; }
+.topbar-left h1 { margin: 0; font-size: 20px; font-weight: 800; }
+.topbar-sub { font-size: 13px; color: #6b7684; font-weight: 600; }
+
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+.top-pill {
+  height: 36px; padding: 0 13px; border-radius: 12px; border: 0; background: #fff; color: #4e5968;
+  font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;
+}
+.top-pill:hover { background: #e5e8eb; color: #191f28; }
+
+.content {
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  padding: 0 24px 24px;
+}
+
+/* 왼쪽 설정 목록 / 오른쪽 시간 끊기 상세 패널 */
+.set-grid {
+  display: grid; grid-template-columns: minmax(340px, 0.92fr) minmax(0, 1.12fr);
+  gap: 16px; align-items: start;
+}
+
+.list-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.group-card { background: #fff; border-radius: 20px; overflow: hidden; }
+.group-label {
+  padding: 12px 18px 6px; font-size: 12px; font-weight: 800; color: #8b95a1;
+}
+.set-row {
+  width: 100%; border: 0; background: transparent; text-align: left; color: #191f28;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 18px; border-top: 1px solid #f2f4f6; transition: background .15s;
+}
+.set-row:first-of-type { border-top: 0; }
+.set-row:hover { background: #f9fafb; }
+.set-row.selected { background: #e8f3ff; }
+.set-row.selected .set-name { color: #1b64da; }
+.set-row.selected .set-val { color: #1b64da; font-weight: 700; }
+
+.set-name { font-size: 14.5px; font-weight: 700; color: #191f28; }
+.set-val { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: #8b95a1; flex: none; }
+.sync-dot { width: 7px; height: 7px; border-radius: 4px; background: #3182f6; }
+
+/* 오른쪽: 시간 끊기 상세 패널 (시안 M 핵심 특징) */
+.detail-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.detail-card { background: #fff; border-radius: 22px; padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; }
+.detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #f2f4f6; }
+.detail-head h2 { margin: 0; font-size: 19px; font-weight: 800; }
+.detail-head p { margin: 5px 0 0; font-size: 13px; color: #6b7684; }
+.scope-badge {
+  height: 28px; padding: 0 11px; border-radius: 9px; background: #e8f3ff; color: #1b64da;
+  font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; flex: none;
+}
+
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field-label { font-size: 13px; font-weight: 800; color: #4e5968; display: flex; align-items: center; justify-content: space-between; }
+.field-hint { font-size: 12px; font-weight: 500; color: #8b95a1; }
+
+.seg {
+  display: flex; padding: 4px; border-radius: 13px; background: #f2f4f6; gap: 4px;
+}
+.seg button {
+  flex: 1; height: 38px; border-radius: 10px; border: 0; background: transparent; color: #8b95a1;
+  font-size: 13.5px; font-weight: 800; transition: background .15s, color .15s;
+}
+.seg button.active { background: #fff; color: #191f28; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08); }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.grace-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.grace-box {
+  background: #f2f4f6; border-radius: 14px; padding: 12px 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.grace-box-label { font-size: 13px; font-weight: 700; color: #4e5968; }
+.grace-box-sub { display: block; font-size: 11px; font-weight: 500; color: #8b95a1; margin-top: 2px; }
+.stepper { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.step-btn {
+  width: 28px; height: 28px; border-radius: 8px; border: 0; background: #fff; color: #191f28;
+  font-size: 15px; font-weight: 800; display: flex; align-items: center; justify-content: center;
+}
+.step-val { min-width: 34px; text-align: center; font-size: 14px; font-weight: 800; }
+
+.auto-out-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 16px; border-radius: 14px; background: #f2f4f6;
+}
+.auto-out-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.time-chip {
+  height: 32px; padding: 0 12px; border-radius: 9px; border: 0; background: #fff; color: #6b7684;
+  font-size: 12.5px; font-weight: 700;
+}
+.time-chip.active { background: #191f28; color: #fff; }
+
+.preview-box {
+  border-radius: 14px; background: #f8fbff; border: 1px solid #d6e9ff; padding: 13px 16px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.preview-box-title { font-size: 12px; font-weight: 800; color: #1b64da; }
+.preview-examples { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12.5px; color: #4e5968; }
+.preview-examples b { color: #191f28; }
+
+/* 아래 보조 카드: 이 기기 설정 & 앱 정보·공유 */
+.sub-card { background: #fff; border-radius: 20px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; }
+.sub-card-head { display: flex; align-items: center; justify-content: space-between; }
+.sub-card-head h3 { margin: 0; font-size: 15px; font-weight: 800; }
+.sub-card-head span { font-size: 12px; color: #8b95a1; font-weight: 600; }
+.device-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.device-tile {
+  background: #f2f4f6; border-radius: 14px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.device-tile span { font-size: 12px; color: #6b7684; font-weight: 600; }
+.device-tile b { font-size: 14px; color: #191f28; font-weight: 800; }
+.device-tile small { font-size: 11px; color: #8b95a1; }
+
+.app-foot-actions { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 2px; }
+.foot-btn {
+  height: 36px; padding: 0 14px; border-radius: 11px; border: 0; background: #f2f4f6; color: #4e5968;
+  font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;
+}
+.foot-btn:hover { background: #e5e8eb; color: #191f28; }
+.foot-btn.blue { background: #e8f3ff; color: #1b64da; }
+
+@media (max-width: 1140px) {
+  .two-col, .grace-row { grid-template-columns: 1fr; }
+  .device-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" aria-label="주 메뉴">
+    <div class="brand">
+      <span class="brand-mark">우</span>
+      <div class="brand-text">
+        <div class="brand-name">우리분식 본점</div>
+        <div class="brand-sub">사장 김사장</div>
+      </div>
+    </div>
+    <nav class="nav-list" aria-label="메뉴">
+      <a class="nav-item" href="M_Punch.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>출퇴근</span>
+      </a>
+      <a class="nav-item" href="M_Pay.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg>
+        <span>근무·급여</span>
+      </a>
+      <a class="nav-item" href="M_Chk.html">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>위생 점검</span>
+      </a>
+      <a class="nav-item" href="M_Set.html" aria-current="page">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+        <span>설정</span>
+      </a>
+    </nav>
+    <div class="sidebar-foot">
+      <b>사장님 도우미 v1.7.1</b>
+      모든 기기 동기화 정상
+    </div>
+  </aside>
+
+  <div class="workspace">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1>설정</h1>
+        <span class="topbar-sub">매장 · 출퇴근 · 급여 기준 · 앱 환경</span>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="top-pill" aria-label="글자 크기 키우기">가+ 글자 크기</button>
+        <button type="button" class="top-pill" aria-label="다크 모드 전환">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          다크 모드
+        </button>
+        <button type="button" class="top-pill">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></svg>
+          사용 방법 (14)
+        </button>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="set-grid">
+        <!-- 왼쪽: 설정 목록 -->
+        <div class="list-col" aria-label="설정 항목 목록">
+          <section class="group-card">
+            <div class="group-label">매장 · 기기</div>
+            <button type="button" class="set-row">
+              <span class="set-name">매장 정보</span>
+              <span class="set-val">우리분식 본점 · 김사장<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+            <button type="button" class="set-row">
+              <span class="set-name">구글 시트 자동 저장</span>
+              <span class="set-val"><span class="sync-dot"></span>연결됨<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+            <button type="button" class="set-row">
+              <span class="set-name">관리자 비밀번호 · 출퇴근 기기</span>
+              <span class="set-val">설정됨<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+            <a class="set-row" href="M_QR.html">
+              <span class="set-name">손님 계좌이체 QR</span>
+              <span class="set-val">예시은행 · QR 열기<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </a>
+          </section>
+
+          <section class="group-card">
+            <div class="group-label">출퇴근</div>
+            <button type="button" class="set-row selected" aria-current="true">
+              <span class="set-name">출퇴근 시간 끊기</span>
+              <span class="set-val num">30분 · 올림/내림<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+            <button type="button" class="set-row">
+              <span class="set-name">알림음 (이 기기만)</span>
+              <span class="set-val num">켜짐 · 80%<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+            <button type="button" class="set-row">
+              <span class="set-name">화면 보호기 (이 기기만)</span>
+              <span class="set-val num">10분 후<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+          </section>
+
+          <section class="group-card">
+            <div class="group-label">급여 · 위생 기준 · 앱</div>
+            <button type="button" class="set-row">
+              <span class="set-name">올해 최저시급 · 식사 시간대</span>
+              <span class="set-val num">10,320원<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+            <button type="button" class="set-row">
+              <span class="set-name">보건증 만료 알림</span>
+              <span class="set-val num">30일 전부터<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+            <button type="button" class="set-row">
+              <span class="set-name">세금 · 4대보험 비율</span>
+              <span class="set-val num">3.3% · 기본값<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+            <button type="button" class="set-row">
+              <span class="set-name">언어 · 글자 크기 · 다크 모드</span>
+              <span class="set-val">한국어 · 보통<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+            <button type="button" class="set-row">
+              <span class="set-name">앱 정보 · 공유 · 사용 방법</span>
+              <span class="set-val num">v1.7.1<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>
+            </button>
+          </section>
+        </div>
+
+        <!-- 오른쪽: 시간 끊기 상세 패널 (시안 M 고유 특징) -->
+        <div class="detail-col">
+          <section class="detail-card" aria-label="출퇴근 시간 끊기 상세 설정">
+            <div class="detail-head">
+              <div>
+                <h2>출퇴근 시간 끊기</h2>
+                <p>직원이 찍은 출퇴근 시각을 정한 단위로 끊어 급여 시간에 반영합니다.</p>
+              </div>
+              <span class="scope-badge">모든 기기 적용</span>
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <span>끊는 단위</span>
+                <span class="field-hint">기본값 30분</span>
+              </div>
+              <div class="seg num" data-seg="unit">
+                <button type="button">5분</button>
+                <button type="button">10분</button>
+                <button type="button">15분</button>
+                <button type="button" class="active">30분</button>
+                <button type="button">1시간</button>
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="field">
+                <div class="field-label">
+                  <span>출근 방식</span>
+                  <span class="field-hint">일찍 와도 정시 기준</span>
+                </div>
+                <div class="seg" data-seg="in">
+                  <button type="button" class="active">올림</button>
+                  <button type="button">그대로</button>
+                </div>
+              </div>
+              <div class="field">
+                <div class="field-label">
+                  <span>퇴근 방식</span>
+                  <span class="field-hint">끝난 시각 기준</span>
+                </div>
+                <div class="seg" data-seg="out">
+                  <button type="button" class="active">내림</button>
+                  <button type="button">그대로</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <span>지각 · 조기퇴근 봐주기</span>
+                <span class="field-hint">설정한 분 이내 차이는 정시로 인정</span>
+              </div>
+              <div class="grace-row">
+                <div class="grace-box">
+                  <div>
+                    <span class="grace-box-label">지각 봐주기</span>
+                    <span class="grace-box-sub num">09:04 출근 → 09:00</span>
+                  </div>
+                  <div class="stepper num">
+                    <button type="button" class="step-btn" aria-label="지각 봐주기 줄이기">−</button>
+                    <span class="step-val">5분</span>
+                    <button type="button" class="step-btn" aria-label="지각 봐주기 늘리기">+</button>
+                  </div>
+                </div>
+                <div class="grace-box">
+                  <div>
+                    <span class="grace-box-label">조기퇴근 봐주기</span>
+                    <span class="grace-box-sub num">17:56 퇴근 → 18:00</span>
+                  </div>
+                  <div class="stepper num">
+                    <button type="button" class="step-btn" aria-label="조기퇴근 봐주기 줄이기">−</button>
+                    <span class="step-val">5분</span>
+                    <button type="button" class="step-btn" aria-label="조기퇴근 봐주기 늘리기">+</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <span>자동 퇴근 시각</span>
+                <span class="field-hint">미퇴근 시 자동 처리 후 '퇴근 확인 필요' 표시</span>
+              </div>
+              <div class="auto-out-row">
+                <span style="font-size: 13.5px; font-weight: 800;">매일 자동 퇴근</span>
+                <div class="auto-out-chips num" data-seg="auto">
+                  <button type="button" class="time-chip">23:00</button>
+                  <button type="button" class="time-chip active">자정 (00:00)</button>
+                  <button type="button" class="time-chip">02:00</button>
+                  <button type="button" class="time-chip">04:00</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="preview-box">
+              <span class="preview-box-title">현재 규칙 적용 예시 (30분 단위 · 출근 올림 · 퇴근 내림 · 봐주기 5분)</span>
+              <div class="preview-examples num">
+                <span>08:57 출근 → <b>09:00</b></span>
+                <span>09:04 출근(봐주기) → <b>09:00</b></span>
+                <span>18:05 퇴근 → <b>18:00</b></span>
+              </div>
+            </div>
+          </section>
+
+          <section class="sub-card" aria-label="이 기기 설정 및 앱 도구">
+            <div class="sub-card-head">
+              <h3>이 기기 설정 · 급여 기준 요약</h3>
+              <span>세금·4대보험 기본값 되돌리기 지원</span>
+            </div>
+            <div class="device-grid num">
+              <div class="device-tile">
+                <span>알림음 (이 기기만)</span>
+                <b>크기 80% · 듣기</b>
+                <small>출근 딩동 · 퇴근 멜로디</small>
+              </div>
+              <div class="device-tile">
+                <span>식사 시간대</span>
+                <b>점심 11~14 · 저녁 17~20</b>
+                <small>최저시급 10,320원</small>
+              </div>
+              <div class="device-tile">
+                <span>보건증 알림</span>
+                <b>30일 전부터 안내</b>
+                <small>7일 전 빨간 경고</small>
+              </div>
+            </div>
+            <div class="app-foot-actions">
+              <button type="button" class="foot-btn">앱 주소 복사</button>
+              <button type="button" class="foot-btn">공유하기</button>
+              <button type="button" class="foot-btn blue">사용 방법 전체 보기 (14개 주제)</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+(function () {
+  document.querySelectorAll('[data-seg]').forEach(function (group) {
+    var btns = group.querySelectorAll('button');
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        btns.forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

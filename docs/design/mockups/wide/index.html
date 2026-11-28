@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>넓은 화면 시안 모아 보기</title>
+<!-- 디자인 시안 모음(정적 목업). 실제 앱 코드가 아님. 배포되는 web/ 폴더 밖에 있음. -->
+<style>
+  body{margin:0;background:#e9ecef;font-family:'Noto Sans KR',system-ui,sans-serif;color:#191f28}
+  header{padding:28px 32px 8px}
+  h1{margin:0 0 6px;font-size:24px}
+  p{margin:0 0 4px;color:#4e5968;font-size:14px;line-height:1.6}
+  .sizes{display:flex;gap:8px;margin:12px 0 0}
+  .sizes button{height:36px;padding:0 14px;border-radius:18px;border:0;background:#fff;color:#4e5968;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  .sizes button[aria-pressed=true]{background:#191f28;color:#fff}
+  section{padding:20px 32px 8px}
+  h2{margin:0 0 4px;font-size:19px}
+  .row{display:flex;gap:20px;overflow-x:auto;padding-bottom:16px}
+  figure{margin:0;flex:none}
+  figcaption{font-size:13px;font-weight:700;color:#4e5968;margin:0 0 6px}
+  .frame{overflow:hidden;border-radius:18px;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.08)}
+  iframe{border:0;transform-origin:0 0;display:block}
+  figure a{display:block;margin-top:4px;font-size:12px;color:#3182f6}
+</style>
+</head>
+<body>
+<header>
+  <h1>넓은 화면 시안 I~M (태블릿 가로 · PC)</h1>
+  <p>휴대폰 시안(<a href="../index.html">../index.html</a>)과 같은 시안을 넓은 화면에 맞게 다시 배치한 것입니다. 이름·금액·시간은 예시입니다.</p>
+  <p>손님 화면은 손님 휴대폰에서만 열리므로 넓은 화면 버전이 없습니다. 아래 미리보기는 축소해서 보여 줍니다. 실제 크기는 "따로 열기"로 보세요.</p>
+  <div class="sizes" role="group" aria-label="화면 크기">
+    <button type="button" data-w="1180" data-h="820" aria-pressed="true">태블릿 가로 1180×820</button>
+    <button type="button" data-w="1440" data-h="900" aria-pressed="false">PC 1440×900</button>
+  </div>
+</header>
+<main id="list"></main>
+<script>
+  var SETS = [
+    ['I', '주차 줄 달력 + 금액 바'], ['J', '주차 탭 달력 + 2단계 출퇴근'], ['K', '주 카드 달력 + 떠 있는 메뉴'],
+    ['L', '큰 칸 달력 + 주 요약 열'], ['M', '요약 대시보드 + 주차 표']
+  ];
+  var PAGES = [['Punch','출퇴근'],['Pay','근무·급여'],['Chk','위생 점검'],['QR','계좌이체 QR'],['Set','설정']];
+  var SCALE = 0.5, W = 1180, H = 820;
+  var list = document.getElementById('list');
+  function size() {
+    document.querySelectorAll('.frame').forEach(function (f) {
+      f.style.width = (W * SCALE) + 'px'; f.style.height = (H * SCALE) + 'px';
+      var fr = f.firstChild; fr.style.width = W + 'px'; fr.style.height = H + 'px';
+      fr.style.transform = 'scale(' + SCALE + ')';
+    });
+  }
+  SETS.forEach(function (s) {
+    var sec = document.createElement('section');
+    var h = document.createElement('h2'); h.textContent = '시안 ' + s[0] + ' · ' + s[1];
+    var row = document.createElement('div'); row.className = 'row';
+    PAGES.forEach(function (p) {
+      var file = s[0] + '_' + p[0] + '.html';
+      var fig = document.createElement('figure');
+      var cap = document.createElement('figcaption'); cap.textContent = p[1];
+      var box = document.createElement('div'); box.className = 'frame';
+      var fr = document.createElement('iframe'); fr.src = file; fr.loading = 'lazy'; fr.title = '시안 ' + s[0] + ' 넓은 화면 ' + p[1];
+      box.appendChild(fr);
+      var a = document.createElement('a'); a.href = file; a.textContent = file + ' 따로 열기';
+      fig.appendChild(cap); fig.appendChild(box); fig.appendChild(a); row.appendChild(fig);
+    });
+    sec.appendChild(h); sec.appendChild(row); list.appendChild(sec);
+  });
+  document.querySelectorAll('.sizes button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      W = +b.dataset.w; H = +b.dataset.h;
+      document.querySelectorAll('.sizes button').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+      size();
+    });
+  });
+  size();
+</script>
+</body>
+</html>
