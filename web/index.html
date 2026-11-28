@@ -11,8 +11,8 @@
   <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-  <script src="./boot.js?v=202611290300"></script>
-  <link rel="stylesheet" href="./style.css?v=202611290300">
+  <script src="./boot.js?v=202611290400"></script>
+  <link rel="stylesheet" href="./style.css?v=202611290400">
 </head>
 <body>
   <header class="app-header">
@@ -140,7 +140,7 @@
             <div class="notice-stats">
               <span>총 <b id="dailyTotalHours">0</b>시간 (<b id="dailyWorkDays">0</b>일)</span>
               <span>·</span>
-              <span>🍚 식대 <b id="dailyMealDays">0</b>회</span>
+              <span>식대 <b id="dailyMealDays">0</b>회</span>
             </div>
           </div>
 
@@ -165,7 +165,7 @@
             <label class="meal-head">
               <input id="pMeal" type="checkbox" checked>
               <span class="weekly-text">
-                <b>🍚 식대 추가 지급</b>
+                <b>식대 추가 지급</b>
                 <small id="mealSummaryText">점심·저녁 식사 시간에 일한 날 식대를 추가 지급합니다 (실비라 세금 계산에서 제외)</small>
               </span>
             </label>
@@ -280,7 +280,7 @@
             </details>
           </div>
           <div class="archive-actions">
-            <span class="total-pill"><span id="rosterMonthLabel">이번 달</span> 입금 합계 <b id="rosterTotal" class="m-amt">0원</b></span>
+            <span class="total-pill"><span id="rosterMonthLabel">이번 달</span> 입금 합계 <b id="rosterTotal" class="m-amt" data-amt="0원"></b></span>
           </div>
         </div>
         <form id="addWorkerForm" class="add-worker" autocomplete="off">
@@ -658,9 +658,9 @@
               <li><b>비밀번호</b>를 입력하고 <b>[출근 찍기]</b>(출근 중이면 <b>[퇴근 찍기]</b>)를 누릅니다.</li>
               <li>결과 창에 <b>이번 달 일한 일수와 누적 근무시간</b>이 나오고, <b>5초 뒤 자동으로 닫힙니다</b>. 바로 닫으려면 [닫기]를 누르세요.</li>
             </ol>
-            <figure class="guide-fig"><img src="./img/guide-punch-list.webp?v=172" alt="출퇴근 화면 (이름 옆 파란 점이 근무 중)" loading="lazy" decoding="async"><figcaption>출퇴근 화면 (이름 옆 파란 점이 근무 중)</figcaption></figure>
-            <figure class="guide-fig"><img src="./img/guide-punch-pw.webp?v=172" alt="비밀번호 입력" loading="lazy" decoding="async"><figcaption>비밀번호 입력</figcaption></figure>
-            <figure class="guide-fig"><img src="./img/guide-punch-out.webp?v=172" alt="퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)" loading="lazy" decoding="async"><figcaption>퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-punch-list.webp?v=173" alt="출퇴근 화면 (이름 옆 파란 점이 근무 중)" loading="lazy" decoding="async"><figcaption>출퇴근 화면 (이름 옆 파란 점이 근무 중)</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-punch-pw.webp?v=173" alt="비밀번호 입력" loading="lazy" decoding="async"><figcaption>비밀번호 입력</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-punch-out.webp?v=173" alt="퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)" loading="lazy" decoding="async"><figcaption>퇴근을 찍은 뒤 결과 (5초 뒤 자동으로 닫힘)</figcaption></figure>
             <ul>
               <li><b>퇴근을 꼭 찍어 주세요.</b> 안 찍으면 자동 퇴근 처리되고, 그날 근무는 사장님이 확인한 뒤에 기록됩니다.</li>
               <li>비밀번호를 5번 연속 틀리면 30초 동안 막힙니다(새로고침해도 그대로). 틀린 기록도 시트에 남습니다. 관리자 비밀번호는 5번 틀리면 1분 동안 막힙니다.</li>
@@ -736,7 +736,7 @@
               <li><b>이름 · 계약서상 일하는 날 · 시급</b>을 넣고 <b>[알바생 추가]</b>를 누르면 끝입니다. 알바생이 직접 출퇴근을 찍게 하려면 <b>출퇴근 비밀번호</b>도 함께 정해 주세요.</li>
               <li>알바생이 여러 명이면 이름이 한 줄로 늘어섭니다. <b>손가락으로 옆으로 밀면</b> 다음 사람이 나옵니다. 이름을 누르면 그 사람의 기록으로 바뀝니다.</li>
             </ol>
-            <figure class="guide-fig"><img src="./img/guide-add.webp?v=172" alt="알바생 추가 창" loading="lazy" decoding="async"><figcaption>알바생 추가 창</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-add.webp?v=173" alt="알바생 추가 창" loading="lazy" decoding="async"><figcaption>알바생 추가 창</figcaption></figure>
             <p class="guide-step-title">② 출근·퇴근 시간 고르기</p>
             <ol>
               <li>이름 아래 <b>◀ 2026년 11월 ▶</b>로 달을 고릅니다. 가운데 글자를 누르면 원하는 달로 바로 갑니다.</li>
@@ -746,22 +746,22 @@
               <li>매일 같다면 창 아래 <b>[여러 날 한꺼번에 적용하기]</b>에서 평일·주말·같은 요일에 한 번에 넣을 수 있습니다.</li>
               <li>자주 쓰는 근무시간은 <b>[＋ 추가]</b>로 직접 만들 수 있습니다. (최대 20개)</li>
             </ol>
-            <figure class="guide-fig"><img src="./img/guide-main.webp?v=172" alt="달 · 출퇴근 달력 (칸 안에 출근·퇴근 시각, 아래 파란 막대가 식대)" loading="lazy" decoding="async"><figcaption>달 · 출퇴근 달력 (칸 안에 출근·퇴근 시각, 아래 파란 막대가 식대)</figcaption></figure>
-            <figure class="guide-fig"><img src="./img/guide-day.webp?v=172" alt="날짜를 누르면 열리는 설정 창" loading="lazy" decoding="async"><figcaption>날짜를 누르면 열리는 설정 창</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-main.webp?v=173" alt="달 · 출퇴근 달력 (칸 안에 출근·퇴근 시각, 아래 파란 막대가 식대)" loading="lazy" decoding="async"><figcaption>달 · 출퇴근 달력 (칸 안에 출근·퇴근 시각, 아래 파란 막대가 식대)</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-day.webp?v=173" alt="날짜를 누르면 열리는 설정 창" loading="lazy" decoding="async"><figcaption>날짜를 누르면 열리는 설정 창</figcaption></figure>
             <p class="guide-step-title">③ 줄 돈 확인하기</p>
             <ol>
               <li>달력 아래 <b>[줄 돈 보기]</b>를 누르면 <b>"○○님에게 줄 돈"</b>(실수령액)이 나옵니다. 다른 사람이 화면을 볼 수 있어서 <b>금액은 평소에 숨겨져</b> 있습니다. 다시 누르면 숨겨집니다.</li>
               <li><b>[카톡 명세서 복사]</b> 후 카카오톡에 붙여넣으면 알바생에게 바로 보낼 수 있습니다.</li>
               <li><b>[명세서 보기]</b>로 항목별 계산 내용을, <b>[PDF]</b>·<b>[엑셀]</b>로 파일을 만들 수 있습니다.</li>
             </ol>
-            <figure class="guide-fig"><img src="./img/guide-money.webp?v=172" alt="줄 돈 보기를 누른 화면" loading="lazy" decoding="async"><figcaption>줄 돈 보기를 누른 화면</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-money.webp?v=173" alt="줄 돈 보기를 누른 화면" loading="lazy" decoding="async"><figcaption>줄 돈 보기를 누른 화면</figcaption></figure>
             <p class="guide-step-title">④ 시급·세금 등 바꾸기</p>
             <ol>
               <li>달력 아래 <b>[정산 설정]</b> 줄을 누르면 설정 창이 올라옵니다.</li>
               <li><b>이름 · 시급 · 주 근무 약속일수 · 세금(3.3% / 4대보험 / 미적용) · 주휴수당 · 식대</b>를 여기서 고치고 <b>[완료]</b>를 누릅니다. 고치는 즉시 저장됩니다.</li>
               <li><b>출퇴근 비밀번호</b>는 알바생이 매장 기기에서 출근·퇴근을 찍을 때 입력하는 번호입니다. 직접 입력하는 방식으로 쓰지 않는다면 비워 두셔도 됩니다.</li>
             </ol>
-            <figure class="guide-fig"><img src="./img/guide-set.webp?v=172" alt="정산 설정 창" loading="lazy" decoding="async"><figcaption>정산 설정 창</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-set.webp?v=173" alt="정산 설정 창" loading="lazy" decoding="async"><figcaption>정산 설정 창</figcaption></figure>
           </div>
         </details>
 
@@ -795,8 +795,8 @@
               <li>맨 아래 <b>정산 명단</b>에는 알바생이 한 줄씩 카드로 나옵니다. 근무시간과 식대 횟수, 금액이 보이고(금액은 <b>[줄 돈 보기]</b>를 눌러야 보임), 카드를 누르면 그 사람 기록으로 바뀌고, 오른쪽 <b>✕</b>를 누르면 삭제합니다.</li>
               <li>정산 명단 오른쪽 위 <b>[⋯] → [엑셀로 받기]</b>를 누르면 알바생 목록이 뜹니다. <b>받고 싶은 사람만 체크</b>하고 <b>[엑셀 받기]</b>를 누르면, 체크한 사람의 모든 달 기록이 한 파일로 받아집니다. <b>[알바생 본인용]</b>에 체크하면 급여 금액·시급·세금 없이 <b>출근일자·근무시간·식대 횟수만</b> 담긴 파일이 만들어져 알바생에게 그대로 줄 수 있습니다. 한 명만 체크하면 파일 이름에 그 사람 이름이 들어갑니다.</li>
             </ol>
-            <figure class="guide-fig"><img src="./img/guide-roster.webp?v=172" alt="정산 명단 (오른쪽 위 ⋯ 메뉴를 연 모습)" loading="lazy" decoding="async"><figcaption>정산 명단 (오른쪽 위 ⋯ 메뉴를 연 모습)</figcaption></figure>
-            <figure class="guide-fig"><img src="./img/guide-export.webp?v=172" alt="엑셀로 받을 알바생 고르기" loading="lazy" decoding="async"><figcaption>엑셀로 받을 알바생 고르기</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-roster.webp?v=173" alt="정산 명단 (오른쪽 위 ⋯ 메뉴를 연 모습)" loading="lazy" decoding="async"><figcaption>정산 명단 (오른쪽 위 ⋯ 메뉴를 연 모습)</figcaption></figure>
+            <figure class="guide-fig"><img src="./img/guide-export.webp?v=173" alt="엑셀로 받을 알바생 고르기" loading="lazy" decoding="async"><figcaption>엑셀로 받을 알바생 고르기</figcaption></figure>
           </div>
         </details>
 
@@ -1064,7 +1064,7 @@
                   <span class="preset-label">빠른 시간대 <small id="presetCount" class="preset-count">0/20</small></span>
                   <div class="preset-actions">
                     <button type="button" class="chip preset-add" id="presetAddBtn" title="시간대 추가 (최대 20개)">＋ 시간대 추가</button>
-                    <button type="button" class="chip preset-edit-toggle" id="presetEditToggle" title="시간대 수정/삭제 모드">✏️ 편집</button>
+                    <button type="button" class="chip preset-edit-toggle" id="presetEditToggle" title="시간대 수정/삭제 모드">편집</button>
                   </div>
                 </div>
                 <div class="preset-list" id="presetList"></div>
@@ -1142,7 +1142,7 @@
 
               <!-- 식대: 점심/저녁 (근무 시간으로 자동 체크, 필요하면 빼기) -->
               <div id="mealPick" class="meal-pick" hidden>
-                <span class="meal-pick-title">🍚 식대</span>
+                <span class="meal-pick-title">식대</span>
                 <label class="meal-check"><input id="mealLunch" type="checkbox"><span>점심</span></label>
                 <label class="meal-check"><input id="mealDinner" type="checkbox"><span>저녁</span></label>
                 <small id="mealPickNote" class="meal-pick-note">자동</small>
@@ -1151,7 +1151,7 @@
               <!-- 휴게시간 & 일괄 적용 버튼 바 -->
               <div class="editor-footer-bar">
                 <div class="break-selector">
-                  <span>☕ 휴게시간 차감</span>
+                  <span>휴게시간 차감</span>
                   <div id="breakBtns" class="break-btns">
                     <button type="button" class="chip active" data-break-val="0">없음</button>
                     <button type="button" class="chip" data-break-val="30">30분</button>
@@ -1173,16 +1173,16 @@
             </div>
 
       <div class="day-actions">
-        <button id="btnSetDayOff" type="button" class="btn btn-ghost">🚫 이 날 휴무</button>
+        <button id="btnSetDayOff" type="button" class="btn btn-ghost">이 날 휴무</button>
         <button id="btnApplySelectedDay" type="button" class="btn btn-primary">✓ 완료</button>
       </div>
     </div>
   </div>
 
-  <script src="./engine.js?v=202611290300"></script>
-  <script src="./lang_web.js?v=202611290300"></script>
-  <script src="./i18n.js?v=202611290300"></script>
-  <script src="./gsync.js?v=202611290300"></script>
-  <script src="./app.js?v=202611290300"></script>
+  <script src="./engine.js?v=202611290400"></script>
+  <script src="./lang_web.js?v=202611290400"></script>
+  <script src="./i18n.js?v=202611290400"></script>
+  <script src="./gsync.js?v=202611290400"></script>
+  <script src="./app.js?v=202611290400"></script>
 </body>
 </html>

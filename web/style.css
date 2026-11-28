@@ -2197,7 +2197,7 @@ body.modal-open { overflow: hidden; }
   .day-sheet .preset-add { font-size: 0; }
   .day-sheet .preset-add::before { content: '＋ 추가'; font-size: 14px; }
   .day-sheet .preset-edit-toggle { font-size: 0; }
-  .day-sheet .preset-edit-toggle::before { content: '✏️ 편집'; font-size: 14px; }
+  .day-sheet .preset-edit-toggle::before { content: '편집'; font-size: 14px; }
 
   /* 줄 돈: 기본 숨김, 눌러야 보임 / 달력 바로 아래 */
   #scheduleBoard { order: 2; }
@@ -2371,7 +2371,7 @@ body.on-punch .app-footer, body.locked .app-footer { display: none; }
 .lang-btn { font-size: 14px; font-weight: 700; padding: 0 12px; }
 @media screen {
   html[lang="en"] .day-sheet .preset-add::before { content: '＋ Add'; }
-  html[lang="en"] .day-sheet .preset-edit-toggle::before { content: '✏️ Edit'; }
+  html[lang="en"] .day-sheet .preset-edit-toggle::before { content: 'Edit'; }
   html[lang="en"] body:not(.money-show) .m-amt::after { content: '•••••'; }
 }
 
@@ -2957,3 +2957,8 @@ nav.tabs .tabs-store { display: none; }
 .bell-btn { display: inline-flex; align-items: center; gap: 4px; }
 .bell-btn[hidden] { display: none; }
 #themeToggle { display: inline-flex; align-items: center; justify-content: center; }
+/* 출퇴근 결과 창 아이콘: 선 아이콘(출근 해 / 퇴근 달), 파란색 */
+.punch-res-icon { display: flex; justify-content: center; color: var(--primary); }
+.punch-res-icon .hdr-ico { width: 56px; height: 56px; }
+/* 인쇄: 화면에서 금액을 비워 둔 입금 합계(#rosterTotal)는 종이에 data-amt 값으로 찍는다 */
+@media print { #rosterTotal:empty::after { content: attr(data-amt); } }
