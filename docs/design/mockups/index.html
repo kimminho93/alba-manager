@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사장님 도우미 UI 시안 I~M 모아 보기</title>
+<!-- 디자인 시안 모음(정적 목업). 실제 앱 코드가 아님. 배포되는 web/ 폴더 밖에 있음. -->
+<style>
+  body{margin:0;background:#e9ecef;font-family:'Noto Sans KR',system-ui,sans-serif;color:#191f28}
+  header{padding:28px 32px 8px}
+  h1{margin:0 0 6px;font-size:24px}
+  p{margin:0 0 4px;color:#4e5968;font-size:14px;line-height:1.6}
+  section{padding:20px 32px 8px}
+  h2{margin:0 0 4px;font-size:19px}
+  .desc{margin:0 0 12px;color:#6b7684;font-size:13px}
+  .row{display:flex;gap:20px;overflow-x:auto;padding-bottom:16px}
+  figure{margin:0;flex:none}
+  figcaption{font-size:13px;font-weight:700;color:#4e5968;margin:0 0 6px}
+  iframe{width:390px;height:844px;border:0;border-radius:32px;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.08)}
+  figure a{display:block;margin-top:4px;font-size:12px;color:#3182f6}
+</style>
+</head>
+<body>
+<header>
+  <h1>사장님 도우미 UI 시안 I~M</h1>
+  <p>390×844(휴대폰) 크기의 정적 시안입니다. 이름·금액·시간은 모두 예시 데이터입니다.</p>
+  <p>시안마다 출퇴근 · 근무·급여 · 위생 점검 · 계좌이체 QR · 설정 · 손님 화면(pay.html) 6장이 있습니다. 화면 안 하단 메뉴를 누르면 같은 시안의 다른 화면으로 이동합니다.</p>
+  <p>설명과 적용 방법은 <code>docs/design/README.md</code>에 있습니다.</p>
+</header>
+<main id="list"></main>
+<script>
+  var SETS = [
+    ['I', '주차 줄 달력 + 금액 바', '달력 칸: 날짜·출근·퇴근 + 아래 막대 = 식대. 주마다 요약 줄. 줄 돈은 화면 아래 고정 바(숨김→보기).'],
+    ['J', '주차 탭 달력 + 2단계 출퇴근', '주차 탭으로 주를 고르면 달력에서 강조 + 아래 요약 줄. 출퇴근: 이름 → 비밀번호 → 큰 버튼.'],
+    ['K', '주 카드 달력 + 떠 있는 메뉴', '주마다 카드 한 장(머리에 주차 요약, 안에 7칸). 떠 있는 하단 메뉴.'],
+    ['L', '큰 칸 달력 + 주 요약 열', '칸이 커서 출근·퇴근 12px. 왼쪽 검은 열에 주차 시간·식대·주휴. 출퇴근은 비밀번호 키패드 시트.'],
+    ['M', '요약 대시보드 + 주차 표', '이번 달 시간 크게, 파란 블록 달력(점 = 식대), 아래 1~5주 표. 점검은 진행 도넛 + 분류 타일.']
+  ];
+  var PAGES = [['Punch','출퇴근'],['Pay','근무·급여'],['Chk','위생 점검'],['QR','계좌이체 QR'],['Set','설정'],['Cust','손님 화면']];
+  var list = document.getElementById('list');
+  SETS.forEach(function (s) {
+    var sec = document.createElement('section');
+    var h = document.createElement('h2'); h.textContent = '시안 ' + s[0] + ' · ' + s[1];
+    var d = document.createElement('p'); d.className = 'desc'; d.textContent = s[2];
+    var row = document.createElement('div'); row.className = 'row';
+    PAGES.forEach(function (p) {
+      var file = s[0] + '_' + p[0] + '.html';
+      var fig = document.createElement('figure');
+      var cap = document.createElement('figcaption'); cap.textContent = p[1];
+      var fr = document.createElement('iframe'); fr.src = file; fr.loading = 'lazy'; fr.title = '시안 ' + s[0] + ' ' + p[1];
+      var a = document.createElement('a'); a.href = file; a.textContent = file + ' 따로 열기';
+      fig.appendChild(cap); fig.appendChild(fr); fig.appendChild(a); row.appendChild(fig);
+    });
+    sec.appendChild(h); sec.appendChild(d); sec.appendChild(row); list.appendChild(sec);
+  });
+</script>
+</body>
+</html>

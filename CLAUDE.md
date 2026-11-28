@@ -10,6 +10,26 @@ Claude는 이 저장소에서 작업을 시작할 때 이 문서를 먼저 읽�
 - 디자인 시안 캔버스: https://claude.ai/artifact/MBtD999uf7nwsM5gdRyqJ8
 - claude.ai 프로젝트 "Claude 프로젝트"에도 같은 내용의 사본이 있다 (`claude/사장님도우미_요구사항.md`).
 
+## Claude Code로 시작하기 (새 컴퓨터에서 처음 한 번)
+1. 클론: `git clone https://github.com/kimminho93/alba-manager.git` → `cd alba-manager` → `claude`
+   - 푸시는 저장소 주인(kimminho93) 계정으로 로그인된 git에서만 된다. 처음 푸시할 때 GitHub 로그인 창이 뜨면 본인 계정으로 로그인한다.
+2. 필요한 것: Node.js 20 이상만 있으면 된다(외부 패키지 설치 없음, `npm install` 불필요).
+   e2e 화면 확인을 하려면 Playwright가 필요하다: `npx playwright install chromium`.
+3. 자주 쓰는 명령
+   - 빌드 + 기본 테스트: `make test` (Windows에서 make가 없으면 `node tools/build.js && node tests/test_main.js && node tests/test_server.js`)
+   - 전체 테스트: `npm test` / 오래 돌리는 반복 테스트: `npm run stress`
+   - 내 PC에서 앱 띄우기: `npm run web` → http://localhost:8000
+   - 번역 누락 확인: `node tools/i18n_scan.js`
+4. 다른 컴퓨터에서 작업을 이어 갈 때는 **항상 `git pull`부터** 한다. 이 문서와 `docs/`가 모든 컴퓨터 공통 기준이다.
+5. 결정이 바뀌면 이 문서를 고치고, claude.ai 프로젝트 문서(`claude/사장님도우미_요구사항.md`, `claude/사장님도우미_기능목록.md`)도 같은 내용으로 맞춘다.
+
+## 폴더 구조 (요약)
+- `web/` — 실제 배포되는 앱(GitHub Pages가 이 폴더만 올린다). `index.html`, `app.js`(화면), `engine.js`(빌드 결과), `gsync.js`(구글 시트), `pay.html`(손님 화면), `style.css`
+- `src/` — 계산 엔진 원본(급여, 점검표, QR, 엑셀 등). `tools/build.js`가 묶어서 `web/engine.js`를 만든다
+- `server/` — 로컬 서버(선택). `tests/` — 단위·스트레스·퍼즈 테스트
+- `docs/FEATURES.md` — 전체 기능 목록과 새 UI 배치표
+- `docs/design/` — UI 시안(정적 HTML)과 적용 안내. 배포되지 않는다
+
 ## 작업 규칙
 - 답변은 한국어로 한다.
 - 버그가 없는 게 가장 중요하다. 배포 전에 반복 테스트(e2e 포함)를 반드시 한다.
@@ -28,7 +48,10 @@ Claude는 이 저장소에서 작업을 시작할 때 이 문서를 먼저 읽�
 - 위 셋은 everything-claude-code(ECC, MIT)에서 필요한 것만 골라 이 프로젝트에 맞게 다시 쓴 것이다.
   ECC 전체 설치, ECC 규칙(rules), 훅(hooks)은 쓰지 않는다. 토큰을 많이 쓰고, 우리 규칙(한국어 커밋, main 직접 푸시, Co-Authored-By 줄)과 부딪히며, 훅은 Node가 필요하다(매장 PC에는 Node 없음).
 
-## UI 방향 (2026-11-23 기준, 아직 패치 전)
+## UI 방향 (2026-11-28 기준, 아직 패치 전)
+- **시안 파일은 저장소 안 `docs/design/mockups/`에 있다** (I~M, 시안마다 6화면). 모아 보기는 `index.html`, 설명·색 기준값·적용 순서는 `docs/design/README.md`.
+- 다음 단계: I~M 중 하나를 고르거나 섞기로 결정 → 이 문서에 기록 → `docs/design/README.md`의 순서대로 화면 하나씩 패치.
+- 정한 것(11-24): 하단 메뉴 4개(출퇴근 / 근무·급여 / 위생 점검 / 설정). QR은 출퇴근 화면 버튼과 설정에서 전체 화면으로 연다. 사용 방법은 설정 안으로 옮기고 상단 ? 버튼은 없앤다. 출퇴근 시간표 보기(2-17)는 달력에 합친다.
 - 상용 앱 수준으로, 토스와 워터(전기차 충전 앱)처럼 심플함이 돋보이게 한다.
 - 불필요한 이모지는 빼고 선 아이콘을 쓴다.
 - 색감은 시안 A(토스 클린: 밝은 회색 바탕 #f2f4f6, 흰 카드, 파랑 #3182f6)로 간다.
