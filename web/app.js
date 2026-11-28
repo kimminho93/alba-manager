@@ -218,6 +218,7 @@
         // 사용 방법은 설정 안으로 옮겼으므로, 사용 방법이 열려 있을 때는 [설정] 메뉴를 켜진 것처럼 보인다(표시만)
         if (target === 'guide') { var st = document.querySelector('.tabs .tab[data-tab="settings"]'); if (st) st.classList.add('active'); }
         document.body.classList.toggle('on-punch', target === 'punch');
+        document.body.classList.toggle('on-payroll', target === 'payroll');
         document.querySelectorAll('.tab-panel').forEach(function (panel) {
           panel.classList.toggle('active', panel.id === 'tab-' + target);
         });
@@ -687,6 +688,12 @@
       if (grid[d.weekIndex]) grid[d.weekIndex][d.dayIndex] = d;
     });
 
+    var now = new Date();
+    var todayY = now.getFullYear(), todayM = now.getMonth() + 1, todayD = now.getDate();
+    var ymDiff = (cal.year * 12 + cal.month) - (todayY * 12 + todayM);
+    var curW = selWorker();
+    var curWorkDate = (curW && E.punchNext(curW, now) === 'out' && curW.punch) ? curW.punch.date : '';
+
     var rowsHtml = '';
     for (var wi = 0; wi < cal.weekCount; wi++) {
       var wkObj = r.weeks[wi] || { week: wi + 1, hours: 0, eligible: false, allowance: 0, mealDays: 0 };
@@ -700,45 +707,74 @@
         }
         var isSel = day.index === state.selectedDayIdx;
         var isMeal = r.includeMeal && day.mealEligible;
+        var isOff = day.off || day.hours <= 0;
+        var isToday = ymDiff === 0 && day.date === todayD;
+        var isFuture = ymDiff > 0 || (ymDiff === 0 && day.date > todayD);
+        var dayIso = cal.year + '-' + pad2(cal.month) + '-' + pad2(day.date);
+        var isWorkNow = isToday && curWorkDate === dayIso;
         var cls = 'cal-day-cell' +
           (isSel ? ' selected' : '') +
           (isMeal ? ' meal-ok' : '') +
-          (day.off ? ' off-day' : '');
+          (isOff && !isWorkNow ? ' off-day' : '') +
+          (isToday ? ' is-today' : '') +
+          (isWorkNow ? ' is-working' : '') +
+          (isFuture && isOff ? ' is-future' : '') +
+          (di === 5 ? ' is-sat' : (di === 6 ? ' is-sun' : ''));
         var dateColor = di === 5 ? ' sat' : (di === 6 ? ' sun' : '');
-        var isOff = day.off || day.hours <= 0;
+
+        var bodyHtml = '';
+        if (isWorkNow && isOff) {
+          bodyHtml = '<div class="cal-shift-range"><span>' + escHtml(curW.punch.time) + '</span><span class="cal-live">' + tr('근무중') + '</span></div>';
+        } else if (!isOff) {
+          bodyHtml = '<div class="cal-shift-range">' + shiftRangeHtml(day.start, day.end) + '</div>';
+        }
+        var mealBarHtml = '';
+        if (!isOff && r.includeMeal) {
+          if (isMeal) {
+            var two = day.meals && day.meals.lunch && day.meals.dinner;
+            mealBarHtml = '<div class="cal-meal-icon cal-meal-bar' + (two ? ' two' : '') + '" title="' + escHtml(tr('식대: {w}', { w: mealWords(day.meals) })) + '">' + (two ? '<i></i><i></i>' : '') + '</div>';
+          } else {
+            mealBarHtml = '<div class="cal-meal-bar none" title="' + escHtml(tr('식대 없음')) + '"></div>';
+          }
+        }
 
         rowsHtml += '<td class="' + cls + '" data-day-idx="' + day.index + '">' +
           '<div class="cal-date-num' + dateColor + '">' + day.date + '</div>' +
-          (isOff
-            ? '<div class="cal-off-badge">' + tr('휴무') + '</div>'
-            : '<div class="cal-shift-range">' + shiftRangeHtml(day.start, day.end) + '</div>') +
-          // 식대: 칸 아래 파란 막대 + 점/저/점저(하루 1회·2회 구분)
-          (isMeal ? '<div class="cal-meal-icon cal-meal-bar" title="' + tr('식대: {w}', { w: mealWords(day.meals) }) + '"><span>' + mealShort(day.meals) + '</span></div>' : '') +
+          bodyHtml + mealBarHtml +
           '</td>';
       }
       rowsHtml += '</tr>';
 
-      // 주간 합계 한 줄: "1주 · 5일 · 40h · 식대 5 · 주휴 O" (주휴 금액은 [줄 돈 보기]를 눌렀을 때만)
+      // 주간 합계 한 줄: "1주 ──── 5일 · 40h · 식대 5 · 주휴 O" (주휴 금액은 [줄 돈 보기]일 때만)
       var st = weekStatus(wkObj, r, wi);
       var timing = weekTiming(cal, r, wi);
       if (timing && r.includeWeekly && !(wkObj.eligible || wkObj.excused)) {   // 안 끝난 주는 "주휴 X" 대신 진행 중/예정 (계산·버튼은 그대로)
         st.mark = timing === 'run' ? tr('진행 중') : tr('예정');
         st.note = ''; st.cls = timing;
       }
-      var facts = [];
-      if (wkObj.workDays !== null && wkObj.workDays !== undefined) facts.push(tr('{n}일', { n: wkObj.workDays }));
-      facts.push(E.formatNum(wkObj.hours, 1) + 'h');
-      if (r.includeMeal) facts.push(tr('식대 {n}', { n: wkObj.mealDays }));
-      facts.push(st.mark);
+      var mutedLbl = !!(timing && !(wkObj.eligible || wkObj.excused));
+      var sumContent = '';
+      if (timing && wkObj.hours <= 0 && !(wkObj.eligible || wkObj.excused)) {
+        sumContent = escHtml(timing === 'run' ? tr('진행 중') : tr('예정'));
+      } else {
+        var facts = [];
+        if (wkObj.workDays !== null && wkObj.workDays !== undefined) facts.push(tr('{n}일', { n: wkObj.workDays }));
+        facts.push(E.formatNum(wkObj.hours, 1) + 'h');
+        if (r.includeMeal) facts.push(tr('식대 {n}', { n: wkObj.mealDays }));
+        facts.push((wkObj.eligible || wkObj.excused) ? '<strong>' + escHtml(st.mark) + '</strong>' : escHtml(st.mark));
+        sumContent = facts.join(' · ') +
+          (st.note ? ' <span class="wk-note">' + escHtml(st.note) + '</span>' : '') +
+          (st.money ? ' <span class="wk-money m-amt-hide" data-amt="' + escHtml(st.money) + '"></span>' : '');
+      }
       rowsHtml += '<tr class="cal-week-sum"><td colspan="7"><div class="wk-line ' + st.cls + '">' +
-        '<b>' + tr('{k}주', { k: wi + 1 }) + '</b>' +
-        '<span class="wk-line-text">' + facts.join(' · ') +
-          (st.note ? ' <span class="wk-note">' + st.note + '</span>' : '') +
-          (st.money ? ' <span class="wk-money">' + st.money + '</span>' : '') + '</span>' +
+        '<span class="wk-lbl' + (mutedLbl ? ' muted' : '') + '">' + tr('{k}주', { k: wi + 1 }) + '</span>' +
+        '<span class="wk-rule" aria-hidden="true"></span>' +
+        '<span class="wk-line-text">' + sumContent + '</span>' +
         (st.btn || '') + '</div></td></tr>';
     }
 
     $('monthCalBody').innerHTML = rowsHtml;
+    fillMoney();
   }
 
   // 달력 칸: 출근·퇴근 시각을 두 줄로 그대로(09:00 / 18:02). 시각이 아닌 값이면 예전처럼 한 줄
@@ -844,11 +880,28 @@
       '<span class="pay-sub">' + tr('{h}시간 · 주휴 {w}', { h: E.formatNum(r.totalHours, 2), w: r.includeWeekly ? tr('포함') : tr('미포함') }) +
         (r.includeMeal ? tr(' · 식대 {n}회 포함', { n: r.mealDays }) : '') + ' · ' + escHtml(r.tax.label) + '</span>';
     // 화면 아래 줄 돈 바: 고른 알바생 한 명의 이번 달 실수령액. 금액은 syncMoneyUi가 [보기]일 때만 넣는다
+    var pm = /^(\d{4})-(\d{2})$/.exec($('pMonth').value || '');
+    var ms = $('payMonthSummary');
+    if (ms) {
+      ms.textContent = tr('{d}일 · {h}h', { d: r.workDays, h: E.formatNum(r.totalHours, 1) }) +
+        (r.includeMeal ? ' · ' + tr('식대 {n}', { n: r.mealDays }) : '');
+    }
     var mb = $('moneyBar');
     if (mb) {
-      var pm = /^(\d{4})-(\d{2})$/.exec($('pMonth').value || '');
-      $('moneyBarLabel').textContent = pm ? tr('{n}님 {m}월 줄 돈', { n: r.name || '', m: Number(pm[2]) }) : tr('이번 달 줄 돈');
+      $('moneyBarLabel').textContent = pm ? tr('{m}월 줄 돈', { m: Number(pm[2]) }) : tr('이번 달 줄 돈');
       mb.hidden = !state.workers.length;
+    }
+    var rb = $('payRuleBox'), curW = selWorker();
+    if (rb) {
+      rb.hidden = !curW;
+      if (curW) {
+        $('payRuleTitle').textContent = tr('{n} 정산 기준', { n: r.name || curW.name });
+        $('payRuleWage').textContent = tr('{w} · 주 {d}일', { w: E.moneyText(r.hourlyWage), d: state.contractDays });
+        $('payRuleTax').textContent = tr(r.includeWeekly ? '{t} · 주휴 포함' : '{t} · 주휴 미포함', { t: r.tax.label });
+        $('payRuleMeal').textContent = r.includeMeal
+          ? tr('{h}시간 이상 · {a}', { h: E.formatNum(r.mealMinHours, 1), a: E.moneyText(r.mealAmount) })
+          : tr('미포함');
+      }
     }
     syncMoneyUi();
     $('setSummary').textContent = tr('시급 {w} · 주 {d}일 · ', { w: E.moneyText(r.hourlyWage), d: state.contractDays }) +
@@ -1083,33 +1136,60 @@
     return state.workers.map(function (w) { return E.calculatePayroll(E.workerPayrollInput(w, pm)); });
   }
 
-  /* 폰 전용: 맨 위 알바생 칩 (많으면 손가락으로 옆으로 밀어서 넘김) */
+  /* 시안 I: "홍길동 ▾" 알바생 고르기 (누르면 알바생 목록 + 알바생 추가 + 정산 명단이 펼쳐짐) */
+  var workerPickOpen = false;
+  function setWorkerPick(open) {
+    workerPickOpen = !!open;
+    var box = $('workerChips');
+    if (!box) return;
+    var wrap = box.querySelector('.wpick'), btn = $('workerPickBtn'), menu = $('workerPickMenu');
+    if (wrap) wrap.classList.toggle('open', workerPickOpen);
+    if (btn) btn.setAttribute('aria-expanded', workerPickOpen ? 'true' : 'false');
+    if (menu) menu.hidden = !workerPickOpen;
+  }
   function renderChips() {
     var box = $('workerChips');
     document.body.classList.toggle('no-workers', !state.workers.length);
-    var html = '<button type="button" class="wchip wchip-add" id="chipAdd" aria-label="' + tr('알바생 추가') + '">＋</button>' +
-      workingFirstOrder().map(function (i) {
-        var w = state.workers[i];
-        return '<button type="button" class="wchip' + (w.id === state.selId ? ' on' : '') + '" data-chip="' + escHtml(w.id) + '">' + (E.punchNext(w, new Date()) === 'out' ? '<i class="wdot" aria-hidden="true"></i>' : '') + escName(w.name) + '</button>';
-      }).join('');
-    var keep = box.scrollLeft;
-    box.innerHTML = html;
-    box.scrollLeft = keep;
-    var on = box.querySelector('.wchip.on');
-    if (on) {   // 고른 칩이 가려져 있으면 칩 줄만 가로로 이동 (화면은 안 움직임)
-      var l = on.offsetLeft - box.offsetLeft, r = l + on.offsetWidth;
-      if (l < box.scrollLeft + 56) box.scrollLeft = Math.max(0, l - 64);
-      else if (r > box.scrollLeft + box.clientWidth) box.scrollLeft = r - box.clientWidth + 16;
+    if (!state.workers.length) {
+      workerPickOpen = false;
+      box.innerHTML = '<span class="wpick-empty-title">' + tr('근무·급여') + '</span>';
+      return;
     }
+    var cur = selWorker() || state.workers[0];
+    var now = new Date();
+    var pm = $('pMonth').value;
+    var itemsHtml = workingFirstOrder().map(function (i) {
+      var w = state.workers[i];
+      var on = E.punchNext(w, now) === 'out';
+      var pend = (w.pending || []).length > 0;
+      var sum = E.monthSummary(w, pm);
+      var meta = on ? tr('근무 중') : (pend ? tr('퇴근 확인') : (sum.totalHours ? E.formatNum(sum.totalHours, 1) + 'h' : ''));
+      return '<button type="button" class="wchip' + (w.id === state.selId ? ' on' : '') + '" data-chip="' + escHtml(w.id) + '" role="option" aria-selected="' + (w.id === state.selId ? 'true' : 'false') + '">' +
+        '<span class="wchip-left">' + (on ? '<i class="wdot" aria-hidden="true"></i>' : '') + escName(w.name) + '</span>' +
+        (meta ? '<span class="wchip-right' + (on ? ' is-work' : (pend ? ' is-warn' : '')) + '">' + escHtml(meta) + '</span>' : '') +
+        '</button>';
+    }).join('');
+    box.innerHTML = '<div class="wpick' + (workerPickOpen ? ' open' : '') + '">' +
+      '<button type="button" class="wpick-btn" id="workerPickBtn" aria-haspopup="listbox" aria-expanded="' + (workerPickOpen ? 'true' : 'false') + '">' +
+        '<span class="wpick-name" data-no-i18n>' + escHtml(cur.name) + '</span>' +
+        '<svg class="wpick-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>' +
+      '</button>' +
+      '<div class="wpick-menu" id="workerPickMenu" role="listbox"' + (workerPickOpen ? '' : ' hidden') + '>' +
+        '<div class="wpick-list">' + itemsHtml + '</div>' +
+        '<div class="wpick-foot">' +
+          '<button type="button" class="wchip wchip-add" id="chipAdd">' + tr('알바생 추가') + '</button>' +
+          '<button type="button" class="wchip wchip-roster" id="chipRoster">' + tr('정산 명단 ({n}명)', { n: state.workers.length }) + '</button>' +
+        '</div>' +
+      '</div></div>';
   }
 
-  function openSheet(kind) {   // 'set' | 'add'
-    document.body.classList.remove('set-open', 'add-open');
+  function openSheet(kind) {   // 'set' | 'add' | 'roster'
+    document.body.classList.remove('set-open', 'add-open', 'roster-open');
     document.body.classList.add(kind + '-open');
     $('sheetBackdrop').hidden = false;
   }
   function closeSheets() {
-    document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open');
+    document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open', 'roster-open');
     $('sheetBackdrop').hidden = true;
   }
 
@@ -1157,15 +1237,33 @@
     renderPunch();
 
     var ord = workingFirstOrder();
+    var nowR = new Date();
+    var hMap = {};
+    if (typeof healthAlertList === 'function') healthAlertList().forEach(function (a) { hMap[a.id] = a; });
     $('rosterCards').innerHTML = ord.map(function (idx) {
       var r = results[idx];
       var w = state.workers[idx];
       var hasRec = !!(w.months && w.months[pm]);
       var sel = w.id === state.selId;
+      var working = E.punchNext(w, nowR) === 'out';
+      var pend = (w.pending || []).length > 0;
+      var ha = hMap[w.id];
+      var tag = '';
+      if (working) tag = '<span class="rcard-tag is-work">' + tr('근무 중') + '</span>';
+      else if (pend) tag = '<span class="rcard-tag is-warn">' + tr('퇴근 확인') + '</span>';
+      else if (ha && (ha.state === 'expired' || ha.state === 'urgent')) {
+        tag = '<span class="rcard-tag is-red">' + (ha.state === 'expired' ? tr('보건증 만료') : tr('보건증 D-{n}', { n: ha.days })) + '</span>';
+      }
+      var metaLeft = hasRec
+        ? (r.includeMeal ? tr('{d}일 · 식대 {m}회', { d: r.workDays, m: r.mealDays }) : tr('{n}일', { n: r.workDays }))
+        : tr('기록 없음');
       return '<div class="rcard' + (sel ? ' on' : '') + '">' +
         '<button type="button" class="rcard-main" data-pick-worker="' + escHtml(w.id) + '">' +
-          '<span class="rcard-name">' + escName(r.name) + (sel ? ' <em>' + tr('보는 중') + '</em>' : '') + workingBadge(w) + '</span>' +
-          '<span class="rcard-sub">' + (hasRec ? tr('{h}시간 · 식대 {m}', { h: E.formatNum(r.totalHours, 2), m: r.includeMeal ? tr('{n}회', { n: r.mealDays }) : tr('없음') }) : tr('기록 없음')) + '</span>' +
+          '<span class="rcard-top">' +
+            '<span class="rcard-name">' + escName(r.name) + (working ? '<i class="wdot" aria-hidden="true"></i>' : '') + '</span>' +
+            '<span class="rcard-hrs num">' + (hasRec ? E.formatNum(r.totalHours, 1) + 'h' : '0h') + '</span>' +
+          '</span>' +
+          '<span class="rcard-sub"><span>' + escHtml(metaLeft) + '</span>' + tag + '</span>' +
         '</button>' +
         '<b class="rcard-amt m-amt" data-amt="' + escHtml(E.moneyText(r.net)) + '"></b>' +
         '<button type="button" class="rcard-del" data-del-worker="' + escHtml(w.id) + '" aria-label="' + escHtml(tr('{n} 삭제', { n: r.name })) + '">✕</button>' +
@@ -1715,11 +1813,16 @@
       el.addEventListener('change', editPayroll);
     });
 
-    // ----- 폰 전용 화면: 칩 / 설정 창 / 알바생 추가 창 / 명세서 -----
+    // ----- 시안 I: 알바생 ▾ 메뉴 / 설정 창 / 알바생 추가 창 / 정산 명단 / 명세서 / ⋯ 더보기 -----
     $('workerChips').addEventListener('click', function (ev) {
-      if (ev.target.closest('#chipAdd')) { openSheet('add'); return; }
+      if (ev.target.closest('#workerPickBtn')) { ev.stopPropagation(); setWorkerPick(!workerPickOpen); return; }
+      if (ev.target.closest('#chipAdd')) { setWorkerPick(false); openSheet('add'); return; }
+      if (ev.target.closest('#chipRoster')) { setWorkerPick(false); openSheet('roster'); return; }
       var c = ev.target.closest('[data-chip]');
-      if (c) selectWorker(c.getAttribute('data-chip'));
+      if (c) { setWorkerPick(false); selectWorker(c.getAttribute('data-chip')); }
+    });
+    document.addEventListener('click', function (ev) {
+      if (workerPickOpen && !ev.target.closest('#workerChips')) setWorkerPick(false);
     });
     $('emptyAdd').addEventListener('click', function () { openSheet('add'); });
     $('emptyGuide').addEventListener('click', function () {
@@ -1729,6 +1832,40 @@
     $('openSet').addEventListener('click', function () { if (selWorker()) openSheet('set'); else openSheet('add'); });
     $('setSheetDone').addEventListener('click', closeSheets);
     $('addSheetClose').addEventListener('click', closeSheets);
+    if ($('rosterSheetClose')) $('rosterSheetClose').addEventListener('click', closeSheets);
+    if ($('btnAddStaffQuick')) $('btnAddStaffQuick').addEventListener('click', function () { openSheet('add'); });
+    if ($('payRuleEdit')) $('payRuleEdit').addEventListener('click', function () { $('openSet').click(); });
+    if ($('tbSlip')) $('tbSlip').addEventListener('click', function () { document.body.classList.add('slip-open'); });
+    if ($('tbKakao')) $('tbKakao').addEventListener('click', function () { $('copyKakao').click(); });
+    if ($('tbPdf')) $('tbPdf').addEventListener('click', function () { $('btnPrintPay').click(); });
+    if ($('tbXlsx')) $('tbXlsx').addEventListener('click', function () { $('btnXlsxPay').click(); });
+    if ($('moneyBarSlip')) $('moneyBarSlip').addEventListener('click', function () { document.body.classList.add('slip-open'); });
+    if ($('payMoreMenu')) $('payMoreMenu').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-pm]');
+      if (!b) return;
+      var act = b.getAttribute('data-pm');
+      $('payMoreMenu').open = false;
+      if (act === 'set') $('openSet').click();
+      else if (act === 'slip') document.body.classList.add('slip-open');
+      else if (act === 'kakao') $('copyKakao').click();
+      else if (act === 'pdf') $('btnPrintPay').click();
+      else if (act === 'xlsx') $('btnXlsxPay').click();
+      else if (act === 'roster-xlsx') $('btnRosterXlsx').click();
+      else if (act === 'roster') openSheet('roster');
+      else if (act === 'clear-days') $('btnClearAllDays').click();
+      else if (act === 'cloud') $('cloudBtn').click();
+      else if (act === 'lock') $('lockBtn').click();
+      else if (act === 'roster-clear') $('btnRosterClear').click();
+    });
+    if ($('moneyBar')) $('moneyBar').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-mb]');
+      if (!b) return;
+      var act = b.getAttribute('data-mb');
+      if (act === 'slip') document.body.classList.add('slip-open');
+      else if (act === 'kakao') $('copyKakao').click();
+      else if (act === 'pdf') $('btnPrintPay').click();
+      else if (act === 'xlsx') $('btnXlsxPay').click();
+    });
     $('sheetBackdrop').addEventListener('click', closeSheets);
     $('btnSlipOpen').addEventListener('click', function () {
       document.body.classList.add('slip-open');
@@ -1741,18 +1878,9 @@
     // 아래 줄 돈 바의 [보기]/[숨기기]는 위 버튼과 같은 상태를 쓴다
     $('moneyBarBtn').addEventListener('click', function () { $('moneyToggle').click(); });
     document.addEventListener('keydown', function (ev) {
-      if (ev.key === 'Escape' && /set-open|add-open|slip-open|export-open/.test(document.body.className)) closeSheets();
+      if (ev.key === 'Escape' && workerPickOpen) setWorkerPick(false);
+      if (ev.key === 'Escape' && /set-open|add-open|slip-open|export-open|roster-open/.test(document.body.className)) closeSheets();
     });
-    // 폰에서는 '지급월'을 설정 창 밖(맨 위)에 두고, PC에서는 원래 자리(시급 위)에 둔다
-    var phoneMq = window.matchMedia('screen');
-    function placeMonthField() {
-      var mf = $('monthField'), sheet = $('setSheet');
-      if (phoneMq.matches) sheet.parentNode.insertBefore(mf, sheet);
-      else sheet.insertBefore(mf, $('fieldWage'));
-    }
-    placeMonthField();
-    if (phoneMq.addEventListener) phoneMq.addEventListener('change', placeMonthField);
-    else if (phoneMq.addListener) phoneMq.addListener(placeMonthField);
 
     // 카톡 명세서 복사
     $('copyKakao').addEventListener('click', function () {
@@ -1837,6 +1965,7 @@
       if (!pick) return;
       var wid = pick.getAttribute('data-pick-worker') || pick.getAttribute('data-wid');
       selectWorker(wid);
+      if (document.body.classList.contains('roster-open')) closeSheets();
       var w = selWorker();
       if (w) showToast(tr('👤 {n}님 {m}월 ', { n: w.name, m: state.calendar.month }) + (w.months[$('pMonth').value] ? tr('기록을 불러왔습니다') : tr('— 아직 기록이 없어 비어 있습니다')));
     }
@@ -2257,19 +2386,28 @@
     if (!box) return;
     var list = loadConflicts();
     if (!list.length) { box.hidden = true; box.innerHTML = ''; return; }
-    box.innerHTML = '<div class="pending-head">' + tr('⚠️ 다른 기기와 수정이 겹쳤어요 {n}건', { n: list.length }) + '</div>' +
-      '<p class="pending-note">' + tr('두 기기에서 같은 곳을 거의 동시에 고쳤어요. 지금은 [저장된 값]으로 되어 있어요. 맞는 값을 골라 주세요.') + '</p>' +
-      list.map(function (c) {
-        var can = !!conflictTarget(c);
-        var id = escHtml(c.id);
-        return '<div class="pending-row">' +
-          '<div class="pending-who"><b>' + escHtml(conflictWhat(c)) + '</b></div>' +
-          '<div class="conflict-vals"><span>' + tr('저장된 값') + ': <b>' + escHtml(cellText(c.local)) + '</b></span><span>' + tr('덮인 값') + ': <b>' + escHtml(cellText(c.remote)) + '</b></span></div>' +
-          '<div class="pending-act">' +
-            '<button type="button" class="btn btn-primary" data-conflict-keep="' + id + '">' + tr('저장된 값 유지') + '</button>' +
-            (can ? '<button type="button" class="btn" data-conflict-undo="' + id + '">' + tr('덮인 값으로 되돌리기') + '</button>' : '') +
-          '</div></div>';
-      }).join('');
+    var wasOpen = !!(box.querySelector('details.pending-det[open]'));
+    box.innerHTML = '<details class="pending-det conflict-det"' + (wasOpen ? ' open' : '') + '>' +
+      '<summary class="pending-sum conflict-sum">' +
+        '<svg class="warn-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>' +
+        '<span class="pending-sum-txt">' + tr('다른 기기와 수정이 겹쳤어요 {n}건', { n: list.length }) + '</span>' +
+        '<span class="pending-sum-end"><span class="pending-sum-cta">' + tr('확인하기') + '</span>' +
+          '<svg class="pending-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>' +
+      '</summary>' +
+      '<div class="pending-body">' +
+        '<p class="pending-note">' + tr('두 기기에서 같은 곳을 거의 동시에 고쳤어요. 지금은 [저장된 값]으로 되어 있어요. 맞는 값을 골라 주세요.') + '</p>' +
+        list.map(function (c) {
+          var can = !!conflictTarget(c);
+          var id = escHtml(c.id);
+          return '<div class="pending-row">' +
+            '<div class="pending-who"><b>' + escHtml(conflictWhat(c)) + '</b></div>' +
+            '<div class="conflict-vals"><span>' + tr('저장된 값') + ': <b>' + escHtml(cellText(c.local)) + '</b></span><span>' + tr('덮인 값') + ': <b>' + escHtml(cellText(c.remote)) + '</b></span></div>' +
+            '<div class="pending-act">' +
+              '<button type="button" class="btn btn-primary" data-conflict-keep="' + id + '">' + tr('저장된 값 유지') + '</button>' +
+              (can ? '<button type="button" class="btn" data-conflict-undo="' + id + '">' + tr('덮인 값으로 되돌리기') + '</button>' : '') +
+            '</div></div>';
+        }).join('') +
+      '</div></details>';
     box.hidden = false;
   }
   function onConflictClick(ev) {
@@ -2329,6 +2467,12 @@
     else if (kind === 'saving') { btn.textContent = tr('저장 중…'); btn.className = 'cloud-btn'; }
     else if (kind === 'needLogin' || kind === 'error') { btn.textContent = tr('⚠️ 다시 연결'); btn.className = 'cloud-btn bad'; }
     else { btn.textContent = tr('저장됨') + (clock ? ' ' + clock : ''); btn.className = 'cloud-btn ok'; }
+    var pmc = $('pmCloud');
+    if (pmc) {
+      pmc.textContent = btn.textContent;
+      pmc.classList.toggle('is-ok', btn.classList.contains('ok'));
+      pmc.classList.toggle('is-bad', btn.classList.contains('bad'));
+    }
 
     var html;
     if (!connected) {
@@ -2406,7 +2550,7 @@
 
   function initCloud() {
     var C = window.AlbaCloud;
-    if (!C) { var b = $('cloudBtn'); if (b) b.hidden = true; return; }
+    if (!C) { var b = $('cloudBtn'); if (b) b.hidden = true; var pmc = $('pmCloud'); if (pmc) pmc.hidden = true; return; }
     C.init({
       getData: cloudData,
       getTables: cloudTables,
@@ -2529,6 +2673,8 @@
     var enL = E.getLang() === 'en';
     $('lockBtn').textContent = locked ? (enL ? 'Admin' : '관리자') : (enL ? 'Lock' : '잠그기');
     $('lockBtn').classList.toggle('is-open', !locked);
+    var pml = $('pmLock');
+    if (pml) { pml.hidden = !pin; pml.textContent = $('lockBtn').textContent; }
     if (typeof healthDay === 'string' && $('bellBtn')) { renderHealth(); if (locked) closeHealth(); }
     $('pinState').textContent = (pin ? tr('· 설정됨') : tr('· 아직 없음')).replace(/^·\s*/, '');
     if (locked) openTab('punch');
@@ -2536,15 +2682,35 @@
 
   /* 줄 돈 보기/숨김 상태를 버튼 글자·바 금액에 맞춘다(토글, 계산, 언어 바꿈, 잠금 때마다).
      숨김일 때는 바에 금액을 아예 넣지 않는다 — 글자 크기 0으로 가리기만 하면 스크린 리더·복사·찾기에 금액이 남는다 */
+  var EYE_SVG = {
+    open: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    off: '<path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4.2 4.2"/><path d="M9.9 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.3"/><path d="M6.6 6.6A16.5 16.5 0 0 0 2 12s3.5 7 10 7a10.4 10.4 0 0 0 4.1-.8"/>'
+  };
   function syncMoneyUi() {
     var on = document.body.classList.contains('money-show');
     var t = $('moneyToggle');
     if (t) t.setAttribute('aria-expanded', on ? 'true' : 'false');
     if ($('moneyToggleTitle')) $('moneyToggleTitle').textContent = on ? tr('줄 돈 숨기기') : tr('줄 돈 보기');
     var b = $('moneyBarBtn');
-    if (b) { b.textContent = on ? tr('숨기기') : tr('보기'); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+    if (b) {
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      var bt = $('moneyBarBtnText');
+      if (bt) bt.textContent = on ? tr('숨기기') : tr('보기');
+      else b.textContent = on ? tr('숨기기') : tr('보기');
+      var eye = $('moneyBarEye');
+      if (eye) eye.innerHTML = on ? EYE_SVG.off : EYE_SVG.open;
+    }
     var a = $('moneyBarAmt');
     if (a) a.textContent = on && state.payroll ? E.moneyText(state.payroll.net) : '';
+    var subText = '';
+    if (on && state.payroll) {
+      var r = state.payroll;
+      var wkPaid = (r.weeks || []).filter(function (w) { return w.eligible; }).length;
+      subText = tr('시급 {w} · 주휴 {wk} · ', { w: E.moneyText(r.hourlyWage), wk: r.includeWeekly ? tr('{n}주', { n: wkPaid }) : tr('미포함') }) +
+        (r.includeMeal ? tr('식대 {n}회 · ', { n: r.mealDays }) : '') + r.tax.label;
+    }
+    if ($('moneyBarSub')) $('moneyBarSub').textContent = subText;
+    if ($('moneyBarDrawerSub')) $('moneyBarDrawerSub').textContent = subText;
     fillMoney();
   }
 
@@ -2552,7 +2718,7 @@
      (비운 칸은 CSS ::after가 •••••원으로 보여 준다. 글자 크기 0으로만 가리면 스크린 리더·복사·찾기에 금액이 남는다) */
   function fillMoney() {
     var on = document.body.classList.contains('money-show');
-    Array.prototype.forEach.call(document.querySelectorAll('.m-amt[data-amt]'), function (el) {
+    Array.prototype.forEach.call(document.querySelectorAll('.m-amt[data-amt], .m-amt-hide[data-amt]'), function (el) {
       el.textContent = on ? el.getAttribute('data-amt') : '';
     });
   }
@@ -2561,10 +2727,11 @@
     if (!getPin()) return;
     punchState.unlocked = false;
     markUnlocked(false);
+    setWorkerPick(false);
     document.body.classList.remove('money-show');   // 잠갔다 풀었을 때 금액이 열린 채로 남지 않게
     syncMoneyUi();
     if (punchState.idleTimer) { clearTimeout(punchState.idleTimer); punchState.idleTimer = null; }
-    document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open', 'modal-open');
+    document.body.classList.remove('set-open', 'add-open', 'slip-open', 'export-open', 'roster-open', 'modal-open');
     $('sheetBackdrop').hidden = true;
     $('dayModal').hidden = true;
     $('cloudModal').hidden = true;
@@ -2849,21 +3016,34 @@
       if (el.value) typed[el.getAttribute('data-pending-time')] = el.value;
       if (el === document.activeElement) focusKey = el.getAttribute('data-pending-time');
     });
-    box.innerHTML = '<div class="pending-head">' + tr('⚠️ 퇴근 확인 필요 {n}건', { n: items.length }) + '</div>' +
-      '<p class="pending-note">' + tr('퇴근을 안 찍어 자동 퇴근된 근무예요. 실제 퇴근 시각을 넣으면 달력에 기록돼요. 일하지 않았으면 [근무 없음]을 누르세요.') + '</p>' +
-      items.map(function (x) {
-        var d = x.p.date, wd = E.dayName((new Date(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8))).getDay() + 6) % 7);
-        var rawKey = x.w.id + '|' + (x.p.id || (x.p.date + ' ' + x.p.start));
-        var key = escHtml(rawKey);
-        var val = typed[rawKey] || x.p.end || '';
-        return '<div class="pending-row">' +
-          '<div class="pending-who"><b>' + escName(x.w.name) + '</b> · ' + tr('{m}월 {d}일 ({w}) {t} 출근', { m: Number(d.slice(5, 7)), d: Number(d.slice(8)), w: wd, t: escHtml(x.p.start) }) + '</div>' +
-          '<div class="pending-act">' +
-            '<input type="time" class="pending-time" data-pending-time="' + key + '" value="' + escHtml(val) + '" aria-label="' + escHtml(tr('퇴근 시각')) + '">' +
-            '<button type="button" class="btn btn-primary" data-pending-ok="' + key + '">' + tr('퇴근 기록') + '</button>' +
-            '<button type="button" class="btn" data-pending-no="' + key + '">' + tr('근무 없음') + '</button>' +
-          '</div></div>';
-      }).join('');
+    var wasOpen = !!(box.querySelector('details.pending-det[open]'));
+    var first = items[0];
+    var firstDate = Number(first.p.date.slice(5, 7)) + '.' + Number(first.p.date.slice(8));
+    var sumHead = tr('퇴근 확인 필요 {n}건', { n: items.length }) + ' · ' + escName(first.w.name) + ' <span class="num">' + escHtml(firstDate) + '</span>' +
+      (items.length > 1 ? ' ' + tr('외 {n}건', { n: items.length - 1 }) : '');
+    box.innerHTML = '<details class="pending-det"' + (wasOpen ? ' open' : '') + '>' +
+      '<summary class="pending-sum">' +
+        '<svg class="warn-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>' +
+        '<span class="pending-sum-txt">' + sumHead + '</span>' +
+        '<span class="pending-sum-end"><span class="pending-sum-cta">' + tr('시각 수정') + '</span>' +
+          '<svg class="pending-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>' +
+      '</summary>' +
+      '<div class="pending-body">' +
+        '<p class="pending-note">' + tr('퇴근을 안 찍어 자동 퇴근된 근무예요. 실제 퇴근 시각을 넣으면 달력에 기록돼요. 일하지 않았으면 [근무 없음]을 누르세요.') + '</p>' +
+        items.map(function (x) {
+          var d = x.p.date, wd = E.dayName((new Date(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8))).getDay() + 6) % 7);
+          var rawKey = x.w.id + '|' + (x.p.id || (x.p.date + ' ' + x.p.start));
+          var key = escHtml(rawKey);
+          var val = typed[rawKey] || x.p.end || '';
+          return '<div class="pending-row">' +
+            '<div class="pending-who"><b>' + escName(x.w.name) + '</b> · ' + tr('{m}월 {d}일 ({w}) {t} 출근', { m: Number(d.slice(5, 7)), d: Number(d.slice(8)), w: wd, t: escHtml(x.p.start) }) + '</div>' +
+            '<div class="pending-act">' +
+              '<input type="time" class="pending-time" data-pending-time="' + key + '" value="' + escHtml(val) + '" aria-label="' + escHtml(tr('퇴근 시각')) + '">' +
+              '<button type="button" class="btn btn-primary" data-pending-ok="' + key + '">' + tr('퇴근 기록') + '</button>' +
+              '<button type="button" class="btn" data-pending-no="' + key + '">' + tr('근무 없음') + '</button>' +
+            '</div></div>';
+        }).join('') +
+      '</div></details>';
     box.hidden = false;
     box.setAttribute('data-sig', sig);
     if (focusKey) box.querySelectorAll('[data-pending-time]').forEach(function (el) { if (el.getAttribute('data-pending-time') === focusKey) el.focus(); });
@@ -3290,6 +3470,13 @@
     $('bellCount').textContent = hot ? String(hot) : '';
     btn.classList.toggle('hot', bankPending() || list.some(function (a) { return a.state === 'expired' || a.state === 'urgent'; }));
     btn.setAttribute('aria-label', hot ? tr('알림 {n}건', { n: hot }) : tr('보건증 알림'));
+    var pb = $('payBellBtn'), pc = $('payBellCount');
+    if (pb && pc) {
+      pb.hidden = isLocked();
+      pc.textContent = hot ? String(hot) : '';
+      pb.classList.toggle('hot', btn.classList.contains('hot'));
+      pb.setAttribute('aria-label', btn.getAttribute('aria-label'));
+    }
     if (!$('healthModal').hidden) renderHealthList(list);
   }
   function renderHealthList(list) {
@@ -3451,6 +3638,7 @@
   function initHealthBank() {
     $('bankList').innerHTML = BANKS.map(function (n) { return '<option value="' + escHtml(n) + '">'; }).join('');
     $('bellBtn').addEventListener('click', openHealth);
+    if ($('payBellBtn')) $('payBellBtn').addEventListener('click', openHealth);
     $('healthModal').addEventListener('click', function (ev) {
       var t = ev.target;
       if (t.closest('[data-health-close]')) { closeHealth(); return; }

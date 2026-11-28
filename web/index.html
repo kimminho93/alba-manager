@@ -11,10 +11,10 @@
   <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-  <script src="./boot.js?v=202611290400"></script>
-  <link rel="stylesheet" href="./style.css?v=202611290400">
+  <script src="./boot.js?v=202611290600"></script>
+  <link rel="stylesheet" href="./style.css?v=202611290600">
 </head>
-<body>
+<body class="on-payroll">
   <header class="app-header">
     <div class="brand">
       <span class="brand-logo" aria-hidden="true"><svg class="hdr-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></span>
@@ -62,15 +62,125 @@
 
     <!-- ======================= 탭 1: 급여 ======================= -->
     <section id="tab-payroll" class="tab-panel active" role="tabpanel">
-      <!-- 폰 전용: 맨 위 알바생 칩 (PC에서는 숨김) -->
-      <div id="workerChips" class="worker-chips" role="tablist" aria-label="알바생 선택"></div>
-      <!-- 출퇴근 탭에서 출근 중인 사람 표시 -->
-      <div id="workNow" class="work-now" hidden role="status"></div>
-      <!-- 퇴근을 안 찍어 자동 퇴근된 근무: 사장님이 퇴근 시각 입력 -->
-      <div id="conflictBox" class="pending-box conflict-box" hidden></div>
-      <div id="pendingBox" class="pending-box" hidden></div>
-      <!-- 폰 전용: 알바생이 없을 때 안내 -->
-      <div id="emptyCard" class="empty-card">
+      <div class="pay-shell">
+        <!-- 넓은 화면 왼쪽 260px 알바생 목록 + 정산 기준 / 휴대폰에서는 시트로 열림 -->
+        <aside id="rosterPanel" class="card archive staff-col" aria-label="정산 명단">
+          <div class="sheet-head roster-sheet-head">
+            <b>정산 명단</b>
+            <button type="button" id="rosterSheetClose" class="sheet-done">닫기</button>
+          </div>
+          <div class="archive-head">
+            <div class="archive-title-row">
+              <h2 class="card-title">정산 명단 <span id="rosterCount" class="count">0명</span></h2>
+              <div class="staff-col-actions">
+                <button type="button" id="btnAddStaffQuick" class="add-staff-btn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                  <span>추가</span>
+                </button>
+                <details class="more-menu">
+                  <summary aria-label="명단 더보기"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></summary>
+                  <div class="more-pop">
+                    <button id="btnRosterXlsx" type="button" class="btn">엑셀로 받기</button>
+                    <button id="btnRosterClear" type="button" class="btn btn-danger">명단 전체 지우기</button>
+                  </div>
+                </details>
+              </div>
+            </div>
+            <div class="archive-actions">
+              <span class="total-pill"><span id="rosterMonthLabel">이번 달</span> 입금 합계 <b id="rosterTotal" class="m-amt" data-amt="0원"></b></span>
+            </div>
+          </div>
+          <p class="roster-hint">이름을 누르면 그 알바생의 근무 기록이 위 달력에 나타납니다. 고치면 바로 저장됩니다.</p>
+          <div id="rosterCards" class="roster-cards"></div>
+          <div class="table-wrap roster-table-wrap">
+            <table class="list-table">
+              <thead>
+                <tr><th>#</th><th>성명</th><th>지급월</th><th class="num">근무</th><th class="num">시급</th><th class="num">주휴수당</th><th class="num">식대</th><th class="num">세전총액</th><th class="num">공제</th><th class="num">실수령액</th><th></th></tr>
+              </thead>
+              <tbody id="rosterBody"></tbody>
+              <tfoot id="rosterFoot"></tfoot>
+            </table>
+          </div>
+          <!-- 넓은 화면: 선택 알바생 정산 기준 요약 -->
+          <section id="payRuleBox" class="rule-box" aria-label="정산 기준 요약" hidden>
+            <div class="rule-head">
+              <span id="payRuleTitle" class="rule-title">정산 기준</span>
+              <button type="button" id="payRuleEdit" class="rule-edit">수정</button>
+            </div>
+            <div class="rule-line"><span>시급 · 계약</span><strong id="payRuleWage" class="num">-</strong></div>
+            <div class="rule-line"><span>공제 · 주휴</span><strong id="payRuleTax" class="num">-</strong></div>
+            <div class="rule-line"><span>식대 기준</span><strong id="payRuleMeal" class="num">-</strong></div>
+          </section>
+        </aside>
+
+        <!-- 가운데/오른쪽: 시안 I 근무·급여 본문 -->
+        <div class="pay-main">
+          <!-- 시안 I 머리 줄 (1줄: 홍길동 ▾ + 알림 종 + ⋯ / 2줄: ‹ 2026년 11월 › + 16일 · 120h · 식대 14) -->
+          <header class="pay-topbar">
+            <div class="pay-topbar-row1">
+              <!-- 알바생 선택 드롭다운 (renderChips가 "홍길동 ▾" 버튼과 펼침 목록을 그림) -->
+              <div id="workerChips" class="worker-chips" role="tablist" aria-label="알바생 선택"></div>
+              <div class="pay-topbar-tools">
+                <button type="button" id="tbSlip" class="tool-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6"/></svg><span>명세서</span></button>
+                <button type="button" id="tbKakao" class="tool-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.5 7.5L3 20l1.4-4.6A8.5 8.5 0 1 1 21 11.5z"/></svg><span>카톡</span></button>
+                <button type="button" id="tbPdf" class="tool-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg><span>PDF</span></button>
+                <button type="button" id="tbXlsx" class="tool-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 20h14"/></svg><span>엑셀</span></button>
+                <button type="button" id="payBellBtn" class="pay-ico-btn" aria-label="보건증 알림">
+                  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+                  <span id="payBellCount" class="pay-bell-badge"></span>
+                </button>
+                <details id="payMoreMenu" class="more-menu pay-more">
+                  <summary class="pay-ico-btn" aria-label="더보기">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>
+                  </summary>
+                  <div class="more-pop pay-more-pop">
+                    <button type="button" class="btn" data-pm="set">정산 설정</button>
+                    <button type="button" class="btn" data-pm="slip">급여명세서 보기</button>
+                    <button type="button" class="btn" data-pm="kakao">카톡 명세서 복사</button>
+                    <button type="button" class="btn" data-pm="pdf">PDF 출력/저장</button>
+                    <button type="button" class="btn" data-pm="xlsx">엑셀(.xlsx) 다운로드</button>
+                    <button type="button" class="btn" data-pm="roster-xlsx">여러 명·본인용 엑셀</button>
+                    <button type="button" class="btn pm-mobile-only" data-pm="roster">정산 명단</button>
+                    <button type="button" class="btn" data-pm="clear-days">전체 휴무 초기화</button>
+                    <div class="more-sep" aria-hidden="true"></div>
+                    <button type="button" class="btn" id="pmCloud" data-pm="cloud">구글 저장</button>
+                    <button type="button" class="btn" id="pmLock" data-pm="lock" hidden data-no-i18n>잠그기</button>
+                    <button type="button" class="btn btn-danger" data-pm="roster-clear">명단 전체 지우기</button>
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            <div class="pay-topbar-row2">
+              <div class="field month-field" id="monthField"><span>지급월</span>
+                <input id="pMonth" type="hidden">
+                <div class="month-stepper" role="group" aria-label="지급월 선택">
+                  <button type="button" id="pMonthPrev" class="month-step" aria-label="이전 달"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+                  <button type="button" id="pMonthLabel" class="month-label month-label-btn" aria-haspopup="true" aria-expanded="false" aria-label="달 직접 고르기">----년 --월</button>
+                  <button type="button" id="pMonthNext" class="month-step" aria-label="다음 달"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                </div>
+                <div id="monthPicker" class="month-picker" hidden>
+                  <div class="month-picker-year">
+                    <button type="button" id="mpYearPrev" class="month-step" aria-label="이전 해">◀</button>
+                    <b id="mpYearLabel">2026년</b>
+                    <button type="button" id="mpYearNext" class="month-step" aria-label="다음 해">▶</button>
+                  </div>
+                  <div id="mpGrid" class="month-picker-grid"></div>
+                  <button type="button" id="mpThisMonth" class="btn btn-sm month-picker-now">이번 달로 이동</button>
+                  <p class="month-picker-hint">● 표시는 근무 기록이 있는 달입니다</p>
+                </div>
+              </div>
+              <span id="payMonthSummary" class="pay-month-sum"></span>
+            </div>
+          </header>
+
+          <!-- 출퇴근 탭에서 출근 중인 사람 표시 (훅 유지, 시안 I에서는 이름 ▾ 목록 점으로 표시) -->
+          <div id="workNow" class="work-now" hidden role="status"></div>
+          <!-- 수정 충돌 / 퇴근 확인 필요 노란 띠 (있을 때만 표시) -->
+          <div id="conflictBox" class="pending-box conflict-box" hidden></div>
+          <div id="pendingBox" class="pending-box" hidden></div>
+          <!-- 알바생이 없을 때 안내 -->
+          <div id="emptyCard" class="empty-card">
         <div class="empty-plus" aria-hidden="true">＋</div>
         <h2>아직 알바생이 없어요</h2>
         <p>한 명만 추가하면 급여와 주휴수당이<br>자동으로 계산돼요</p>
@@ -100,25 +210,6 @@
             <label class="health-off"><input id="pHealthOff" type="checkbox" disabled> <span>보건증 알림 끄기 (퇴사·휴직 등)</span></label>
           </div>
           <p id="noWorkerNote" class="no-worker-note">아래 <b>정산 명단</b>에서 <b>알바생을 추가</b>하면 근무 기록이 자동으로 저장됩니다.</p>
-
-          <div class="field month-field" id="monthField"><span>지급월</span>
-            <input id="pMonth" type="hidden">
-            <div class="month-stepper" role="group" aria-label="지급월 선택">
-              <button type="button" id="pMonthPrev" class="month-step" aria-label="이전 달">◀</button>
-              <button type="button" id="pMonthLabel" class="month-label month-label-btn" aria-haspopup="true" aria-expanded="false" aria-label="달 직접 고르기">----년 --월</button>
-              <button type="button" id="pMonthNext" class="month-step" aria-label="다음 달">▶</button>
-            </div>
-            <div id="monthPicker" class="month-picker" hidden>
-              <div class="month-picker-year">
-                <button type="button" id="mpYearPrev" class="month-step" aria-label="이전 해">◀</button>
-                <b id="mpYearLabel">2026년</b>
-                <button type="button" id="mpYearNext" class="month-step" aria-label="다음 해">▶</button>
-              </div>
-              <div id="mpGrid" class="month-picker-grid"></div>
-              <button type="button" id="mpThisMonth" class="btn btn-sm month-picker-now">이번 달로 이동</button>
-              <p class="month-picker-hint">● 표시는 근무 기록이 있는 달입니다</p>
-            </div>
-          </div>
 
           <label class="field" id="fieldWage"><span>시급 (원) <em class="hint" id="minWageHint">2026 최저시급 10,320원</em></span>
             <input id="pWage" type="number" inputmode="numeric" min="0" step="10" value="10320">
@@ -222,6 +313,13 @@
                 <h4 id="calBoardTitle">2026년 11월 출퇴근 달력 (총 5개 주차)</h4>
                 <span class="muted small">날짜를 누르면 근무시간·식대를 정할 수 있어요 · 칸 아래 파란 막대 = 식대</span>
               </div>
+              <div class="cal-top-meta">
+                <span>날짜 칸을 눌러 출퇴근 시각·휴게·식대를 수정해요</span>
+                <div class="legend-group">
+                  <span class="legend-item"><span class="legend-bar blue"></span><span>식대 지급</span></span>
+                  <span class="legend-item"><span class="legend-bar gray"></span><span>식대 없음</span></span>
+                </div>
+              </div>
               <div class="table-wrap cal-table-view">
                 <table class="month-cal-table" aria-label="월별 출퇴근 달력">
                   <thead>
@@ -267,62 +365,58 @@
         </div>
       </div>
 
-      <div class="card archive">
-        <div class="archive-head">
-          <div class="archive-title-row">
-            <h2 class="card-title">정산 명단 <span id="rosterCount" class="count">0명</span></h2>
-            <details class="more-menu">
-              <summary aria-label="더보기">⋯</summary>
-              <div class="more-pop">
-                <button id="btnRosterXlsx" type="button" class="btn">엑셀로 받기</button>
-                <button id="btnRosterClear" type="button" class="btn btn-danger">명단 전체 지우기</button>
+          <!-- 시안 I: 화면 아래 붙는 줄 돈 바 (금액은 [보기]를 눌러야 보임, #moneyToggle과 같은 상태) -->
+          <div id="moneyBar" class="money-bar" hidden>
+            <div class="mb-main">
+              <div class="mb-info">
+                <span id="moneyBarLabel" class="mb-label">이번 달 줄 돈</span>
+                <b id="moneyBarAmt" class="mb-amt m-amt"></b>
+                <span id="moneyBarSub" class="mb-sub"></span>
               </div>
-            </details>
+              <div class="mb-right">
+                <button id="moneyBarSlip" type="button" class="mb-slip">급여명세서</button>
+                <button id="moneyBarBtn" type="button" class="mb-btn" aria-controls="moneyBarAmt" aria-pressed="false">
+                  <svg id="moneyBarEye" class="mb-eye" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <span id="moneyBarBtnText">보기</span>
+                </button>
+              </div>
+            </div>
+            <div class="mb-drawer">
+              <div id="moneyBarDrawerSub" class="mb-drawer-sub"></div>
+              <div class="mb-drawer-acts">
+                <button type="button" class="mb-act" data-mb="slip">명세서</button>
+                <button type="button" class="mb-act mb-act-kakao" data-mb="kakao">카톡 복사</button>
+                <button type="button" class="mb-act" data-mb="pdf">PDF</button>
+                <button type="button" class="mb-act" data-mb="xlsx">엑셀</button>
+              </div>
+            </div>
           </div>
-          <div class="archive-actions">
-            <span class="total-pill"><span id="rosterMonthLabel">이번 달</span> 입금 합계 <b id="rosterTotal" class="m-amt" data-amt="0원"></b></span>
-          </div>
+        </div><!-- /.pay-main -->
+      </div><!-- /.pay-shell -->
+
+      <!-- 알바생 추가 시트 (어느 화면 폭에서나 모달/시트로 열림) -->
+      <form id="addWorkerForm" class="add-worker" autocomplete="off">
+        <div class="sheet-head">
+          <b>알바생 추가</b>
+          <button type="button" id="addSheetClose" class="sheet-done">닫기</button>
         </div>
-        <form id="addWorkerForm" class="add-worker" autocomplete="off">
-          <div class="sheet-head">
-            <b>알바생 추가</b>
-            <button type="button" id="addSheetClose" class="sheet-done">닫기</button>
-          </div>
-          <label class="field"><span>이름</span>
-            <input id="awName" type="text" maxlength="20" placeholder="예) 홍길동">
-          </label>
-          <label class="field"><span>계약서상 일하는 날</span>
-            <select id="awDays" aria-label="계약서상 주 몇 일 근무">
-              <option value="1">주 1일</option><option value="2">주 2일</option><option value="3">주 3일</option>
-              <option value="4">주 4일</option><option value="5" selected>주 5일</option><option value="6">주 6일</option><option value="7">주 7일</option>
-            </select>
-          </label>
-          <label class="field"><span>시급 (원)</span>
-            <input id="awWage" type="number" inputmode="numeric" min="0" step="10" value="10320">
-          </label>
-          <label class="field"><span>출퇴근 비밀번호 <em class="hint">(선택)</em></span>
-            <input id="awPw" type="text" maxlength="20" autocomplete="off" placeholder="예) 1234">
-          </label>
-          <button id="btnAddWorker" type="submit" class="btn btn-primary">알바생 추가</button>
-        </form>
-        <p class="roster-hint">이름을 누르면 그 알바생의 근무 기록이 위 달력에 나타납니다. 고치면 바로 저장됩니다.</p>
-        <div id="rosterCards" class="roster-cards"></div>
-        <div class="table-wrap roster-table-wrap">
-          <table class="list-table">
-            <thead>
-              <tr><th>#</th><th>성명</th><th>지급월</th><th class="num">근무</th><th class="num">시급</th><th class="num">주휴수당</th><th class="num">식대</th><th class="num">세전총액</th><th class="num">공제</th><th class="num">실수령액</th><th></th></tr>
-            </thead>
-            <tbody id="rosterBody"></tbody>
-            <tfoot id="rosterFoot"></tfoot>
-          </table>
-        </div>
-      </div>
-      <!-- 시안 I: 화면 아래 붙는 줄 돈 바 (금액은 [보기]를 눌러야 보임, #moneyToggle과 같은 상태) -->
-      <div id="moneyBar" class="money-bar" hidden>
-        <span id="moneyBarLabel" class="mb-label">이번 달 줄 돈</span>
-        <b id="moneyBarAmt" class="mb-amt m-amt"></b>
-        <button id="moneyBarBtn" type="button" class="mb-btn" aria-controls="moneyBarAmt" aria-pressed="false">보기</button>
-      </div>
+        <label class="field"><span>이름</span>
+          <input id="awName" type="text" maxlength="20" placeholder="예) 홍길동">
+        </label>
+        <label class="field"><span>계약서상 일하는 날</span>
+          <select id="awDays" aria-label="계약서상 주 몇 일 근무">
+            <option value="1">주 1일</option><option value="2">주 2일</option><option value="3">주 3일</option>
+            <option value="4">주 4일</option><option value="5" selected>주 5일</option><option value="6">주 6일</option><option value="7">주 7일</option>
+          </select>
+        </label>
+        <label class="field"><span>시급 (원)</span>
+          <input id="awWage" type="number" inputmode="numeric" min="0" step="10" value="10320">
+        </label>
+        <label class="field"><span>출퇴근 비밀번호 <em class="hint">(선택)</em></span>
+          <input id="awPw" type="text" maxlength="20" autocomplete="off" placeholder="예) 1234">
+        </label>
+        <button id="btnAddWorker" type="submit" class="btn btn-primary">알바생 추가</button>
+      </form>
     </section>
 
     <!-- ======================= 탭 2: 위생 점검 ======================= -->
@@ -1179,10 +1273,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611290400"></script>
-  <script src="./lang_web.js?v=202611290400"></script>
-  <script src="./i18n.js?v=202611290400"></script>
-  <script src="./gsync.js?v=202611290400"></script>
-  <script src="./app.js?v=202611290400"></script>
+  <script src="./engine.js?v=202611290600"></script>
+  <script src="./lang_web.js?v=202611290600"></script>
+  <script src="./i18n.js?v=202611290600"></script>
+  <script src="./gsync.js?v=202611290600"></script>
+  <script src="./app.js?v=202611290600"></script>
 </body>
 </html>
