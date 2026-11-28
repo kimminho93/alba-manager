@@ -14,11 +14,11 @@ concurrency:
   group: "pages"
   cancel-in-progress: true
 
+# 빌드(테스트·업로드)와 배포를 두 작업으로 나눈다(GitHub 권장 구조).
+# 한 작업 안에서 업로드 직후 바로 배포하면, 업로드한 파일이 아직 등록되기 전에 배포가 찾으려다
+# "No artifacts named github-pages" 로 실패하는 일이 있었다(2026-11-28, 3번 연속).
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,6 +44,13 @@ jobs:
         with:
           path: './web'
 
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
