@@ -1,0 +1,12 @@
+# 제미나이가 실행해도 되는 명령(테스트·확인만). 한 줄에 하나, 글자 그대로만 허용된다.
+node tools/build.js
+node tests/test_main.js
+node tests/test_server.js
+node tests/test_cloud.js
+node tests/test_single.js 20
+node tests/test_punch_fuzz.js 50
+node tools/i18n_scan.js
+node tools/i18n_scan.js web/app.js
+git status --short
+git diff --stat
+git checkout -- web/engine.js

@@ -38,6 +38,19 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 NAME="$(basename "$BRIEF" .md)"
 LOG="logs/gemini/${STAMP}_${NAME}.log"
 
+# 허용 명령 목록(선택): GEMINI_CMDS=파일 — 한 줄에 명령 하나, 글자 그대로만 허용된다(안티그래비티 permissions.allow의 command(전체 명령)).
+# 예) tools/gemini-cmds/test.txt(테스트만), tools/gemini-cmds/ship.txt(테스트 + git add/commit/push)
+CMDS_RULE="- 터미널(셸) 명령은 절대 실행하지 않는다(무인 실행이라 자동으로 거부되고 작업이 통째로 멈춘다).
+  파일 목록 보기·읽기·쓰기는 모두 파일 도구로만 한다. git·패키지 설치도 하지 않는다."
+SETTINGS="{}"
+if [ -n "${GEMINI_CMDS:-}" ]; then
+  [ -f "$GEMINI_CMDS" ] || { echo "명령 목록 파일이 없습니다: $GEMINI_CMDS" >&2; exit 2; }
+  SETTINGS="$(node -e "const L=require('fs').readFileSync(process.argv[1],'utf8').split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!s.startsWith('#'));process.stdout.write(JSON.stringify({permissions:{allow:L.map(c=>'command('+c+')')}}))" "$GEMINI_CMDS")"
+  CMDS_RULE="- 터미널 명령은 아래 목록에 있는 것만, 글자 하나 다르지 않게 그대로 실행한다(목록 밖 명령은 자동 거부되고 작업이 멈춘다).
+  파일 목록 보기·읽기·쓰기는 파일 도구로 한다. 패키지 설치·브랜치 바꾸기·강제 푸시는 하지 않는다.
+$(grep -v '^#' "$GEMINI_CMDS" | sed '/^[[:space:]]*$/d; s/^/    /')"
+fi
+
 # 실행 전 상태 기록(허용 폴더 밖 변경 감지용)
 BEFORE="$(git status --porcelain -- . ":(exclude)$ALLOW" ":(exclude)logs" | sort)"
 
@@ -46,8 +59,7 @@ PROMPT="$(cat <<EOF
 
 [반드시 지킬 규칙]
 - 파일은 '$ALLOW' 폴더 안에서만 만들고 고친다. 그 밖의 파일은 읽기만 한다.
-- 터미널(셸) 명령은 절대 실행하지 않는다(무인 실행이라 자동으로 거부되고 작업이 통째로 멈춘다).
-  파일 목록 보기·읽기·쓰기는 모두 파일 도구로만 한다. git·패키지 설치도 하지 않는다.
+$CMDS_RULE
 - 계획만 세우고 끝내지 말고 실제 파일을 끝까지 만든다.
 - 끝나면 만든·고친 파일 목록과 한두 줄 요약만 한국어로 답한다. 파일 내용을 답에 다시 붙여 넣지 않는다.
 
@@ -58,7 +70,7 @@ EOF
 
 echo "제미나이 실행: 모델 $MODEL, 허용 폴더 $ALLOW, 로그 $LOG"
 set +e
-"$AGY" -p "$PROMPT" --model "$MODEL" --mode accept-edits --add-dir "$ROOT" --print-timeout "$TIMEOUT" --output-format json >"$LOG" 2>&1
+"$AGY" -p "$PROMPT" --model "$MODEL" --mode accept-edits --add-dir "$ROOT" --print-timeout "$TIMEOUT" --output-format json --settings "$SETTINGS" >"$LOG" 2>&1
 RC=$?
 set -e
 

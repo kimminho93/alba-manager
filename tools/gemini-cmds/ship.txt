@@ -1,0 +1,17 @@
+# 제미나이 배포용: 테스트 명령 + 커밋·푸시(main). 커밋 메시지는 logs/gemini/commit-msg.txt 에 써 둔다.
+node tools/build.js
+node tests/test_main.js
+node tests/test_server.js
+node tests/test_cloud.js
+node tests/test_single.js 20
+node tests/test_punch_fuzz.js 50
+node tools/i18n_scan.js
+node tools/i18n_scan.js web/app.js
+git status --short
+git diff --stat
+git checkout -- web/engine.js
+git add web docs/design docs/FEATURES.md
+git commit -F logs/gemini/commit-msg.txt
+git push origin HEAD:main
+git log --oneline -1
+gh run list --limit 1
