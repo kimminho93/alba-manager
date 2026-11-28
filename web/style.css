@@ -2715,3 +2715,81 @@ body.locked .punch-cloud.bad, body.locked .punch-cloud.off { background: transpa
   body:not(.locked) { padding-left: 220px; }
   body:not(.locked) .toast { left: calc(50% + 110px); max-width: calc(100vw - 220px - 32px); }
 }
+
+/* ==========================================================
+   시안 I 2단계: 출퇴근 화면 (docs/design/PATCH_PLAN_I.md)
+   - 위: 날짜(작게) + 큰 시계, 그 아래 안내 한 줄 + [모두 퇴근]
+   - 줄: [이름(근무 중이면 파란 점) / 한 줄 상태] + 오른쪽 [출근]·[퇴근] 표시(줄 전체가 버튼)
+   - 아래: [계좌이체 QR] [English], 구글 저장 상태
+   - 1024px 이상: 왼쪽 시계 패널 + 오른쪽 2열 명단
+   - 비밀번호 창(#punchPw)·결과 창은 그대로(비밀번호는 최대 20자 문자라 키패드로 바꾸지 않는다)
+   ========================================================== */
+#tab-punch .punch-wrap {
+  max-width: 560px; margin: 8px auto 0;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px;
+  grid-template-areas: "clock clock" "title all" "remote remote" "list list" "bank lang" "cloud cloud";
+}
+#tab-punch .punch-clock { grid-area: clock; display: flex; flex-direction: column-reverse; align-items: flex-start; text-align: left; padding: 10px 6px 14px; }
+#tab-punch .punch-date { margin: 0; font-size: 16px; color: var(--muted); }
+#tab-punch .punch-time { font-size: 76px; font-weight: 800; letter-spacing: -3px; line-height: 1.05; }
+#tab-punch .punch-title { grid-area: title; align-self: center; margin: 0 6px 10px; font-size: 14px; font-weight: 700; color: var(--muted); text-align: left; }
+#tab-punch .punch-all { grid-area: all; align-self: center; width: auto; max-width: none; min-height: 32px; margin: 0 0 10px; padding: 0 12px; border-radius: 16px; border: 0; background: var(--card); color: var(--muted); font-size: 13px; font-weight: 700; }
+#tab-punch .punch-all[hidden] { display: none; }
+#tab-punch .punch-remote { grid-area: remote; }
+#tab-punch .punch-list { grid-area: list; gap: 10px; }
+#tab-punch .punch-row {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 72px; margin: 0;
+  padding: 10px 14px 10px 18px; border: 0; border-radius: 20px; background: var(--card); box-shadow: var(--shadow);
+  text-align: left; color: var(--text); font: inherit; cursor: pointer;
+}
+#tab-punch .punch-row.on { background: var(--card); border: 0; }
+#tab-punch .punch-row.view { cursor: default; }
+#tab-punch .punch-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+#tab-punch .punch-name { display: flex; align-items: center; gap: 8px; max-width: 100%; font-size: 19px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tab-punch .punch-dot { flex: none; width: 8px; height: 8px; border-radius: 4px; background: var(--primary); }
+#tab-punch .punch-sub { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#tab-punch .punch-main .punch-chip.warn { margin: 2px 0 0; padding: 2px 8px; font-size: 12px; }
+#tab-punch .punch-act {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 84px; height: 46px; padding: 0 12px;
+  border-radius: 14px; background: var(--primary); color: #fff; font-size: 16px; font-weight: 800;
+}
+#tab-punch .punch-act.out { background: var(--text); color: var(--card); }
+#tab-punch .punch-bank, #tab-punch .punch-lang {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; max-width: none;
+  min-height: 52px; margin: 12px 0 0; padding: 0 14px; border-radius: 16px; border: 0;
+  background: var(--card); color: var(--text); font-size: 15px; font-weight: 800; box-shadow: var(--shadow);
+}
+#tab-punch .punch-bank { grid-area: bank; }
+#tab-punch .punch-lang { grid-area: lang; min-width: 92px; color: var(--muted); font-weight: 700; }
+#tab-punch .punch-bank[hidden] { display: none; }
+#tab-punch .punch-bank[hidden] ~ .punch-lang { grid-column: 1 / -1; }   /* QR이 없으면 English가 한 줄 전체 */
+#tab-punch .punch-ico { flex: none; width: 20px; height: 20px; }
+#tab-punch .punch-cloud { grid-area: cloud; max-width: none; margin: 12px 0 0; }
+@media (max-width: 380px) {
+  #tab-punch .punch-time { font-size: 64px; }
+  #tab-punch .punch-act { min-width: 72px; }
+}
+
+@media screen and (min-width: 1024px) {
+  #tab-punch .punch-wrap {
+    max-width: 1240px; margin-top: 4px; column-gap: 20px; align-items: start;
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto auto auto 1fr;
+    grid-template-areas:
+      "clock title  all"
+      "clock remote remote"
+      "clock list   list"
+      "bank  list   list"
+      "lang  list   list"
+      "cloud list   list";
+  }
+  #tab-punch .punch-clock { padding: 26px 24px; border-radius: 24px; background: var(--card); box-shadow: var(--shadow); }
+  #tab-punch .punch-time { font-size: 84px; }
+  #tab-punch .punch-bank[hidden] ~ .punch-lang { grid-column: auto; }
+  #tab-punch .punch-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; }
+  #tab-punch .punch-list .punch-empty { grid-column: 1 / -1; }
+  #tab-punch .punch-title, #tab-punch .punch-all { margin-top: 6px; }
+}
+/* 2단계 검토 반영: 긴 이름은 이름만 … 로 줄이고 파란 점은 남긴다, 다크 모드 [출근] 글자 대비 */
+#tab-punch .punch-name > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tab-punch .punch-act:not(.out) { color: var(--primary-ink); }

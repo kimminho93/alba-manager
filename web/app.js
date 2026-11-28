@@ -2844,7 +2844,7 @@
     if (allBtn) {
       var nOn = state.workers.filter(function (w) { return E.punchNext(w, now) === 'out'; }).length;
       allBtn.hidden = nOn < 1 || remote;
-      allBtn.textContent = tr('🌙 근무 중인 {n}명 모두 퇴근', { n: nOn });
+      allBtn.textContent = tr('근무 중 {n}명 모두 퇴근', { n: nOn });
     }
     if (!state.workers.length) {
       box.innerHTML = '<p class="punch-empty">' + tr('등록된 알바생이 없습니다.<br>사장님께 알려 주세요.') + '</p>';
@@ -2852,17 +2852,36 @@
     }
     // 근무 중인 사람을 맨 위로 (출근한 순서대로), 나머지는 등록한 순서 그대로
     var order = workingFirstOrder().map(function (i) { var w = state.workers[i]; return { w: w, on: E.punchNext(w, now) === 'out' }; });
+    // 시안 I: 줄 = [이름(+근무 중 점) / 한 줄 상태] + 오른쪽 출근·퇴근 표시. 줄 전체가 버튼인 것은 그대로(data-punch)
     box.innerHTML = order.map(function (o) {
       var w = o.w;
       var working = o.on;
-      var chip = working
-        ? '<span class="punch-chip on">' + tr('근무 중 · {t} 출근', { t: escHtml(w.punch.time) }) + '</span>'
-        : '<span class="punch-chip">' + tr('퇴근 상태') + '</span>';
       var pend = (w.pending || []).length ? '<span class="punch-chip warn">' + tr('⚠️ 퇴근 확인 필요') + '</span>' : '';
-      if (remote) return '<div class="punch-row view' + (working ? ' on' : '') + '">' + '<span class="punch-name">' + escName(w.name) + '</span>' + pend + chip + '</div>';
-      return '<button type="button" class="punch-row' + (working ? ' on' : '') + '" data-punch="' + escHtml(w.id) + '">' +
-        '<span class="punch-name">' + escName(w.name) + '</span>' + pend + chip + '</button>';
+      var main = '<span class="punch-main"><span class="punch-name">' + escName(w.name) +
+        (working ? '<span class="punch-dot" aria-hidden="true"></span>' : '') + '</span>' +
+        '<span class="punch-sub">' + punchSubText(w, working, now) + '</span>' + pend + '</span>';
+      // "출근"/"퇴근" 사전 키는 엑셀 머리글(In/Out)과 같이 쓰므로 여기서는 사전을 쓰지 않고 언어별 글자를 바로 넣는다
+      var en = E.getLang() === 'en';
+      var act = '<span class="punch-act' + (working ? ' out' : '') + '" data-no-i18n>' + (working ? (en ? 'Clock out' : '퇴근') : (en ? 'Clock in' : '출근')) + '</span>';
+      if (remote) return '<div class="punch-row view' + (working ? ' on' : '') + '">' + main + '</div>';
+      return '<button type="button" class="punch-row' + (working ? ' on' : '') + '" data-punch="' + escHtml(w.id) + '">' + main + act + '</button>';
     }).join('');
+  }
+
+  /* 출퇴근 줄의 한 줄 상태: "09:00 출근 · 41분째" / "18:02 퇴근" / "오늘 기록 없음" (읽기만 한다) */
+  function punchSubText(w, working, now) {
+    if (working && w.punch) {
+      var at = new Date(w.punch.date + 'T' + (w.punch.at || w.punch.time) + ':00');
+      var mins = Math.max(0, Math.floor((now.getTime() - at.getTime()) / 60000));
+      var d = mins < 60 ? tr('{n}분째', { n: mins }) : tr('{h}시간 {m}분째', { h: Math.floor(mins / 60), m: mins % 60 });
+      return tr('{t} 출근 · {d}', { t: escHtml(w.punch.time), d: d });
+    }
+    try {
+      var ym = now.getFullYear() + '-' + pad2(now.getMonth() + 1);
+      var sh = (E.workerShifts(w, ym) || [])[now.getDate() - 1];
+      if (sh && !sh.off && sh.end) return tr('{t} 퇴근', { t: escHtml(sh.end) });
+    } catch (e) { /* 기록을 못 읽어도 출퇴근 화면은 계속 보여야 한다 */ }
+    return tr('오늘 기록 없음');
   }
 
   function tickClock() {
@@ -3480,9 +3499,9 @@
     initStoreInfo();
     var pl = $('punchLang');   // 출퇴근 화면(잠금 중에도)에서 알바생이 언어를 바꿀 수 있게
     if (pl) {
-      pl.textContent = E.getLang() === 'en' ? '🌐 한국어' : '🌐 English';
+      pl.textContent = E.getLang() === 'en' ? '한국어' : 'English';
       pl.addEventListener('click', function () { if (window.AlbaLang) window.AlbaLang.set(E.getLang() === 'en' ? 'ko' : 'en'); });
-      window.addEventListener('alba:lang', function () { pl.textContent = E.getLang() === 'en' ? '🌐 한국어' : '🌐 English'; renderSetSummaries(); });
+      window.addEventListener('alba:lang', function () { pl.textContent = E.getLang() === 'en' ? '한국어' : 'English'; renderSetSummaries(); });
     }
     initMoreMenus();
     runAutoClose();
