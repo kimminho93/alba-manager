@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>협업 센터</title>
+<style>
+:root{--bg:#f2f4f6;--card:#fff;--ink:#191f28;--sub:#4e5968;--mute:#8b95a1;--line:#e5e8eb;--blue:#3182f6;--blue-bg:#e8f3ff;--red:#f04452;--red-bg:#fdecec;--amber-bg:#fff4e5;--amber:#b25e00;--green:#03b26c;--green-bg:#e6f8f0;--violet:#7c3aed;--violet-bg:#f3e8ff}
+@media (prefers-color-scheme:dark){:root{--bg:#101215;--card:#1b1e23;--ink:#eceef1;--sub:#b0b8c1;--mute:#8b95a1;--line:#2c3036;--blue-bg:#16263d;--red-bg:#3a1c20;--amber-bg:#3a2a12;--amber:#f5b45a;--green-bg:#123026;--violet:#c4a1ff;--violet-bg:#2a1d40}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 'Noto Sans KR',system-ui,sans-serif}
+header{padding:16px 20px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:19px}
+.agents{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
+.agent{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:14px;padding:8px 12px;min-width:220px}
+.agent b{font-size:14px}.agent .n{font-variant-numeric:tabular-nums;font-weight:800}
+.agent small{color:var(--mute);display:block;font-size:12px}
+.dot{width:9px;height:9px;border-radius:5px;background:var(--mute);flex:none}
+.busy .dot{background:var(--blue);animation:b 1s infinite alternate}.bad .dot{background:var(--red)}@keyframes b{to{opacity:.3}}
+.cmp{width:100%;display:flex;align-items:center;gap:10px;padding:10px 20px 0;color:var(--sub);font-size:13px}
+.cmpbar{flex:1;height:8px;border-radius:4px;overflow:hidden;display:flex;background:var(--line)}
+.cmpbar i{display:block;height:100%}.cmpbar .c{background:var(--violet)}.cmpbar .g{background:var(--blue)}
+main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr);gap:14px;padding:12px 20px 20px;height:calc(100% - 96px);min-height:560px}
+@media (max-width:960px){main{grid-template-columns:1fr;height:auto}}
+.card{background:var(--card);border-radius:18px;padding:14px 16px;min-width:0}
+.card h2{margin:0 0 8px;font-size:15px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card h2 small{font-weight:500;color:var(--mute);font-size:12px}
+.chat{display:flex;flex-direction:column;min-height:0}
+.log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:4px 2px 8px;min-height:240px}
+.msg{max-width:92%;border-radius:14px;padding:10px 12px;white-space:pre-wrap;word-break:break-word}
+.msg.user{align-self:flex-end;background:var(--ink);color:var(--card)}
+.msg.claude{align-self:flex-start;background:var(--violet-bg)}
+.msg.gemini{align-self:flex-start;background:var(--blue-bg)}
+.msg.fail{border:1.5px solid var(--red)}
+.msg .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--sub);margin-bottom:4px;white-space:normal}
+.msg.user .meta{color:inherit;opacity:.75}
+.sys{align-self:center;font-size:12px;color:var(--mute);text-align:center;max-width:92%}
+.who{font-size:12px;font-weight:800;padding:1px 8px;border-radius:8px}.who.claude{background:var(--violet);color:#fff}.who.gemini{background:var(--blue);color:#fff}
+.tag{display:inline-block;padding:0 7px;border-radius:9px;font-size:11px;font-weight:700;background:var(--card);color:var(--sub)}
+.tag.run{color:var(--blue)}.tag.fail{color:var(--red)}.tag.done{color:var(--green)}
+.files{margin-top:6px;font-size:12px;white-space:normal}.files a{margin-right:8px}
+.composer{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+textarea{width:100%;min-height:76px;max-height:240px;resize:vertical;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;color:inherit;background:var(--bg)}
+textarea:focus{outline:none;border-color:var(--blue)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg{display:inline-flex;background:var(--bg);border-radius:10px;padding:3px}
+.seg button{border:0;background:transparent;padding:6px 12px;border-radius:8px;font:inherit;font-size:13px;font-weight:700;color:var(--sub);cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+label.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--sub)}
+.btn{height:38px;padding:0 16px;border-radius:10px;border:0;font:inherit;font-weight:800;cursor:pointer}
+.btn.primary{background:var(--blue);color:#fff;margin-left:auto}.btn.primary:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:var(--bg);color:var(--sub)}
+.hint{font-size:12px;color:var(--mute)}
+.side{display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto}
+ul{list-style:none;margin:0;padding:0}li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line);font-size:13px}li:first-child{border-top:0}
+li .t{color:var(--mute);white-space:nowrap;font-variant-numeric:tabular-nums}
+a{color:var(--blue);text-decoration:none;word-break:break-all}a:hover{text-decoration:underline}
+pre{margin:0;white-space:pre-wrap;word-break:break-word;font:12.5px/1.6 ui-monospace,Consolas,monospace;background:var(--bg);border-radius:12px;padding:10px;max-height:260px;overflow:auto}
+.empty{color:var(--mute);font-size:13px}
+details>summary{cursor:pointer;font-weight:700;font-size:14px;list-style:none}details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:'›';display:inline-block;margin-right:6px;transition:transform .15s}details[open]>summary::before{transform:rotate(90deg)}
+.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:8px;font-size:12px}
+.steps div{border:1px solid var(--line);border-radius:10px;padding:6px;text-align:center}
+.frame{margin-top:8px;width:100%;aspect-ratio:1180/820;overflow:hidden;border-radius:10px;border:1px solid var(--line);background:#fff;position:relative}
+.frame iframe{position:absolute;left:0;top:0;width:1180px;height:820px;border:0;transform-origin:0 0}
+</style></head><body>
+<header>
+  <h1>Claude ↔ 제미나이 협업 센터</h1>
+  <div class="agents" id="agents"></div>
+</header>
+<div class="cmp"><span>오늘 토큰</span><div class="cmpbar" id="cmpbar"><i class="c"></i><i class="g"></i></div><span id="next"></span></div>
+<main>
+  <section class="card chat">
+    <h2>대화 로그 <small id="upd"></small></h2>
+    <div class="log" id="log" aria-live="polite"></div>
+    <form class="composer" id="form">
+      <textarea id="prompt" placeholder="둘에게 시킬 일을 적어 주세요. (Ctrl+Enter로 보내기)&#10;예) docs/design/PATCH_PLAN_I.md 2단계를 검토하고 위험을 정리해 줘"></textarea>
+      <div class="row">
+        <div class="seg" role="group" aria-label="누구에게">
+          <button type="button" data-t="auto" aria-pressed="true">자동 배정</button>
+          <button type="button" data-t="claude" aria-pressed="false">Claude</button>
+          <button type="button" data-t="gemini" aria-pressed="false">제미나이</button>
+        </div>
+        <label class="chk"><input type="checkbox" id="cont"> 이전 대화 이어서</label>
+        <button type="button" class="btn ghost" id="stop">지금 작업 멈추기</button>
+        <button type="submit" class="btn primary" id="send">보내기</button>
+      </div>
+      <div class="hint">자동 배정: 오늘 토큰을 덜 쓴 쪽이 받고, 실패(로그인·한도)하면 다른 쪽이 이어받습니다. 답 끝에 <code>@상대: 할 일</code>이 있으면 상대에게 이어서 맡깁니다(최대 2번). 한 번에 한 작업씩, 나머지는 줄을 섭니다.</div>
+    </form>
+  </section>
+  <aside class="side">
+    <section class="card"><h2><span>제미나이 지금 하는 일</span><small id="bid"></small></h2><div id="brain"></div></section>
+    <section class="card"><h2><span>Claude 검토 메모</span><small>logs/gemini/review.md</small></h2><div id="review"></div></section>
+    <section class="card"><details id="dsg"><summary>시안 작업 (넓은 화면 I~M)</summary><div class="steps" id="steps"></div><div id="preview"></div></details></section>
+    <section class="card"><details><summary>지시서 · 제미나이 로그</summary><ul id="docs" style="margin-top:8px"></ul></details></section>
+  </aside>
+</main>
+<script>
+var TOKEN='__COLLAB_TOKEN__';
+var target='auto', lastIds='', stick=true;
+function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+function tm(ms){return ms?new Date(ms).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}
+function num(n){return (n||0).toLocaleString('ko-KR')}
+function dur(a,b){if(!a)return'';var s=Math.round(((b||Date.now())-a)/1000);return s<60?s+'초':Math.floor(s/60)+'분 '+(s%60)+'초'}
+function link(href,text){var a=el('a',null,text);a.href=href;a.target='_blank';a.rel='noopener';return a}
+var NAME={claude:'Claude',gemini:'제미나이'};
+document.querySelectorAll('.seg button').forEach(function(b){b.addEventListener('click',function(){target=b.dataset.t;document.querySelectorAll('.seg button').forEach(function(x){x.setAttribute('aria-pressed',x===b)})})});
+var logEl=document.getElementById('log');
+logEl.addEventListener('scroll',function(){stick=logEl.scrollHeight-logEl.scrollTop-logEl.clientHeight<60});
+function post(url,body){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-Collab-Token':TOKEN},body:JSON.stringify(body||{})}).then(function(r){return r.json().catch(function(){return{}})})}
+document.getElementById('form').addEventListener('submit',function(e){e.preventDefault();var p=document.getElementById('prompt');var v=p.value.trim();if(!v)return;
+  var btn=document.getElementById('send');btn.disabled=true;
+  post('/api/ask',{prompt:v,target:target,cont:document.getElementById('cont').checked}).then(function(r){btn.disabled=false;if(r&&r.id){p.value='';stick=true;tick()}else alert((r&&r.error)||'보내지 못했습니다')}).catch(function(){btn.disabled=false;alert('센터 서버가 꺼져 있습니다')})});
+document.getElementById('prompt').addEventListener('keydown',function(e){if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();document.getElementById('form').requestSubmit()}});
+document.getElementById('stop').addEventListener('click',function(){if(confirm('지금 돌고 있는 작업을 멈출까요? 그때까지 고친 파일은 그대로 남습니다.'))post('/api/stop').then(tick)});
+
+function renderAgents(s){
+  var box=document.getElementById('agents');box.textContent='';
+  s.agents.forEach(function(a){var d=el('div','agent'+(a.busy?' busy':'')+(a.problem?' bad':''));d.appendChild(el('span','dot'));
+    var t=el('div');var top=el('div');top.appendChild(el('b',null,a.name+' '));top.appendChild(el('span','n',num(a.today.tokens)));
+    t.appendChild(top);t.appendChild(el('small',null,(a.problem?a.problem:(a.busy?'작업 중':'대기'))+' · 오늘 '+a.today.runs+'건'+(a.today.cost?' · $'+a.today.cost.toFixed(2):'')));d.appendChild(t);
+    if(a.problem&&a.bin){var rb=el('button','btn ghost','다시 확인');rb.type='button';rb.style.height='30px';rb.title='로그인했거나 한도가 풀렸으면 눌러 주세요';rb.addEventListener('click',function(){post('/api/clear-problem').then(tick)});d.appendChild(rb)}
+    box.appendChild(d)});
+  var c=s.agents[0].today.tokens,g=s.agents[1].today.tokens,tot=c+g||1;var bar=document.getElementById('cmpbar');
+  bar.children[0].style.width=(c/tot*100)+'%';bar.children[1].style.width=(g/tot*100)+'%';
+  if(!c&&!g){bar.children[0].style.width='50%';bar.children[1].style.width='50%'}
+  document.getElementById('next').textContent='다음 자동 배정: '+NAME[s.next.agent];
+}
+function jobBlock(j,frag){
+  var u=el('div','msg user');var m=el('div','meta');
+  m.appendChild(el('span',null,(j.from==='user'?'나':NAME[j.from]+'가 넘김')+' · '+tm(j.at)));
+  m.appendChild(el('span','tag',j.target==='auto'?'자동 배정':NAME[j.target]+'에게'));if(j.cont)m.appendChild(el('span','tag','이어서'));
+  u.appendChild(m);u.appendChild(document.createTextNode(j.prompt));
+  if(j.from!=='user'){u.className='msg user';u.style.opacity='.85'}
+  frag.appendChild(u);
+  if(j.reason)frag.appendChild(el('div','sys',j.reason));
+  if(j.status==='queued'){frag.appendChild(el('div','sys','줄 서는 중…'));return}
+  var a=el('div','msg '+(j.agent||'gemini')+(j.status==='failed'?' fail':''));var am=el('div','meta');
+  am.appendChild(el('span','who '+j.agent,NAME[j.agent]||'?'));
+  am.appendChild(el('span','tag '+(j.status==='running'?'run':j.status==='failed'?'fail':'done'),j.status==='running'?'작업 중 '+dur(j.started):j.status==='failed'?'실패'+(j.error?' · '+j.error:''):'끝 · '+dur(j.started,j.ended)));
+  if(j.weighted)am.appendChild(el('span',null,'토큰 '+num(j.weighted)+(j.cost?' · $'+j.cost.toFixed(3):'')));
+  if(j.handoff)am.appendChild(el('span','tag','→ '+NAME[j.handoff]+'에게 넘김'));
+  a.appendChild(am);
+  a.appendChild(document.createTextNode(j.status==='running'?'작업하는 중입니다…':(j.reply||'(답 없음)')));
+  if(j.files&&j.files.length){var f=el('div','files');f.appendChild(document.createTextNode('바뀐 파일: '));j.files.slice(0,20).forEach(function(p){f.appendChild(link('/file?p='+encodeURIComponent(p),p))});a.appendChild(f)}
+  frag.appendChild(a);
+}
+function renderLog(s){
+  var all=s.jobs.slice();s.queue.forEach(function(q){if(!all.some(function(x){return x.id===q.id}))all.push(q)});
+  var key=JSON.stringify(all.map(function(j){return [j.id,j.status,j.reply&&j.reply.length,j.status==='running'?Math.floor((s.now-j.started)/5000):0]}));
+  if(key===lastIds)return;lastIds=key;
+  var frag=document.createDocumentFragment();
+  if(!all.length)frag.appendChild(el('div','sys','아직 대화가 없습니다. 아래에 시킬 일을 적어 보세요.'));
+  all.forEach(function(j){jobBlock(j,frag)});
+  logEl.textContent='';logEl.appendChild(frag);if(stick)logEl.scrollTop=logEl.scrollHeight;
+}
+function renderSide(s){
+  var b=document.getElementById('brain');b.textContent='';var br=s.gemini.brain;
+  if(br&&br.feed.length){document.getElementById('bid').textContent=(s.gemini.running>0?'실행 중 · ':'')+'작업 '+br.id.slice(0,8);
+    var ago=Math.round((s.now-br.feed[0].at)/1000);b.appendChild(el('div','empty','마지막 활동 '+(ago<60?ago+'초':Math.floor(ago/60)+'분')+' 전'+(s.gemini.running>0&&ago>30?' · 긴 파일을 쓰는 중일 수 있어요':'')));
+    var ul=el('ul');br.feed.slice(0,10).forEach(function(f){var li=el('li');li.appendChild(el('span',null,({think:'생각',tool:'도구',say:'답'}[f.kind]||f.kind)+' · '+f.text));li.appendChild(el('span','t',tm(f.at)));ul.appendChild(li)});b.appendChild(ul)}
+  else b.appendChild(el('div','empty','기록 없음'));
+  var r=document.getElementById('review');r.textContent='';if(s.review)r.appendChild(el('pre',null,s.review));else r.appendChild(el('div','empty','없음'));
+  var st=document.getElementById('steps');st.textContent='';s.design.forEach(function(v){st.appendChild(el('div',null,v.v+' '+v.made.length+'/5'))});
+  var pv=document.getElementById('preview');var latest=s.outputs.filter(function(f){return f.name!=='index.html'})[0];
+  if(latest&&pv.dataset.k!==latest.name+latest.mtime&&document.getElementById('dsg').open){pv.dataset.k=latest.name+latest.mtime;pv.textContent='';var fr=el('div','frame');var ifr=el('iframe');ifr.setAttribute('sandbox','allow-scripts');ifr.src='/out/'+encodeURIComponent(latest.name);fr.appendChild(ifr);pv.appendChild(fr);pv.appendChild(link('/out/'+encodeURIComponent(latest.name),latest.name+' 크게 보기'));requestAnimationFrame(function(){ifr.style.transform='scale('+(fr.clientWidth/1180)+')'})}
+  var dl=document.getElementById('docs');dl.textContent='';
+  s.briefs.forEach(function(f){var li=el('li');li.appendChild(link('/file?p='+encodeURIComponent('docs/design/briefs/'+f.name),'지시서 · '+f.name));li.appendChild(el('span','t',tm(f.mtime)));dl.appendChild(li)});
+  s.logs.forEach(function(f){var li=el('li');li.appendChild(link('/file?p='+encodeURIComponent('logs/gemini/'+f.name),'로그 · '+f.name));li.appendChild(el('span','t',f.size?Math.round(f.size/1024)+'KB':'작성 중'));dl.appendChild(li)});
+}
+function tick(){fetch('/api/state',{cache:'no-store'}).then(function(r){return r.json()}).then(function(s){
+  document.getElementById('upd').textContent=tm(s.now)+' · 3초마다 새로 고침';renderAgents(s);renderLog(s);renderSide(s)})
+  .catch(function(){document.getElementById('upd').textContent='센터 서버가 꺼졌습니다 (npm run collab)'})}
+tick();setInterval(tick,3000);
+</script></body></html>

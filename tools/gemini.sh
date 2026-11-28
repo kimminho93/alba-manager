@@ -58,12 +58,14 @@ EOF
 
 echo "제미나이 실행: 모델 $MODEL, 허용 폴더 $ALLOW, 로그 $LOG"
 set +e
-"$AGY" -p "$PROMPT" --model "$MODEL" --mode accept-edits --add-dir "$ROOT" --print-timeout "$TIMEOUT" >"$LOG" 2>&1
+"$AGY" -p "$PROMPT" --model "$MODEL" --mode accept-edits --add-dir "$ROOT" --print-timeout "$TIMEOUT" --output-format json >"$LOG" 2>&1
 RC=$?
 set -e
 
+# JSON 결과에서 응답 글만 꺼내 보여 주고, 토큰은 협업 센터 장부(logs/collab/ledger.jsonl)에 쌓는다
+OKFLAG="$(node tools/collab/ledger.js "$LOG" "$BRIEF")" || OKFLAG="fail"
 echo "----- 제미나이 응답(끝부분) -----"
-tail -n 25 "$LOG"
+tail -n 25 "$LOG.txt" 2>/dev/null || tail -n 25 "$LOG"
 echo "---------------------------------"
 
 AFTER="$(git status --porcelain -- . ":(exclude)$ALLOW" ":(exclude)logs" | sort)"
@@ -77,7 +79,7 @@ echo "허용 폴더 안 변경:"
 git status --porcelain -- "$ALLOW" | head -50
 
 # 권한 거부·빈 응답은 성공 코드여도 실패로 본다
-if grep -q "no output produced" "$LOG" || [ ! -s "$LOG" ]; then
+if [ "$OKFLAG" != "ok" ] || grep -q "no output produced" "$LOG" || [ ! -s "$LOG" ]; then
   echo "실패: 제미나이가 결과를 내지 못했습니다(권한 거부 또는 빈 응답). 로그: $LOG" >&2
   exit 4
 fi

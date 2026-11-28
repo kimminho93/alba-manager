@@ -46,7 +46,13 @@ Claude는 이 저장소에서 작업을 시작할 때 이 문서를 먼저 읽�
 - `code-reviewer` 에이전트: 배포 전 diff 검토(계산·동기화·조용한 실패·화면).
 - `security-reviewer` 에이전트: 손님 화면, 입력, 구글 연동, 내보내기 보안 점검.
 - `/gemini` 스킬 + `tools/gemini.sh`: 시안·문서처럼 큰 파일 작성은 제미나이(안티그래비티 CLI `agy`, 기본 모델 gemini-4-neon-high)에게 지시서로 맡기고 Claude는 지시·검토만 해서 토큰을 아낀다. 제미나이는 터미널 명령 없이 파일 도구만 쓴다(무인 실행에서 명령은 자동 거부됨). 앱 코드의 계산·동기화·보안과 커밋·푸시는 맡기지 않는다.
-- 협업 상황판: `npm run collab` → http://127.0.0.1:8787 (제미나이 진행·활동·만든 파일 미리보기·Claude 검토 메모(`logs/gemini/review.md`), 3초마다 자동 새로 고침). `logs/`는 git에 올리지 않는다.
+- **협업 센터**: `npm run collab` → http://127.0.0.1:8787 (`tools/collab/`). 입력창 하나로 Claude(데스크톱 앱에 든 Claude Code CLI, 처음 한 번 `/login` 필요)와 제미나이(agy)에게 일을 준다.
+  - 자동 배정: 오늘 토큰(입력+출력+캐시 생성+캐시 읽기×0.1)을 덜 쓴 쪽이 받는다. 로그인·한도로 실패하면 다른 쪽이 이어받는다(10분 뒤 다시 시도, 카드의 [다시 확인]).
+  - 넘기기: 답 마지막 줄이 `@제미나이: 할 일` / `@claude: 할 일`이면 상대에게 이어서 맡긴다(최대 2번). 받을 쪽이 못 하면 넘긴 쪽이 직접 한다.
+  - 한 번에 한 작업만 돈다. 두 일꾼 모두 git commit·push는 못 한다(Claude는 허용 도구 목록, 제미나이는 지시로 막음). 커밋은 대화창의 Claude가 검토 후에 한다.
+  - 기록: `logs/collab/jobs.jsonl`(대화), `logs/collab/ledger.jsonl`(토큰. `tools/gemini.sh` 실행분 포함). `logs/`는 git에 올리지 않는다.
+  - 보안: 127.0.0.1에만 열림, Host 확인, 작업 요청은 서버 시작 때 만든 비밀값+Origin 확인, 미리보기는 sandbox.
+  - 대화창의 Claude(이 세션) 사용량은 센터가 셀 수 없어서 비교에 들어가지 않는다.
 - 위 셋은 everything-claude-code(ECC, MIT)에서 필요한 것만 골라 이 프로젝트에 맞게 다시 쓴 것이다.
   ECC 전체 설치, ECC 규칙(rules), 훅(hooks)은 쓰지 않는다. 토큰을 많이 쓰고, 우리 규칙(한국어 커밋, main 직접 푸시, Co-Authored-By 줄)과 부딪히며, 훅은 Node가 필요하다(매장 PC에는 Node 없음).
 
