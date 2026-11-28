@@ -1224,19 +1224,59 @@
   }
 
   /* 점검 항목 체크 목록(왼쪽 입력 폼)을 한 번만 그린다 */
+  /* 시안 I: 분류마다 접기/펼치기 + 항목마다 [적합 | 점검 필요].
+     저장 형식은 그대로 — 항목마다 체크박스 하나(체크 = 적합, 안 체크 = 점검 필요)이고, 두 버튼은 그 체크박스를 켜고 끈다 */
   function buildChecklistForm() {
     var html = '';
-    E.getChecklistGroups().forEach(function (g) {
-      html += '<section class="chk-form-group"><h4 class="chk-form-title">' + escHtml(g.title) + '</h4>';
+    E.getChecklistGroups().forEach(function (g, gi) {
+      html += '<details class="chk-form-group" data-g="' + gi + '"><summary class="chk-form-sum">' +
+        '<span class="chk-form-title">' + escHtml(g.title) + '</span>' +
+        '<span class="chk-gcount" data-gcount></span><span class="chk-gneed" data-gneed></span></summary>';
       g.items.forEach(function (it) {
-        html += '<label class="check-item chk-form-item"><input type="checkbox" value="' + it.no + '">' +
-          '<span><b>' + it.no + '.</b> ' + escHtml(it.text) +
+        html += '<div class="check-item chk-form-item" data-item="' + it.no + '">' +
+          '<input type="checkbox" class="chk-in" value="' + it.no + '" tabindex="-1" aria-hidden="true">' +
+          '<div class="chk-fitem-text"><b>' + it.no + '.</b> ' + escHtml(it.text) +
           (it.standard ? '<small class="item-std">' + escHtml(it.standard) + '</small>' : '') +
-          '</span></label>';
+          '<div class="health-warn chk-item-warn" data-iwarn hidden></div></div>' +
+          '<div class="chk-seg" role="group" aria-label="' + escHtml(tr('{n}번 결과', { n: it.no })) + '">' +
+          '<button type="button" class="seg-ok" data-chk-set="' + it.no + '" data-v="1" aria-pressed="false">' + tr('적합') + '</button>' +
+          '<button type="button" class="seg-bad" data-chk-set="' + it.no + '" data-v="0" aria-pressed="true">' + tr('점검 필요') + '</button>' +
+          '</div></div>';
       });
-      html += '</section>';
+      html += '</details>';
     });
     $('chkFormList').innerHTML = html;
+  }
+
+  /* 체크 상태를 버튼 눌림·분류 개수·경고에 맞춘다(renderChecklist 끝에서 매번 부름).
+     분류 펼침은 폼을 새로 그린 뒤 첫 번에만 "점검 필요가 있으면 펼침"으로 정하고(data-init), 그 뒤로는 손대지 않는다 —
+     항목을 누르다 분류가 저절로 접히면 아래 내용이 손가락 밑으로 올라오기 때문이다 */
+  function syncChkForm(c, hNote) {
+    var byNo = {};
+    (c && c.groups || []).forEach(function (g) { g.items.forEach(function (it) { byNo[it.no] = it; }); });
+    Array.prototype.forEach.call(document.querySelectorAll('#chkFormList .chk-form-group'), function (gEl) {
+      var boxes = gEl.querySelectorAll('input.chk-in'), on = 0;
+      Array.prototype.forEach.call(boxes, function (cb) {
+        var ok = cb.checked;
+        var jud = byNo[Number(cb.value)];
+        if (jud ? jud.ok : ok) on++;   // 분류 개수는 판정 결과로 센다(20번은 체크해도 온도 이탈이면 점검필요)
+        var row = cb.closest('.chk-form-item');
+        row.classList.toggle('is-ok', ok);
+        row.querySelector('.seg-ok').setAttribute('aria-pressed', ok ? 'true' : 'false');
+        row.querySelector('.seg-bad').setAttribute('aria-pressed', ok ? 'false' : 'true');
+        var no = Number(cb.value), it = byNo[no], w = row.querySelector('[data-iwarn]'), msg = '';
+        if (no === 4 && hNote) msg = '⚠️ ' + hNote;                                   // 보건증 만료 경고
+        else if (it && ok && it.ok === false) msg = tr('⚠️ 체크했지만 온도가 기준을 벗어나 점검필요로 판정돼요');   // 20번 온도 자동 판정
+        w.textContent = msg; w.hidden = !msg;
+      });
+      var need = boxes.length - on;
+      gEl.querySelector('[data-gcount]').textContent = on + '/' + boxes.length;
+      var ne = gEl.querySelector('[data-gneed]');
+      ne.textContent = need ? tr('필요 {n}', { n: need }) : '';
+      ne.hidden = !need;
+      gEl.classList.toggle('all-ok', !need);
+      if (!gEl.dataset.init) { gEl.open = need > 0; gEl.dataset.init = '1'; }
+    });
   }
 
   function setAllChecks(on) {
@@ -1308,6 +1348,7 @@
       cardsHtml += '</section>';
     });
     $('chkCards').innerHTML = cardsHtml;
+    syncChkForm(c, hNote);
   }
 
   function recalcChecklist() {
@@ -1873,6 +1914,17 @@
       $(id).addEventListener('input', recalcChecklist);
     });
     $('chkFormList').addEventListener('change', recalcChecklist);
+    // [적합]/[점검 필요] → 그 항목 체크박스를 켜고 끈 뒤, 체크박스를 직접 누른 것처럼 change를 올려 보낸다(저장·계산 경로 그대로)
+    $('chkFormList').addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-chk-set]');
+      if (!b) return;
+      var cb = $('chkFormList').querySelector('input.chk-in[value="' + b.getAttribute('data-chk-set') + '"]');
+      if (!cb) return;
+      var want = b.getAttribute('data-v') === '1';
+      if (cb.checked === want) return;
+      cb.checked = want;
+      cb.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     $('btnCheckAll').addEventListener('click', function () { setAllChecks(true); });
     $('btnCheckNone').addEventListener('click', function () { setAllChecks(false); });
 
@@ -3706,8 +3758,12 @@
   window.addEventListener('alba:lang', function () {
     syncMoneyUi();   // [보기]/[숨기기]·줄 돈 보기 글자를 새 언어로
     var checked = Array.prototype.map.call(document.querySelectorAll('#chkFormList input:checked'), function (el) { return el.value; });
+    var opened = Array.prototype.map.call(document.querySelectorAll('#chkFormList details'), function (d) { return d.open; });   // 펼친 분류 기억
     buildChecklistForm();
     checked.forEach(function (v) { var el = document.querySelector('#chkFormList input[value="' + v + '"]'); if (el) el.checked = true; });
+    Array.prototype.forEach.call(document.querySelectorAll('#chkFormList details'), function (d, i) {
+      if (i < opened.length) { d.open = opened[i]; d.dataset.init = '1'; }
+    });
     var si = $('sndIn'), so = $('sndOut');
     if (si && so) {
       var iv = si.value, ov = so.value;
