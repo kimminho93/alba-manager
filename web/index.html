@@ -11,8 +11,8 @@
   <meta name="theme-color" content="#3563e9">
   <title>사장님 도우미 · 알바 급여 & 매장 점검</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧾</text></svg>">
-  <script src="./boot.js?v=202611282300"></script>
-  <link rel="stylesheet" href="./style.css?v=202611282300">
+  <script src="./boot.js?v=202611290100"></script>
+  <link rel="stylesheet" href="./style.css?v=202611290100">
 </head>
 <body>
   <header class="app-header">
@@ -24,14 +24,15 @@
       </div>
     </div>
     <div class="header-actions">
-      <button id="lockBtn" class="cloud-btn lock-btn" type="button" hidden>🔒 관리자</button>
+      <button id="lockBtn" class="cloud-btn lock-btn" type="button" hidden data-no-i18n>관리자</button>
       <button id="bellBtn" class="cloud-btn bell-btn" type="button" hidden aria-label="보건증 알림">🔔<span id="bellCount" class="bell-count"></span></button>
       <button id="cloudBtn" class="cloud-btn" type="button" aria-label="구글 시트에 저장 설정">☁️ 구글 저장</button>
-      <button id="helpBtn" class="icon-btn help-btn" type="button" aria-label="사용 방법" title="사용 방법">?</button>
+      <button id="helpBtn" class="icon-btn help-btn" type="button" aria-label="사용 방법" title="사용 방법" hidden>?</button><!-- 시안 I: 위쪽 ? 버튼은 없애고 사용 방법은 설정 안에서 연다(JS가 참조하므로 요소는 남김) -->
     </div>
   </header>
 
   <nav class="tabs" role="tablist">
+    <div id="railStore" class="tabs-store" aria-hidden="true" data-no-i18n></div>
     <button class="tab" type="button" role="tab" data-tab="punch" aria-selected="false"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="tab-label" data-en="Clock-in">출퇴근</span></button>
     <button class="tab active" type="button" role="tab" data-tab="payroll" aria-selected="true"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg><span class="tab-label" data-en="Work &amp; Pay">근무·급여</span></button>
     <button class="tab" type="button" role="tab" data-tab="checklist" aria-selected="false"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span class="tab-label" data-en="Hygiene">위생 점검</span></button>
@@ -636,7 +637,7 @@
             <ol>
               <li>회원가입이나 로그인 없이 바로 쓸 수 있습니다.</li>
               <li>글씨가 작으면 <b>설정 → 화면</b>의 <b>[가+]</b> 버튼을 누르세요. 글자가 더 크게 보입니다.</li>
-              <li>화면이 눈부시면 같은 곳의 <b>[🌙]</b> 버튼으로 어두운 화면으로 바꿀 수 있습니다. 궁금한 게 있으면 오른쪽 위 <b>[?]</b>를 누르면 이 사용 방법이 열립니다.</li>
+              <li>화면이 눈부시면 같은 곳의 <b>[🌙]</b> 버튼으로 어두운 화면으로 바꿀 수 있습니다. 궁금한 게 있으면 <b>설정</b> 맨 아래 <b>[사용 방법 보기]</b>를 누르면 이 사용 방법이 열립니다.</li>
               <li>자주 쓰신다면 <b>휴대폰 홈 화면에 추가</b>해 두세요. 앱처럼 한 번에 열립니다.
                 <ul>
                   <li>아이폰(Safari): 아래 <b>공유 버튼</b> → <b>홈 화면에 추가</b></li>
@@ -674,7 +675,7 @@
             <p>매장에 두는 <b>공용 기기(사장님 폰·태블릿)</b>에서 알바생이 직접 출근·퇴근을 찍게 하려면 아래를 한 번만 해 두세요.</p>
             <ol>
               <li>알바생마다 <b>[정산 설정]</b>(컴퓨터는 왼쪽 입력칸)의 <b>"출퇴근 비밀번호"</b>를 정해 줍니다. 비밀번호가 없는 알바생은 출퇴근을 찍을 수 없습니다.</li>
-              <li><b>설정 → 관리자 비밀번호</b>를 정합니다. 처음 직원을 추가하면 안내창이 뜨는데, 바로 정하거나 <b>[나중에]</b>를 눌러 나중에 정해도 됩니다. 정하면 평소에는 <b>⏱️ 출퇴근 화면만</b> 보이고, 급여·위생·설정은 <b>[🔒 관리자]</b>를 눌러 비밀번호를 입력해야 열립니다. 아무것도 안 하면 10분 뒤 자동으로 다시 잠깁니다.</li>
+              <li><b>설정 → 관리자 비밀번호</b>를 정합니다. 처음 직원을 추가하면 안내창이 뜨는데, 바로 정하거나 <b>[나중에]</b>를 눌러 나중에 정해도 됩니다. 정하면 평소에는 <b>⏱️ 출퇴근 화면만</b> 보이고, 급여·위생·설정은 <b>[관리자]</b>를 눌러 비밀번호를 입력해야 열립니다. 아무것도 안 하면 10분 뒤 자동으로 다시 잠깁니다.</li>
               <li><b>구글 저장</b>을 연동해 두세요. 출퇴근 기록이 시트에 쌓이고, 기기가 바뀌어도 기록이 남습니다. 연동이 안 되어 있으면 출퇴근 화면에 붉은 경고가 보입니다.</li>
               <li>사장님 폰·PC로도 함께 보거나 고친다면, 매장 기기에서 <b>설정 → 출퇴근 기기 → [이 기기를 출퇴근 기기로 지정]</b>을 눌러 두세요. 매장 기기만 시트에 저장하고 다른 기기의 수정은 요청으로 받아 반영해서, 기기끼리 기록을 덮어쓰지 않습니다. (아래 [구글 시트 자동 저장] 참고)</li>
               <li><b>설정 → 출퇴근 시간 끊기</b>에서 시간 끊는 단위, 지각·조기퇴근 봐주기, <b>자동 퇴근 시각</b>을 매장에 맞게 정합니다. (바로 아래 [출퇴근 시간은 어떻게 기록되나요] 참고)</li>
@@ -1178,10 +1179,10 @@
     </div>
   </div>
 
-  <script src="./engine.js?v=202611282300"></script>
-  <script src="./lang_web.js?v=202611282300"></script>
-  <script src="./i18n.js?v=202611282300"></script>
-  <script src="./gsync.js?v=202611282300"></script>
-  <script src="./app.js?v=202611282300"></script>
+  <script src="./engine.js?v=202611290100"></script>
+  <script src="./lang_web.js?v=202611290100"></script>
+  <script src="./i18n.js?v=202611290100"></script>
+  <script src="./gsync.js?v=202611290100"></script>
+  <script src="./app.js?v=202611290100"></script>
 </body>
 </html>

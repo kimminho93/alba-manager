@@ -2883,3 +2883,30 @@ body:not(.money-show) .money-bar .mb-amt::after { color: inherit; opacity: .75; 
 }
 @media print { #chkFormList .chk-seg { display: none; } }
 #chkFormList .chk-gcount, #chkFormList .chk-gneed { flex: none; white-space: nowrap; }
+
+/* ==========================================================
+   시안 I 5단계: 머리띠·설정 (docs/design/PATCH_PLAN_I.md)
+   - 위쪽 ? 버튼은 없앤다(사용 방법은 설정 맨 아래 [사용 방법 보기]). 요소는 JS가 참조해서 남겨 두고 숨김
+   - 관리자 버튼: 이모지 대신 선 아이콘(잠김/열림)
+   - 넓은 화면(1300px 이상) 왼쪽 메뉴 맨 위에 가게 이름
+   ========================================================== */
+#helpBtn { display: none !important; }
+.lock-btn { display: inline-flex; align-items: center; gap: 5px; }
+.lock-btn[hidden] { display: none; }
+.lock-btn::before {
+  content: ''; flex: none; width: 15px; height: 15px; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.lock-btn.is-open::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 7.8-1.2'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 7.8-1.2'/%3E%3C/svg%3E");
+}
+nav.tabs .tabs-store { display: none; }
+@media screen and (min-width: 1300px) {
+  nav.tabs .tabs-store {
+    display: block; padding: 6px 14px 16px; margin-bottom: 4px; border-bottom: 1px solid var(--line);
+    font-size: 16px; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  nav.tabs .tabs-store:empty { display: none; }
+}

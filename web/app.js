@@ -210,6 +210,8 @@
           b.classList.toggle('active', active);
           b.setAttribute('aria-selected', active ? 'true' : 'false');
         });
+        // 사용 방법은 설정 안으로 옮겼으므로, 사용 방법이 열려 있을 때는 [설정] 메뉴를 켜진 것처럼 보인다(표시만)
+        if (target === 'guide') { var st = document.querySelector('.tabs .tab[data-tab="settings"]'); if (st) st.classList.add('active'); }
         document.body.classList.toggle('on-punch', target === 'punch');
         document.querySelectorAll('.tab-panel').forEach(function (panel) {
           panel.classList.toggle('active', panel.id === 'tab-' + target);
@@ -2517,7 +2519,10 @@
     var locked = isLocked();
     document.body.classList.toggle('locked', locked);
     $('lockBtn').hidden = !pin;
-    $('lockBtn').textContent = locked ? tr('🔒 관리자') : tr('🔓 잠그기');
+    // 아이콘은 CSS(.lock-btn::before). "관리자"는 시트 탭 이름으로도 쓰여 사전에 넣지 않고 언어별 글자를 바로 넣는다
+    var enL = E.getLang() === 'en';
+    $('lockBtn').textContent = locked ? (enL ? 'Admin' : '관리자') : (enL ? 'Lock' : '잠그기');
+    $('lockBtn').classList.toggle('is-open', !locked);
     if (typeof healthDay === 'string' && $('bellBtn')) { renderHealth(); if (locked) closeHealth(); }
     $('pinState').textContent = (pin ? tr('· 설정됨') : tr('· 아직 없음')).replace(/^·\s*/, '');
     if (locked) openTab('punch');
@@ -3569,6 +3574,7 @@
     if (!(a && a.id === 'sOwnerName') || fromCloud) $('sOwnerName').value = owner;
     $('sOwnerName').setAttribute('data-was', owner);
     $('cStore').value = name;
+    if ($('railStore')) $('railStore').textContent = name || tr('사장님 도우미');   // 넓은 화면 왼쪽 메뉴 맨 위
     if (!$('cInspector').value || $('cInspector').value === oldOwner) $('cInspector').value = owner;
     recalcChecklist();
     renderSetSummaries();
@@ -3681,7 +3687,7 @@
       if (v.length < 4) { showToast(tr('관리자 비밀번호는 4자 이상으로 정해 주세요.')); return; }
       var msg = getPin()
         ? tr('관리자 비밀번호를 바꿉니다. 계속할까요?')
-        : tr('정하면 지금 바로 잠기고, 출퇴근 화면만 보이게 됩니다.\n다시 열 때는 위의 [🔒 관리자]를 눌러 이 비밀번호를 입력하세요.\n\n계속할까요?');
+        : tr('정하면 지금 바로 잠기고, 출퇴근 화면만 보이게 됩니다.\n다시 열 때는 위의 [관리자]를 눌러 이 비밀번호를 입력하세요.\n\n계속할까요?');
       if (!window.confirm(msg)) return;
       var go = function () { $('sAdminPin').value = ''; commitPin(v); };
       if (getPin()) { punchState.afterPin = go; openAdminPin(); $('adminPinErr').textContent = tr('지금 쓰는 관리자 비밀번호를 입력해 주세요.'); }   // 바꿀 때는 지금 비밀번호 확인
@@ -3757,6 +3763,7 @@
   /* 언어를 바꾸면 앱이 만든 화면 조각을 새 언어로 다시 그림 (입력값은 그대로) */
   window.addEventListener('alba:lang', function () {
     syncMoneyUi();   // [보기]/[숨기기]·줄 돈 보기 글자를 새 언어로
+    if ($('railStore')) $('railStore').textContent = ($('sStoreName') && $('sStoreName').value.trim()) || tr('사장님 도우미');   // 가게 이름이 비었을 때 대체 글자
     var checked = Array.prototype.map.call(document.querySelectorAll('#chkFormList input:checked'), function (el) { return el.value; });
     var opened = Array.prototype.map.call(document.querySelectorAll('#chkFormList details'), function (d) { return d.open; });   // 펼친 분류 기억
     buildChecklistForm();
